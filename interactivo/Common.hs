@@ -23,7 +23,7 @@ module Common where
                 deriving (Show, Eq)
 
 
-  data Tactic = Assumption | Apply Int | Intro deriving (Show)
+  data Tactic = Assumption | Apply String | Intro deriving (Show)
 
   -- Términos localmente sin nombres
   data Term  = Bound Int

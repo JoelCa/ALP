@@ -57,3 +57,18 @@ printType' False (Fun t1 t2) = printType' True t1 <+>
                                text "->"          <+> 
                                printType' False t2
 printType' True t            = PP.parens $ printType' False t
+
+printProof :: Int -> Context -> Type -> Doc
+printProof n c ty = printHypothesis n c $$
+                    text "-----------------" $$
+                    printType ty
+
+printHypothesis :: Int -> Context -> Doc
+printHypothesis 0 [] = empty
+printHypothesis 1 [x] = text "H0: " <>
+                        printType x
+printHypothesis n (x:xs) 
+  | n > 0 = printHypothesis (n-1) xs $$
+            text "H" <> text (show (n-1)) <>  text ": " <> printType x
+  | otherwise = error "error: print hipótesis, no debería pasar"
+printHypothesis _ _ = error "error: print hipótesis, no debería pasar"

@@ -45,7 +45,7 @@ termTac = do symbol "assumption"
              char '.'
              return Assumption
           <|> do symbol "apply"
-                 x <- natural --cambiar
+                 x <- identifier
                  char '.'
                  return (Apply x)
           <|> do symbol "intro" --cambiar

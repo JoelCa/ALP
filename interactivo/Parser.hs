@@ -3,15 +3,15 @@ module Parser where
 import Parsing
 import Common
 
-type Proof = Either String Command
+type Proof = Either ProofExceptions Command
 
 getCommand :: String -> Proof
 getCommand s = case parse exprTy s of
   [(x,[])] -> return $ Ty x
-  [(_,_)] -> fail "error sintaxis"
+  [(_,_)] -> Left SyntaxE
   [] -> case parse termTac s of
     [(x,[])] -> return $ Ta x
-    _ -> fail "error sintaxis"
+    _ -> Left SyntaxE
 
 
 exprTy :: Parser Type

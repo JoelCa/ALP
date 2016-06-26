@@ -4,21 +4,19 @@ import Data.List
 import Common
 import Data.Char (isDigit)
 
-type EmptyTerm = Term->Term
-
-habitar :: (Int, Context, Type, Maybe EmptyTerm) -> Tactic -> Either ProofExceptions (Int, Context, Type, Either Term EmptyTerm)
-habitar (n, c, t, Just empTerm) Assumption = do i <- maybeToEither AssuE (t `elemIndex` c)
-                                                return (n, c,t, Left $ empTerm $ Bound i)
-habitar (n, c, Fun t1 t2, Just empTerm) Intro = return (n+1,t1:c,t2, Right $ empTerm . (\x -> Lam t1 x))
-habitar (n, c, Fun t1 t2, Nothing) Intro = return (n+1,t1:c,t2, Right (\x -> Lam t1 x))
+habitar :: ProofState -> Tactic -> Either ProofExceptions ProofState
+habitar (PState {position=n, context=c, ty=t, term=EmptyTerm empTerm}) Assumption = do i <- maybeToEither AssuE (t `elemIndex` c)
+                                                                                       return (PState {position=n, context=c, ty=t, term=Term $ empTerm $ Bound i})
+habitar (PState {position=n, context=c, ty=Fun t1 t2, term=EmptyTerm empTerm}) Intro = return (PState {position=n+1,context=t1:c, ty=t2, term=EmptyTerm $ empTerm . (\x -> Lam t1 x)})
+habitar (PState {position=n, context=c, ty=Fun t1 t2, term=Nil}) Intro = return (PState {position=n+1,context=t1:c,ty=t2, term=EmptyTerm (\x -> Lam t1 x)})
 habitar _ Intro = Left IntroE
-habitar (n, c, t, Just empTerm) (Apply h) = do i <- getHypothesisValue n h
-                                               t1 <- getType t (c !! (n-i-1))
-                                               return (n,c,t1, Right $ empTerm . (\x -> (Bound i) :@: x))
-habitar (n, c, t, Nothing) (Apply h) = do i <- getHypothesisValue n h
-                                          t1 <- getType t (c !! (n-i-1))
-                                          return (n,c,t1, Right (\x -> (Bound i) :@: x))
-habitar (n, c, t,Nothing) _ = Left CommandInvalid
+habitar (PState {position=n,context=c, ty=t, term=EmptyTerm empTerm}) (Apply h) = do i <- getHypothesisValue n h
+                                                                                     t1 <- getType t (c !! (n-i-1))
+                                                                                     return (PState {position=n, context=c, ty=t1, term=EmptyTerm $ empTerm . (\x -> (Bound i) :@: x)})
+habitar (PState {position=n, context= c, ty= t, term=Nil}) (Apply h) = do i <- getHypothesisValue n h
+                                                                          t1 <- getType t (c !! (n-i-1))
+                                                                          return (PState {position=n, context=c, ty=t1, term=EmptyTerm (\x -> (Bound i) :@: x)})
+habitar (PState {position=n, context=c, ty=t, term=Nil}) _ = Left CommandInvalid
 
 
 getType :: Type -> Type -> Either ProofExceptions Type

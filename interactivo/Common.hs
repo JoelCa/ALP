@@ -53,3 +53,11 @@ data ProofExceptions = PNotFinished | PNotStarted | SyntaxE | AssuE | IntroE | A
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
+
+data ProofState = PState {position :: Int
+                         , context :: Context
+                         , ty :: Type
+                         , term :: SpecialTerm
+                         }
+                                    
+data SpecialTerm = EmptyTerm (Term->Term) | Term Term | Nil

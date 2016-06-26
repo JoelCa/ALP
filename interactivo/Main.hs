@@ -6,47 +6,71 @@ import Common
 import Text.PrettyPrint.HughesPJ (render)
 import PrettyPrinter (printTerm, printProof)
 import System.Console.Haskeline.MonadException
+import Control.Monad.Trans.Class
+import Control.Monad.State.Strict
+import Control.Monad.IO.Class
+import Data.Maybe
+
+-- import System.Console.Haskeline.MonadException
+
+-- import Control.Monad.Trans.State
+-- import Control.Monad.Trans.Class
+                                                             
+type ProofInputState a = InputT (StateT (Maybe ProofState) IO) a
 
 
 main :: IO ()
 main = do args <- getArgs
           if args == []
-            then runInputT defaultSettings (loop Nothing)
+            then evalStateT (runInputT defaultSettings prover) Nothing
             else do putStrLn "aviso: hay argumentos!" --Tratar
-                    runInputT defaultSettings (loop Nothing)
+                    evalStateT (runInputT defaultSettings prover) Nothing
 
-
-loop :: Maybe (Int, Context, Type, Maybe EmptyTerm) -> InputT IO ()
-loop state = do minput <- getInputLine "> "
-                case minput of
-                  Nothing -> return ()
-                  Just "-quit" -> return ()
-                  Just x -> catch (do command <- returnInput $ getCommand x
-                                      analizadorTyTa command state) (\e -> errorMessage e >> loop state)
+prover :: ProofInputState ()
+prover = do minput <- getInputLine "> "
+            s <- lift get
+            when (isNothing s) (outputStrLn "Estado nulo")
+            case minput of
+              Nothing -> return ()
+              Just "-quit" -> do outputStrLn "Saliendo."
+                                 return ()
+              Just x -> catch (do command <- returnInput $ getCommand x
+                                  checkCommand command) (\e -> errorMessage e >> prover)
              
 
-analizadorTyTa :: Command -> Maybe (Int, Context, Type, Maybe EmptyTerm) -> InputT IO ()
-analizadorTyTa (Ty ty) (Just s) = throwIO PNotFinished
-analizadorTyTa (Ty ty) Nothing = do outputStrLn $ render $ printProof 0 [] ty
-                                    loop $ Just (0,[],ty, Nothing)
-analizadorTyTa (Ta ta) (Just s)= do s' <- returnInput $ habitar s ta
-                                    habitarCheck s s'
-analizadorTyTa (Ta ta) Nothing = throwIO PNotStarted
+checkCommand :: Command -> ProofInputState ()
+checkCommand (Ty ty) = do s <- lift get
+                          when (isJust s) (throwIO PNotFinished)
+                          outputStrLn $ render $ printProof 0 [] ty
+                          lift $ put $ Just $ PState {position=0, context=[], ty=ty, term=Nil}
+                          prover
+checkCommand (Ta ta) = do  s <- lift get
+                           when (isNothing s) (throwIO PNotStarted)
+                           proof <- returnInput $ habitar (fromJust s) ta
+                           lift $ put $ Just proof
+                           when (isFinalTerm proof) (outputStrLn ("prueba terminada\n" ++ render (printTerm (getTermFromProof proof))) >> resetProver)
+                           outputStrLn $ render $ printProof (position proof) (context proof) (ty proof)
+                           prover
 
 
-habitarCheck ::  (Int, Context, Type, Maybe EmptyTerm) -> (Int, Context, Type, Either Term EmptyTerm) -> InputT IO ()
-habitarCheck _ (_,_,_, Left term) = do outputStrLn "prueba terminada"
-                                       outputStrLn $ render $ printTerm term
-                                       loop Nothing
-habitarCheck _ (n,c,ty,Right empTerm) = do outputStrLn $ render $ printProof n c ty
-                                           loop $ Just (n, c, ty, Just empTerm)
-   
+resetProver :: ProofInputState ()
+resetProver = lift $ put Nothing
 
-returnInput :: Either ProofExceptions a -> InputT IO a
+isFinalTerm :: ProofState -> Bool
+isFinalTerm (PState {term=Term _, position=_, ty=_, context=_}) = True
+isFinalTerm _ = False
+
+getTermFromProof :: ProofState -> Term
+getTermFromProof (PState {term=Term t, position=_, ty=_, context=_}) = t
+getTermFromProof _ = error "getTermFromProof: no debería pasar"
+
+
+returnInput :: Either ProofExceptions a -> ProofInputState a
 returnInput (Left exception) = throwIO exception
 returnInput (Right x) = return x
 
-errorMessage :: ProofExceptions -> InputT IO ()
+
+errorMessage :: ProofExceptions -> ProofInputState ()
 errorMessage SyntaxE = outputStrLn "error sintaxis"
 errorMessage PNotFinished = outputStrLn "error: prueba no terminada"
 errorMessage PNotStarted = outputStrLn "error: prueba no comenzada"

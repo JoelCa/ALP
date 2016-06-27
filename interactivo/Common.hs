@@ -10,10 +10,10 @@ data Name
      =  Global  String
      |  Quote   Int
      deriving (Show, Eq)
-
-              -- Entornos
+              
+  -- Entornos
 type NameEnv v t = [(Name, (v, t))]
-
+    
 type Var = String
 
   -- Tipo de los tipos
@@ -60,4 +60,4 @@ data ProofState = PState {position :: Int
                          , term :: SpecialTerm
                          }
                                     
-data SpecialTerm = EmptyTerm (Term->Term) | Term Term | Nil
+data SpecialTerm = EmptyTerm (Term->Term) | Term Term

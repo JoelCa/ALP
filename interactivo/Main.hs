@@ -10,12 +10,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.State.Strict
 import Control.Monad.IO.Class
 import Data.Maybe
-
--- import System.Console.Haskeline.MonadException
-
--- import Control.Monad.Trans.State
--- import Control.Monad.Trans.Class
-                                                             
+  
 type ProofInputState a = InputT (StateT (Maybe ProofState) IO) a
 
 
@@ -35,14 +30,14 @@ prover = do minput <- getInputLine "> "
               Just "-quit" -> do outputStrLn "Saliendo."
                                  return ()
               Just x -> catch (do command <- returnInput $ getCommand x
-                                  checkCommand command) (\e -> errorMessage e >> prover)
+                                  checkCommand command) (\e -> errorMessage (e :: ProofExceptions) >> prover)
              
 
 checkCommand :: Command -> ProofInputState ()
 checkCommand (Ty ty) = do s <- lift get
                           when (isJust s) (throwIO PNotFinished)
                           outputStrLn $ render $ printProof 0 [] ty
-                          lift $ put $ Just $ PState {position=0, context=[], ty=ty, term=Nil}
+                          lift $ put $ Just $ PState {position=0, context=[], ty=ty, term=EmptyTerm id}
                           prover
 checkCommand (Ta ta) = do  s <- lift get
                            when (isNothing s) (throwIO PNotStarted)

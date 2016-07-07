@@ -5,6 +5,8 @@ import Common
 
 type Proof = Either ProofExceptions Command
 
+reservedWords = ["forall", "exists"]
+
 getCommand :: String -> Proof
 getCommand s = case parse exprTy s of
   [(x,[])] -> return $ Ty x
@@ -17,7 +19,7 @@ getCommand s = case parse exprTy s of
 exprTy :: Parser Type
 exprTy = do symbol "Theorem"
             t <- exprTy'
-            char '.' -- NO puedo usar '\n' como fin del comando, por que symbol lo come
+            symbol "." -- NO puedo usar '\n' como fin del comando, por que symbol lo come
             return t
              
 exprTy' :: Parser Type
@@ -26,13 +28,18 @@ exprTy' = do t <- termTy
                  e <- exprTy'
                  return (Fun t e)
               <|> return t)
-
+          <|> do symbol "forall"
+                 t <- validIdentifier reservedWords --Algo está mal con la E de exists
+                 symbol ","
+                 e <- exprTy'
+                 return (ForAll t e)
+                           
 termTy :: Parser Type
 termTy = do char '('
             e <- exprTy'
             char ')'
             return e
-         <|> do v <- identifier
+         <|> do v <- validIdentifier reservedWords
                 return (B v)
               
 -- exprTac :: Parser [Tactics]
@@ -45,7 +52,7 @@ termTac = do symbol "assumption"
              char '.'
              return Assumption
           <|> do symbol "apply"
-                 x <- identifier
+                 x <- validIdentifier reservedWords
                  char '.'
                  return (Apply x)
           <|> do symbol "intro" --cambiar

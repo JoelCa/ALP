@@ -22,6 +22,10 @@ fv (Free (Global n)) = [n]
 fv (Free (Quote _))  = []
 fv (t :@: u)         = fv t ++ fv u
 fv (Lam _ u)         = fv u
+fv (t :!: (B ty))    = ty : (fv t)
+fv (t :!: _)         = fv t
+fv (BLam ty u)       = ty : (fv u)
+
 
 -- pretty-printer de términos
 printTerm :: Term -> Doc 
@@ -32,19 +36,26 @@ parenIf False d   = d
 parenIf True d    = PP.parens d
 
 printTerm' :: Int -> [String] -> [String] -> Term -> Doc
-printTerm' _ bs _  (Bound j)             = text $ bs !! j
-printTerm' _ _  _  (Free (Global n))     = text n
-printTerm' _ _  _  (Free (Quote n))      = text "quoted"<>text (show n)
-printTerm' i bs fs (t :@: u)             = parenIf (i < 1) $ 
-                                            printTerm' 2 bs fs t <+> 
-                                            printTerm' 0 bs fs u
-printTerm' i bs (f:fs) (Lam t u)         = parenIf (i > 1) $ 
-                                            text "\\" <> 
-                                            text f <> 
-                                            text ":" <> 
-                                            printType t <> 
-                                            text "." <> 
-                                            printTerm' 1 (f:bs) fs u
+printTerm' _ bs _  (Bound j)         = text $ bs !! j
+printTerm' _ _  _  (Free (Global n)) = text n
+printTerm' _ _  _  (Free (Quote n))  = text "quoted"<>text (show n)
+printTerm' i bs fs (t :@: u)         = parenIf (i < 1) $ 
+                                       printTerm' 2 bs fs t <+> 
+                                       printTerm' 0 bs fs u
+printTerm' i bs (f:fs) (Lam t u)     = parenIf (i > 1) $ 
+                                       text "\\" <> 
+                                       text f <> 
+                                       text ":" <> 
+                                       printType t <> 
+                                       text "." <> 
+                                       printTerm' 1 (f:bs) fs u
+printTerm' i bs fs (BLam t u)        = parenIf (i > 1) $  -- Chequear "parenIf"
+                                       text "\\" <> 
+                                       text t <> 
+                                       text "." <> 
+                                       printTerm' 1 bs fs u
+printTerm' i bs fs (t :!: ty)        = printTerm' 2 bs fs t <+> -- Chequear valores de "i"
+                                       printType ty
 printTerm' _ _  [] (Lam _ _)         = error "prinTerm': no hay nombres para elegir"
 
 -- pretty-printer de tipos
@@ -56,6 +67,10 @@ printType' _ (B v)           = text v
 printType' False (Fun t1 t2) = printType' True t1 <+> 
                                text "->"          <+> 
                                printType' False t2
+printType' False (ForAll v t) = text "forall" <+>
+                                text v <>
+                                text "," <+>
+                                printType' False t
 printType' True t            = PP.parens $ printType' False t
 
 printProof :: Int -> Context -> Type -> Doc

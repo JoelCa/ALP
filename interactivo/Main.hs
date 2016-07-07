@@ -21,16 +21,40 @@ main = do args <- getArgs
             else do putStrLn "aviso: hay argumentos!" --Tratar
                     evalStateT (runInputT defaultSettings prover) Nothing
 
+
 prover :: ProofInputState ()
 prover = do minput <- getInputLine "> "
-            s <- lift get
-            when (isNothing s) (outputStrLn "Estado nulo")
             case minput of
               Nothing -> return ()
               Just "-quit" -> do outputStrLn "Saliendo."
                                  return ()
-              Just x -> catch (do command <- returnInput $ getCommand x
-                                  checkCommand command) (\e -> errorMessage (e :: ProofExceptions) >> prover)
+              Just x -> do minput <- getInputLine "> "
+                           case minput of
+                             Nothing -> return ()
+                             Just y -> do command1 <- returnInput $ getCommand x
+                                          command2 <- returnInput $ getCommand y
+                                          probando command1 command2
+
+probando :: Command -> Command -> ProofInputState ()
+probando (Ty ty1) (Ty ty2) = do let (t,t') = (typeWithoutName ty1, typeWithoutName ty2)
+                                outputStrLn $ show $ t
+                                outputStrLn $ show $ t'
+                                case t of
+                                  TForAll tt -> do outputStrLn $ show $ unification tt t'
+                                                   prover
+                                  _ -> prover
+probando _ _ = prover
+
+-- prover :: ProofInputState ()
+-- prover = do minput <- getInputLine "> "
+--             s <- lift get
+--             when (isNothing s) (outputStrLn "Estado nulo")
+--             case minput of
+--               Nothing -> return ()
+--               Just "-quit" -> do outputStrLn "Saliendo."
+--                                  return ()
+--               Just x -> catch (do command <- returnInput $ getCommand x
+--                                   checkCommand command) (\e -> errorMessage (e :: ProofExceptions) >> prover)
              
 
 checkCommand :: Command -> ProofInputState ()
@@ -43,8 +67,10 @@ checkCommand (Ta ta) = do  s <- lift get
                            when (isNothing s) (throwIO PNotStarted)
                            proof <- returnInput $ habitar (fromJust s) ta
                            lift $ put $ Just proof
-                           when (isFinalTerm proof) (outputStrLn ("prueba terminada\n" ++ render (printTerm (getTermFromProof proof))) >> resetProver)
-                           outputStrLn $ render $ printProof (position proof) (context proof) (ty proof)
+                           if (isFinalTerm proof)
+                             then (outputStrLn ("prueba terminada\n" ++ render (printTerm (getTermFromProof proof)))
+                                    >> resetProver)
+                             else outputStrLn $ render $ printProof (position proof) (context proof) (ty proof)
                            prover
 
 
@@ -70,7 +96,8 @@ errorMessage SyntaxE = outputStrLn "error sintaxis"
 errorMessage PNotFinished = outputStrLn "error: prueba no terminada"
 errorMessage PNotStarted = outputStrLn "error: prueba no comenzada"
 errorMessage AssuE = outputStrLn "error: comando assumption mal aplicado"
-errorMessage IntroE = outputStrLn "error: comando intro mal aplicado"
+errorMessage IntroE1 = outputStrLn "error: comando intro mal aplicado"
+errorMessage IntroE2 = outputStrLn "error: comando intro, variable no tipo libre"
 errorMessage ApplyE1 = outputStrLn "error: comando apply mal aplicado, función no coincide tipo"
 errorMessage ApplyE2 = outputStrLn "error: comando apply mal aplicado, no es función"
 errorMessage ApplyE3 = outputStrLn "error: comando apply, hipótesis incorrecta"

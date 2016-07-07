@@ -19,8 +19,15 @@ type Var = String
   -- Tipo de los tipos
 data Type = B Var
           | Fun Type Type
+          | ForAll Var Type
           deriving (Show, Eq)
   
+  -- Tipo de los tipos localmente sin nombre
+data TType = TB Name
+          | TFun TType TType
+          | TForAll TType
+          deriving (Show, Eq)
+
   -- Términos con nombres (NO seria necesario)
 data LamTerm  =  LVar String
               |  Abs String Type LamTerm
@@ -29,14 +36,13 @@ data LamTerm  =  LVar String
 
 data Tactic = Assumption | Apply String | Intro deriving (Show)
 
-  -- Términos localmente sin nombres
+  -- Términos pseudo localmente sin nombres
 data Term  = Bound Int
            | Free Name 
            | Term :@: Term
            | Lam Type Term
-           | Let2 Name Term Term
-           | As2 Term Type
-           | Unit2
+           | BLam Var Term
+           | Term :!: Type
            deriving (Show, Eq)
 
   -- Valores
@@ -48,7 +54,7 @@ type Context = [Type]
   --Comandos
 data Command = Ty Type | Ta Tactic deriving (Show)
 
-data ProofExceptions = PNotFinished | PNotStarted | SyntaxE | AssuE | IntroE | ApplyE1 | ApplyE2 |
+data ProofExceptions = PNotFinished | PNotStarted | SyntaxE | AssuE | IntroE1 | IntroE2 | ApplyE1 | ApplyE2 |
                        ApplyE3 | CommandInvalid
                      deriving (Show, Typeable)
                               

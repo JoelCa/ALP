@@ -24,38 +24,15 @@ main = do args <- getArgs
 
 prover :: ProofInputState ()
 prover = do minput <- getInputLine "> "
+            s <- lift get
+            when (isNothing s) (outputStrLn "Estado nulo")
             case minput of
               Nothing -> return ()
               Just "-quit" -> do outputStrLn "Saliendo."
                                  return ()
-              Just x -> do minput <- getInputLine "> "
-                           case minput of
-                             Nothing -> return ()
-                             Just y -> do command1 <- returnInput $ getCommand x
-                                          command2 <- returnInput $ getCommand y
-                                          probando command1 command2
+              Just x -> catch (do command <- returnInput $ getCommand x
+                                  checkCommand command) (\e -> errorMessage (e :: ProofExceptions) >> prover)
 
-probando :: Command -> Command -> ProofInputState ()
-probando (Ty ty1) (Ty ty2) = do let (t,t') = (typeWithoutName ty1, typeWithoutName ty2)
-                                outputStrLn $ show $ t
-                                outputStrLn $ show $ t'
-                                case t of
-                                  TForAll tt -> do outputStrLn $ show $ unification tt t'
-                                                   prover
-                                  _ -> prover
-probando _ _ = prover
-
--- prover :: ProofInputState ()
--- prover = do minput <- getInputLine "> "
---             s <- lift get
---             when (isNothing s) (outputStrLn "Estado nulo")
---             case minput of
---               Nothing -> return ()
---               Just "-quit" -> do outputStrLn "Saliendo."
---                                  return ()
---               Just x -> catch (do command <- returnInput $ getCommand x
---                                   checkCommand command) (\e -> errorMessage (e :: ProofExceptions) >> prover)
-             
 
 checkCommand :: Command -> ProofInputState ()
 checkCommand (Ty ty) = do s <- lift get
@@ -99,6 +76,7 @@ errorMessage AssuE = outputStrLn "error: comando assumption mal aplicado"
 errorMessage IntroE1 = outputStrLn "error: comando intro mal aplicado"
 errorMessage IntroE2 = outputStrLn "error: comando intro, variable no tipo libre"
 errorMessage ApplyE1 = outputStrLn "error: comando apply mal aplicado, función no coincide tipo"
-errorMessage ApplyE2 = outputStrLn "error: comando apply mal aplicado, no es función"
-errorMessage ApplyE3 = outputStrLn "error: comando apply, hipótesis incorrecta"
+errorMessage ApplyE2 = outputStrLn "error: comando apply mal aplicado, hipótesis no es función ni cuantificación"
+errorMessage ApplyE3 = outputStrLn "error: comando apply, hipótesis no existe"
+errorMessage Unif = outputStrLn "error: unificación inválida"
 errorMessage CommandInvalid = outputStrLn "error: comando inválido"

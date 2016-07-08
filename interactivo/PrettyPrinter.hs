@@ -22,9 +22,15 @@ fv (Free (Global n)) = [n]
 fv (Free (Quote _))  = []
 fv (t :@: u)         = fv t ++ fv u
 fv (Lam _ u)         = fv u
-fv (t :!: (B ty))    = ty : (fv t)
 fv (t :!: _)         = fv t
-fv (BLam ty u)       = ty : (fv u)
+fv (BLam _ u)        = fv u
+
+
+fvType :: TType -> [String]
+fvType (TBound  _) = []
+fvType (TFree n) = [n]
+fvType (TFun t u) = fvType t ++ fvType u
+fvType (TForAll t) = fvType t
 
 
 -- pretty-printer de términos
@@ -55,10 +61,28 @@ printTerm' i bs fs (BLam t u)        = parenIf (i > 1) $  -- Chequear "parenIf"
                                        text "." <> 
                                        printTerm' 1 bs fs u
 printTerm' i bs fs (t :!: ty)        = printTerm' 2 bs fs t <+> -- Chequear valores de "i"
-                                       printType ty
+                                       printTType ty
 printTerm' _ _  [] (Lam _ _)         = error "prinTerm': no hay nombres para elegir"
 
+
 -- pretty-printer de tipos
+printTType :: TType -> Doc
+printTType t = printTType' 1 [] (vars \\ fvType t) t
+
+-- Chequear si es necesario usar parenIf
+printTType' :: Int -> [String] -> [String] -> TType -> Doc
+printTType' _ bs _ (TBound n) = text $ bs !! n
+printTType' _ bs _ (TFree n) = text n
+printTType' i bs fs (TFun t u) = parenIf (i < 1) $ 
+                                 printTType' 2 bs fs t <+>
+                                 text "->" <+>
+                                 printTType' 0 bs fs u
+printTType' i bs (f:fs) (TForAll t) =  parenIf (i > 1) $ 
+                                       text "\\" <> 
+                                       text f <> 
+                                       text "." <> 
+                                       printTType' 1 (f:bs) fs t
+
 printType :: Type -> Doc
 printType = printType' False
 
@@ -85,5 +109,5 @@ printHypothesis 1 [x] = text "H0: " <>
 printHypothesis n (x:xs) 
   | n > 0 = printHypothesis (n-1) xs $$
             text "H" <> text (show (n-1)) <>  text ": " <> printType x
-  | otherwise = error "error: print hipótesis, no debería pasar"
-printHypothesis _ _ = error "error: print hipótesis, no debería pasar"
+  | otherwise = error "error: printHypothesis, no debería pasar"
+printHypothesis _ _ = error "error: printHypothesis, no debería pasar"

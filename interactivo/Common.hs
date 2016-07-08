@@ -23,10 +23,11 @@ data Type = B Var
           deriving (Show, Eq)
   
   -- Tipo de los tipos localmente sin nombre
-data TType = TB Name
-          | TFun TType TType
-          | TForAll TType
-          deriving (Show, Eq)
+data TType = TBound Int
+           | TFree Var
+           | TFun TType TType
+           | TForAll TType
+           deriving (Show, Eq)
 
   -- Términos con nombres (NO seria necesario)
 data LamTerm  =  LVar String
@@ -34,15 +35,13 @@ data LamTerm  =  LVar String
               |  App LamTerm LamTerm
               deriving (Show, Eq)
 
-data Tactic = Assumption | Apply String | Intro deriving (Show)
-
   -- Términos pseudo localmente sin nombres
 data Term  = Bound Int
            | Free Name 
            | Term :@: Term
            | Lam Type Term
            | BLam Var Term
-           | Term :!: Type
+           | Term :!: TType
            deriving (Show, Eq)
 
   -- Valores
@@ -54,12 +53,19 @@ type Context = [Type]
   --Comandos
 data Command = Ty Type | Ta Tactic deriving (Show)
 
+  -- Tácticas
+data Tactic = Assumption | Apply String | Intro deriving (Show)
+
+
+  -- Excepciones
 data ProofExceptions = PNotFinished | PNotStarted | SyntaxE | AssuE | IntroE1 | IntroE2 | ApplyE1 | ApplyE2 |
-                       ApplyE3 | CommandInvalid
+                       ApplyE3 | ApplyE4 | Unif | CommandInvalid
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
 
+
+  -- Estado de la prueba
 data ProofState = PState {position :: Int
                          , context :: Context
                          , ty :: Type

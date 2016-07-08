@@ -7,7 +7,7 @@ import Data.List (elemIndex)
 habitar :: ProofState -> Tactic -> Either ProofExceptions ProofState
 habitar (PState {position=n, context=c, ty=t, term=EmptyTerm empTerm}) Assumption = do i <- maybeToEither AssuE (t `elemIndex` c)
                                                                                        return $ PState {position=n, context=c, ty=t, term=Term $ empTerm $ Bound i}
-                                                                                       
+
 habitar (PState {position=n, context=c, ty=Fun t1 t2, term=EmptyTerm empTerm}) Intro = return $ PState {position=n+1,context=t1:c, ty=t2, term=EmptyTerm $ empTerm . (\x -> Lam t1 x)}
 
 habitar (PState {position=n, context=c, ty=ForAll q t, term=EmptyTerm empTerm}) Intro = if not $ isFreeType q c
@@ -16,11 +16,20 @@ habitar (PState {position=n, context=c, ty=ForAll q t, term=EmptyTerm empTerm}) 
                                                                                              
 habitar _ Intro = throwError IntroE1
 
-habitar (PState {position=n,context=c, ty=t, term=EmptyTerm empTerm}) (Apply h) = do i <- getHypothesisValue n h
-                                                                                     t1 <- getType t (c !! (n-i-1))
-                                                                                     return (PState {position=n, context=c, ty=t1, term=EmptyTerm $ empTerm . (\x -> (Bound i) :@: x)})
+habitar st@(PState {position=n,context=c}) (Apply h) = do i <- getHypothesisValue n h
+                                                          applyComm i st (c !! (n-i-1))
                                                                                      
-habitar (PState {position=n, context=c, ty=t, term=Term _}) _ = throwError CommandInvalid
+habitar (PState {term=Term _}) _ = throwError CommandInvalid
+
+
+applyComm :: Int -> ProofState -> Type -> Either ProofExceptions ProofState
+applyComm i (PState {position=n, context=c, ty=t, term=EmptyTerm empTerm}) (Fun t1 t2)
+  | t == t2 = return $ PState {position=n, context=c, ty=t1, term=EmptyTerm $ empTerm . (\x -> (Bound i) :@: x)}
+  | otherwise = throwError ApplyE1
+applyComm i (PState {position=n, context=c, ty=t, term=EmptyTerm empTerm}) t'@(ForAll v t1) = do let (tt, tt') = (typeWithoutName t, typeWithoutName t')
+                                                                                                 x <- unification tt' tt
+                                                                                                 return $ PState {position=n, context=c, ty=t, term=Term $ empTerm $ (Bound i) :!: x}
+applyComm _ _ _ = throwError ApplyE2
 
 
 isFreeType' :: Var -> Type -> Bool
@@ -33,13 +42,6 @@ isFreeType' q (ForAll p a)
 isFreeType :: Var -> Context -> Bool
 isFreeType q [] = False
 isFreeType q (x:xs) = isFreeType' q x || isFreeType q xs
-
-
-getType :: Type -> Type -> Either ProofExceptions Type
-getType t (Fun t' t'')
-  | t'' == t = return t'
-  | otherwise = throwError ApplyE1
-getType _ _ = throwError ApplyE2
 
 
 getHypothesisValue :: Int -> String -> Either ProofExceptions Int
@@ -72,39 +74,40 @@ typeWithoutName :: Type -> TType
 typeWithoutName = typeWithoutName' []
 
 typeWithoutName' :: [String] -> Type -> TType
-typeWithoutName' xs (B t) = TB $ maybe (Global t) Quote (t `elemIndex` xs)
+typeWithoutName' xs (B t) = maybe (TFree t) TBound (t `elemIndex` xs)
 typeWithoutName' xs (Fun t t') = TFun (typeWithoutName' xs t) (typeWithoutName' xs t')
 typeWithoutName' xs (ForAll v t) = TForAll $ typeWithoutName' (v:xs) t
 
 
-unification :: TType -> TType -> Either String TType
-unification = unif 0 Nothing
+unification :: TType -> TType -> Either ProofExceptions TType
+unification (TForAll t) = unif 0 Nothing t
+unification _  =  error "no deberia pasar, unificación"
 
-unif :: Int -> Maybe TType -> TType -> TType -> Either String TType
-unif pos (Just (TB (Quote 0))) t t' = unif pos Nothing t t'
-unif pos sust t@(TB (Quote n)) t'
+unif :: Int -> Maybe TType -> TType -> TType -> Either ProofExceptions TType
+unif pos (Just (TBound 0)) t t' = unif pos Nothing t t'
+unif pos sust t@(TBound n) t'
   | t == t' = case sust of
-    Nothing -> return $ TB $ Quote 0
+    Nothing -> return $ TBound 0
     Just s -> return s
   | n == pos = case sust of
     Nothing -> if isFreeTypeVar (pos-1) t'
-               then throwError $ "no unifican"
+               then throwError Unif
                else return t'
     Just s -> if s == t'
               then return s
-              else throwError $ "no unifican"
-  | otherwise = throwError $ "no unifican"
+              else throwError Unif
+  | otherwise = throwError Unif
 unif pos sust (TFun t1 t1') (TFun t2 t2') = do res <- unif pos sust t1 t2
                                                unif pos (Just res) t1' t2'
 unif pos sust (TForAll t) (TForAll t') = unif (pos+1) sust t t'
 unif pos sust t t'
-  | t == t' = return $ TB $ Quote 0
-  | otherwise = throwError $ "no unifican"
+  | t == t' = return $ TBound 0
+  | otherwise = throwError Unif
 
 
 isFreeTypeVar :: Int -> TType -> Bool
-isFreeTypeVar n (TB (Quote m)) = n == m
-isFreeTypeVar n (TB (Global _)) = False
+isFreeTypeVar n (TBound m) = n == m
+isFreeTypeVar n (TFree _) = False
 isFreeTypeVar n (TFun t t') = isFreeTypeVar n t && isFreeTypeVar n t'
 isFreeTypeVar n (TForAll t) = isFreeTypeVar (n+1) t
 

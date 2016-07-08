@@ -2,18 +2,20 @@ module Asistente where
 
 import Common
 import Data.Char (isDigit)
-import Data.List (elemIndex)
+import Data.List (findIndex, elemIndex)
 
 habitar :: ProofState -> Tactic -> Either ProofExceptions ProofState
-habitar (PState {position=n, context=c, ty=t, term=EmptyTerm empTerm}) Assumption = do i <- maybeToEither AssuE (t `elemIndex` c)
-                                                                                       return $ PState {position=n, context=c, ty=t, term=Term $ empTerm $ Bound i}
+habitar (PState {position=n, context=c, ty=(t, tw), term=EmptyTerm empTerm}) Assumption =
+  do i <- maybeToEither AssuE (findIndex (\x->snd x == tw) c)
+     return $ PState {position=n, context=c, ty=(t,tw), term=Term $ empTerm $ Bound i}
 
-habitar (PState {position=n, context=c, ty=Fun t1 t2, term=EmptyTerm empTerm}) Intro = return $ PState {position=n+1,context=t1:c, ty=t2, term=EmptyTerm $ empTerm . (\x -> Lam t1 x)}
+habitar (PState {position=n, context=c, ty=(Fun t1 t2, TFun t1' t2'), term=EmptyTerm empTerm}) Intro =
+  return $ PState {position=n+1,context=(t1,t1'):c, ty=(t2, t2'), term=EmptyTerm $ empTerm . (\x -> Lam t1 x)}
 
-habitar (PState {position=n, context=c, ty=ForAll q t, term=EmptyTerm empTerm}) Intro = if not $ isFreeType q c
-                                                                                        then return $ PState {position=n,context=c, ty=t, term=EmptyTerm $ empTerm . (\x -> BLam q x)}
-                                                                                        else throwError IntroE2
-                                                                                             
+habitar (PState {position=n, context=c, ty=(ForAll q t, TForAll t'), term=EmptyTerm empTerm}) Intro
+  | not $ isFreeType q c = return $ PState {position=n,context=c, ty=(t, t'), term=EmptyTerm $ empTerm . (\x -> BLam q x)}
+  | otherwise = throwError IntroE2
+
 habitar _ Intro = throwError IntroE1
 
 habitar st@(PState {position=n,context=c}) (Apply h) = do i <- getHypothesisValue n h
@@ -21,27 +23,28 @@ habitar st@(PState {position=n,context=c}) (Apply h) = do i <- getHypothesisValu
                                                                                      
 habitar (PState {term=Term _}) _ = throwError CommandInvalid
 
+habitar _ _ = error "error: no debería pasar, habitar"
 
-applyComm :: Int -> ProofState -> Type -> Either ProofExceptions ProofState
-applyComm i (PState {position=n, context=c, ty=t, term=EmptyTerm empTerm}) (Fun t1 t2)
-  | t == t2 = return $ PState {position=n, context=c, ty=t1, term=EmptyTerm $ empTerm . (\x -> (Bound i) :@: x)}
+
+-- Asumimos que las tuplas del 2º arg. de applyComm, tienen la forma correcta.
+applyComm :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
+applyComm i (PState {position=n, context=c, ty=(t, t'), term=EmptyTerm empTerm}) (Fun t1 t2, TFun t1' t2')
+  | t' == t2' = return $ PState {position=n, context=c, ty=(t1,t1'), term=EmptyTerm $ empTerm . (\x -> (Bound i) :@: x)}
   | otherwise = throwError ApplyE1
-applyComm i (PState {position=n, context=c, ty=t, term=EmptyTerm empTerm}) t'@(ForAll v t1) = do let (tt, tt') = (typeWithoutName t, typeWithoutName t')
-                                                                                                 x <- unification tt' tt
-                                                                                                 return $ PState {position=n, context=c, ty=t, term=Term $ empTerm $ (Bound i) :!: x}
+applyComm i (PState {position=n, context=c, ty=(t,t'), term=EmptyTerm empTerm}) (ForAll v t1, TForAll t1') =
+  do x <- unification t1' t'
+     return $ PState {position=n, context=c, ty=(t,t'), term=Term $ empTerm $ (Bound i) :!: x}
 applyComm _ _ _ = throwError ApplyE2
 
 
-isFreeType' :: Var -> Type -> Bool
-isFreeType' q (B p) = q == p
-isFreeType' q (Fun a b) = isFreeType' q a || isFreeType' q b
-isFreeType' q (ForAll p a)
-  | q == p = False
-  | otherwise = isFreeType' q a
+isFreeType' :: Var -> TType -> Bool
+isFreeType' q (TFree p) = q == p
+isFreeType' q (TBound p) = False
+isFreeType' q (TFun a b) = isFreeType' q a || isFreeType' q b
+isFreeType' q (TForAll a) = isFreeType' q a
                 
 isFreeType :: Var -> Context -> Bool
-isFreeType q [] = False
-isFreeType q (x:xs) = isFreeType' q x || isFreeType q xs
+isFreeType q = foldl (\r x -> isFreeType' q (snd x) || r) False
 
 
 getHypothesisValue :: Int -> String -> Either ProofExceptions Int

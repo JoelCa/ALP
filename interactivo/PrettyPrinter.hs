@@ -104,9 +104,9 @@ printProof n c ty = printHypothesis n c $$
 
 printHypothesis :: Int -> Context -> Doc
 printHypothesis 0 [] = empty
-printHypothesis 1 [x] = text "H0: " <>
+printHypothesis 1 [(x,y)] = text "H0: " <>
                         printType x
-printHypothesis n (x:xs) 
+printHypothesis n ((x,y):xs) 
   | n > 0 = printHypothesis (n-1) xs $$
             text "H" <> text (show (n-1)) <>  text ": " <> printType x
   | otherwise = error "error: printHypothesis, no debería pasar"

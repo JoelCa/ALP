@@ -48,7 +48,7 @@ data Term  = Bound Int
 data Value = VLam Type Term
 
   -- Contextos del tipado
-type Context = [Type]
+type Context = [(Type,TType)]
   
   --Comandos
 data Command = Ty Type | Ta Tactic deriving (Show)
@@ -68,7 +68,7 @@ instance Exception ProofExceptions
   -- Estado de la prueba
 data ProofState = PState {position :: Int
                          , context :: Context
-                         , ty :: Type
+                         , ty :: (Type, TType)
                          , term :: SpecialTerm
                          }
                                     

@@ -38,7 +38,7 @@ checkCommand :: Command -> ProofInputState ()
 checkCommand (Ty ty) = do s <- lift get
                           when (isJust s) (throwIO PNotFinished)
                           outputStrLn $ render $ printProof 0 [] ty
-                          lift $ put $ Just $ PState {position=0, context=[], ty=ty, term=EmptyTerm id}
+                          lift $ put $ Just $ PState {position=0, context=[], ty=(ty, typeWithoutName ty), term=EmptyTerm id}
                           prover
 checkCommand (Ta ta) = do  s <- lift get
                            when (isNothing s) (throwIO PNotStarted)
@@ -47,7 +47,7 @@ checkCommand (Ta ta) = do  s <- lift get
                            if (isFinalTerm proof)
                              then (outputStrLn ("prueba terminada\n" ++ render (printTerm (getTermFromProof proof)))
                                     >> resetProver)
-                             else outputStrLn $ render $ printProof (position proof) (context proof) (ty proof)
+                             else outputStrLn $ render $ printProof (position proof) (context proof) (fst (ty proof))
                            prover
 
 
@@ -55,11 +55,11 @@ resetProver :: ProofInputState ()
 resetProver = lift $ put Nothing
 
 isFinalTerm :: ProofState -> Bool
-isFinalTerm (PState {term=Term _, position=_, ty=_, context=_}) = True
+isFinalTerm (PState {term=Term _}) = True
 isFinalTerm _ = False
 
 getTermFromProof :: ProofState -> Term
-getTermFromProof (PState {term=Term t, position=_, ty=_, context=_}) = t
+getTermFromProof (PState {term=Term t}) = t
 getTermFromProof _ = error "getTermFromProof: no debería pasar"
 
 

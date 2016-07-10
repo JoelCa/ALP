@@ -72,6 +72,9 @@ isValidValue :: Int -> Int -> Bool
 isValidValue n value = (value >= 0) && (value < n)
 
 --------------------------------------------------------------------
+bottom :: TType
+bottom = TForAll $ TBound 0
+
 
 typeWithoutName :: Type -> TType
 typeWithoutName = typeWithoutName' []
@@ -83,36 +86,40 @@ typeWithoutName' xs (ForAll v t) = TForAll $ typeWithoutName' (v:xs) t
 
 
 unification :: TType -> TType -> Either ProofExceptions TType
-unification (TForAll t) = unif 0 Nothing t
-unification _  =  error "no deberia pasar, unificación"
+unification = unif 0 Nothing
 
 unif :: Int -> Maybe TType -> TType -> TType -> Either ProofExceptions TType
-unif pos (Just (TBound 0)) t t' = unif pos Nothing t t'
 unif pos sust t@(TBound n) t'
-  | t == t' = case sust of
-    Nothing -> return $ TBound 0
-    Just s -> return s
   | n == pos = case sust of
-    Nothing -> if isFreeTypeVar (pos-1) t'
-               then throwError Unif
-               else return t'
+    Nothing -> maybeToEither Unif (substitution pos t)
     Just s -> if s == t'
               then return s
               else throwError Unif
+  | otherwise = if t == t'
+                then return $ maybe bottom id sust
+                else throwError Unif
+unif _ sust (TFree n) (TFree m)
+  | n == m = return $ maybe bottom id sust
   | otherwise = throwError Unif
 unif pos sust (TFun t1 t1') (TFun t2 t2') = do res <- unif pos sust t1 t2
                                                unif pos (Just res) t1' t2'
 unif pos sust (TForAll t) (TForAll t') = unif (pos+1) sust t t'
-unif pos sust t t'
-  | t == t' = return $ TBound 0
-  | otherwise = throwError Unif
+unif _ _ _ _ = throwError Unif
 
 
-isFreeTypeVar :: Int -> TType -> Bool
-isFreeTypeVar n (TBound m) = n == m
-isFreeTypeVar n (TFree _) = False
-isFreeTypeVar n (TFun t t') = isFreeTypeVar n t && isFreeTypeVar n t'
-isFreeTypeVar n (TForAll t) = isFreeTypeVar (n+1) t
+substitution :: Int -> TType -> Maybe TType
+substitution = substitution' 0
+
+substitution' :: Int -> Int -> TType -> Maybe TType
+substitution' m n t@(TBound x)
+  | x < m = return t
+  | x >= n = return $ TBound (x-n)
+  | otherwise = Nothing
+substitution' _ _ t@(TFree f) = return t
+substitution' m n (TFun t t') = do x <- substitution' m n t
+                                   y <- substitution' m n t'
+                                   return $ TFun x y
+substitution' m n (TForAll t) = substitution' (m+1) (n+1) t
 
 
 --------------------------------------------------------------------

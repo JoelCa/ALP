@@ -12,9 +12,16 @@ import Data.List
 
 -- lista de posibles nombres para variables
 vars :: [String]
-vars = [ c : n | n <- "" : map show nats, c <- ['x','y','z'] ++ ['a'..'w'] ]
-        where nats :: [Integer]
-              nats = [1..]
+vars = [ c : n | n <- "" : map show nats, c <- ['x','y','z'] ++ ['p'..'w'] ]
+  where nats :: [Integer]
+        nats = [1..]
+
+
+typeVars :: [String]
+typeVars = [ c : n | n <- "" : map show nats, c <- ['a' .. 'o']]
+  where nats :: [Integer]
+        nats = [1..]
+
 
 fv :: Term -> [String]
 fv (Bound _)         = []
@@ -24,6 +31,16 @@ fv (t :@: u)         = fv t ++ fv u
 fv (Lam _ u)         = fv u
 fv (t :!: _)         = fv t
 fv (BLam _ u)        = fv u
+
+ftv :: Term -> [String]
+ftv (Bound _)         = []
+ftv (Free (Global n)) = [n]
+ftv (Free (Quote _))  = []
+ftv (t :@: u)         = fv t ++ fv u
+ftv (Lam _ u)         = fv u
+ftv (t :!: )         = fv t
+ftv (BLam t u)        = ftv t ++ ftv u
+
 
 
 fvType :: TType -> [String]
@@ -35,7 +52,7 @@ fvType (TForAll t) = fvType t
 
 -- pretty-printer de términos
 printTerm :: Term -> Doc 
-printTerm t = printTerm' 1 [] (vars \\ fv t) t
+printTerm t = printTerm' 1 [] (vars \\ fv t) (typeVars \\ ftv t) t
 
 parenIf :: Bool -> Doc -> Doc
 parenIf False d   = d
@@ -55,19 +72,19 @@ printTerm' i bs (f:fs) (Lam t u)     = parenIf (i > 1) $
                                        printType t <> 
                                        text "." <> 
                                        printTerm' 1 (f:bs) fs u
-printTerm' i bs fs (BLam t u)        = parenIf (i > 1) $  -- Chequear "parenIf"
+printTerm' i bs (f:fs) (BLam t u)    = parenIf (i > 1) $  -- Chequear "parenIf"
                                        text "\\" <> 
                                        text t <> 
                                        text "." <> 
-                                       printTerm' 1 bs fs u
+                                       printTerm' 1 (f:bs) fs u
 printTerm' i bs fs (t :!: ty)        = printTerm' 2 bs fs t <+> -- Chequear valores de "i"
-                                       printTType ty
+                                       printTType bs ty
 printTerm' _ _  [] (Lam _ _)         = error "prinTerm': no hay nombres para elegir"
 
 
 -- pretty-printer de tipos
-printTType :: TType -> Doc
-printTType t = printTType' 1 [] (vars \\ fvType t) t
+printTType :: [String] -> TType -> Doc
+printTType bs t = printTType' 1 [] (typeVars \\ fvType t) t
 
 -- Chequear si es necesario usar parenIf
 printTType' :: Int -> [String] -> [String] -> TType -> Doc

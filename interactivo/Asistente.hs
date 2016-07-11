@@ -10,10 +10,11 @@ habitar (PState {position=n, context=c, ty=(t, tw), term=EmptyTerm empTerm}) Ass
      return $ PState {position=n, context=c, ty=(t,tw), term=Term $ empTerm $ Bound i}
 
 habitar (PState {position=n, context=c, ty=(Fun t1 t2, TFun t1' t2'), term=EmptyTerm empTerm}) Intro =
-  return $ PState {position=n+1,context=(t1,t1'):c, ty=(t2, t2'), term=EmptyTerm $ empTerm . (\x -> Lam t1 x)}
+  return $ PState {position=n+1,context=(t1,t1'):c, ty=(t2, t2'), term=EmptyTerm $ empTerm . (\x -> Lam t1' x)}
 
+-- Arreglar. Si q está libre renombrar para imprimir correctamente las hipótesis
 habitar (PState {position=n, context=c, ty=(ForAll q t, TForAll t'), term=EmptyTerm empTerm}) Intro
-  | not $ isFreeType q c = return $ PState {position=n,context=c, ty=(t, t'), term=EmptyTerm $ empTerm . (\x -> BLam q x)}
+  | not $ isFreeType q c = return $ PState {position=n,context=c, ty=(t, t'), term=EmptyTerm $ empTerm . (\x -> BLam x)}
   | otherwise = throwError IntroE2
 
 habitar _ Intro = throwError IntroE1
@@ -32,8 +33,10 @@ applyComm i (PState {position=n, context=c, ty=(t, t'), term=EmptyTerm empTerm})
   | t' == t2' = return $ PState {position=n, context=c, ty=(t1,t1'), term=EmptyTerm $ empTerm . (\x -> (Bound i) :@: x)}
   | otherwise = throwError ApplyE1
 applyComm i (PState {position=n, context=c, ty=(t,t'), term=EmptyTerm empTerm}) (ForAll v t1, TForAll t1') =
-  do x <- unification t1' t'
-     return $ PState {position=n, context=c, ty=(t,t'), term=Term $ empTerm $ (Bound i) :!: x}
+  do sust <- unification t1' t'
+     case sust of
+       Nothing -> return $ PState {position=n, context=c, ty=(t,t'), term=Term $ empTerm $ (Bound i) :!: bottom}
+       Just x -> return $ PState {position=n, context=c, ty=(t,t'), term=Term $ empTerm $ (Bound i) :!: x}
 applyComm _ _ _ = throwError ApplyE2
 
 
@@ -85,26 +88,26 @@ typeWithoutName' xs (Fun t t') = TFun (typeWithoutName' xs t) (typeWithoutName' 
 typeWithoutName' xs (ForAll v t) = TForAll $ typeWithoutName' (v:xs) t
 
 
-unification :: TType -> TType -> Either ProofExceptions TType
+unification :: TType -> TType -> Either ProofExceptions (Maybe TType)
 unification = unif 0 Nothing
 
-unif :: Int -> Maybe TType -> TType -> TType -> Either ProofExceptions TType
+unif :: Int -> Maybe TType -> TType -> TType -> Either ProofExceptions (Maybe TType)
 unif pos sust t@(TBound n) t'
   | n == pos = case sust of
-    Nothing -> maybeToEither Unif (substitution pos t)
+    Nothing -> maybe (throwError Unif1) (return . return) (substitution pos t')
     Just s -> if s == t'
-              then return s
-              else throwError Unif
+              then return (Just s)
+              else throwError Unif1
   | otherwise = if t == t'
-                then return $ maybe bottom id sust
-                else throwError Unif
+                then return $ sust
+                else throwError Unif2
 unif _ sust (TFree n) (TFree m)
-  | n == m = return $ maybe bottom id sust
-  | otherwise = throwError Unif
+  | n == m = return $ sust
+  | otherwise = throwError Unif3
 unif pos sust (TFun t1 t1') (TFun t2 t2') = do res <- unif pos sust t1 t2
-                                               unif pos (Just res) t1' t2'
+                                               unif pos res t1' t2'
 unif pos sust (TForAll t) (TForAll t') = unif (pos+1) sust t t'
-unif _ _ _ _ = throwError Unif
+unif _ _ _ _ = throwError Unif4
 
 
 substitution :: Int -> TType -> Maybe TType
@@ -112,8 +115,8 @@ substitution = substitution' 0
 
 substitution' :: Int -> Int -> TType -> Maybe TType
 substitution' m n t@(TBound x)
-  | x < m = return t
   | x >= n = return $ TBound (x-n)
+  | x < m = return t  
   | otherwise = Nothing
 substitution' _ _ t@(TFree f) = return t
 substitution' m n (TFun t t') = do x <- substitution' m n t

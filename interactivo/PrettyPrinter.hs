@@ -30,61 +30,64 @@ fv (Free (Quote _))  = []
 fv (t :@: u)         = fv t ++ fv u
 fv (Lam _ u)         = fv u
 fv (t :!: _)         = fv t
-fv (BLam _ u)        = fv u
+fv (BLam t)          = fv t
 
+-- variables de tipo libre
 ftv :: Term -> [String]
-ftv (Bound _)         = []
-ftv (Free (Global n)) = [n]
-ftv (Free (Quote _))  = []
-ftv (t :@: u)         = fv t ++ fv u
-ftv (Lam _ u)         = fv u
-ftv (t :!: )         = fv t
-ftv (BLam t u)        = ftv t ++ ftv u
+ftv (Bound _) = []
+ftv (Free _)  = []
+ftv (t :@: u) = ftv t ++ ftv u
+ftv (Lam t u) = fType t ++ fv u
+ftv (t :!: u) = ftv t ++ fType u
+ftv (BLam t)  = ftv t
 
 
-
-fvType :: TType -> [String]
-fvType (TBound  _) = []
-fvType (TFree n) = [n]
-fvType (TFun t u) = fvType t ++ fvType u
-fvType (TForAll t) = fvType t
+fType :: TType -> [String]
+fType (TBound  _) = []
+fType (TFree n) = [n]
+fType (TFun t u) = fType t ++ fType u
+fType (TForAll t) = fType t
 
 
 -- pretty-printer de términos
 printTerm :: Term -> Doc 
-printTerm t = printTerm' 1 [] (vars \\ fv t) (typeVars \\ ftv t) t
+printTerm t = printTerm' 1 [] [] (vars \\ fv t) (typeVars \\ ftv t) t
 
 parenIf :: Bool -> Doc -> Doc
 parenIf False d   = d
 parenIf True d    = PP.parens d
 
-printTerm' :: Int -> [String] -> [String] -> Term -> Doc
-printTerm' _ bs _  (Bound j)         = text $ bs !! j
-printTerm' _ _  _  (Free (Global n)) = text n
-printTerm' _ _  _  (Free (Quote n))  = text "quoted"<>text (show n)
-printTerm' i bs fs (t :@: u)         = parenIf (i < 1) $ 
-                                       printTerm' 2 bs fs t <+> 
-                                       printTerm' 0 bs fs u
-printTerm' i bs (f:fs) (Lam t u)     = parenIf (i > 1) $ 
-                                       text "\\" <> 
-                                       text f <> 
-                                       text ":" <> 
-                                       printType t <> 
-                                       text "." <> 
-                                       printTerm' 1 (f:bs) fs u
-printTerm' i bs (f:fs) (BLam t u)    = parenIf (i > 1) $  -- Chequear "parenIf"
-                                       text "\\" <> 
-                                       text t <> 
-                                       text "." <> 
-                                       printTerm' 1 (f:bs) fs u
-printTerm' i bs fs (t :!: ty)        = printTerm' 2 bs fs t <+> -- Chequear valores de "i"
-                                       printTType bs ty
-printTerm' _ _  [] (Lam _ _)         = error "prinTerm': no hay nombres para elegir"
+printTerm' :: Int -> [String] -> [String] -> [String] -> [String] -> Term -> Doc
+printTerm' _ bs _  _ _ (Bound j)         = text $ bs !! j
+printTerm' _ _  _  _ _ (Free (Global n)) = text n
+printTerm' _ _  _  _ _ (Free (Quote n))  = text "quoted"<>text (show n)
+printTerm' i bs bts fs fts (t :@: u)     = parenIf (i < 1) $ 
+                                           printTerm' 2 bs bts fs fts t <+> 
+                                           printTerm' 0 bs bts fs fts u
+printTerm' i bs bts (f:fs) fts (Lam t u) = parenIf (i > 1) $ 
+                                           text "\\" <> 
+                                           text f <> 
+                                           text ":" <> 
+                                           printTypeTerm bts t <>
+                                           text "." <> 
+                                           printTerm' 1 (f:bs) bts fs fts u
+printTerm' i bs bts fs (f':fts) (BLam u) = parenIf (i > 1) $  -- Chequear "parenIf"
+                                           text "\\" <> 
+                                           text f' <> 
+                                           text "." <> 
+                                           printTerm' 1 bs (f':bts) fs fts u
+printTerm' i bs bts fs fts (t :!: ty)    = printTerm' 2 bs bts fs fts t <+> -- Chequear valores de "i"
+                                           printTypeTerm bts ty
+printTerm' _ _ _ [] _ (Lam _ _)          = error "prinTerm': no hay nombres para elegir"
+printTerm' _ _ _ _ [] (BLam _)           = error "prinTerm': no hay nombres para elegir"
 
 
 -- pretty-printer de tipos
-printTType :: [String] -> TType -> Doc
-printTType bs t = printTType' 1 [] (typeVars \\ fvType t) t
+printTypeTerm :: [String] -> TType -> Doc
+printTypeTerm bs t = printTType' 2 bs (typeVars \\ fType t) t
+
+printTType :: TType -> Doc
+printTType t = printTType' 1 [] (typeVars \\ fType t) t
 
 -- Chequear si es necesario usar parenIf
 printTType' :: Int -> [String] -> [String] -> TType -> Doc
@@ -95,7 +98,7 @@ printTType' i bs fs (TFun t u) = parenIf (i < 1) $
                                  text "->" <+>
                                  printTType' 0 bs fs u
 printTType' i bs (f:fs) (TForAll t) =  parenIf (i > 1) $ 
-                                       text "\\" <> 
+                                       text "forall" <+> 
                                        text f <> 
                                        text "." <> 
                                        printTType' 1 (f:bs) fs t

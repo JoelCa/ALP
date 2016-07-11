@@ -39,8 +39,8 @@ data LamTerm  =  LVar String
 data Term  = Bound Int
            | Free Name 
            | Term :@: Term
-           | Lam Type Term
-           | BLam Var Term
+           | Lam TType Term
+           | BLam Term
            | Term :!: TType
            deriving (Show, Eq)
 
@@ -59,7 +59,7 @@ data Tactic = Assumption | Apply String | Intro deriving (Show)
 
   -- Excepciones
 data ProofExceptions = PNotFinished | PNotStarted | SyntaxE | AssuE | IntroE1 | IntroE2 | ApplyE1 | ApplyE2 |
-                       ApplyE3 | ApplyE4 | Unif | CommandInvalid
+                       ApplyE3 | ApplyE4 | Unif1 | Unif2 | Unif3 | Unif4 | CommandInvalid
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions

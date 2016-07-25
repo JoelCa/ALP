@@ -38,7 +38,7 @@ ftv (Bound _) = []
 ftv (Free _)  = []
 ftv (t :@: u) = ftv t ++ ftv u
 ftv (Lam t u) = fType t ++ fv u
-ftv (t :!: u) = ftv t ++ fType u
+ftv (t :!: (u,u')) = ftv t ++ fType u'
 ftv (BLam t)  = ftv t
 
 
@@ -76,8 +76,8 @@ printTerm' i bs bts fs (f':fts) (BLam u) = parenIf (i > 1) $  -- Chequear "paren
                                            text f' <> 
                                            text "." <> 
                                            printTerm' 1 bs (f':bts) fs fts u
-printTerm' i bs bts fs fts (t :!: ty)    = printTerm' 2 bs bts fs fts t <+> -- Chequear valores de "i"
-                                           printTypeTerm bts ty
+printTerm' i bs bts fs fts (t :!: (ty,ty')) = printTerm' 2 bs bts fs fts t <+> -- Chequear valores de "i"
+                                              printType ty
 printTerm' _ _ _ [] _ (Lam _ _)          = error "prinTerm': no hay nombres para elegir"
 printTerm' _ _ _ _ [] (BLam _)           = error "prinTerm': no hay nombres para elegir"
 

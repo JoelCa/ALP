@@ -5,6 +5,8 @@ import Data.Char (isDigit)
 import Data.List (findIndex, elemIndex)
 
 habitar :: ProofState -> Tactic -> Either ProofExceptions ProofState
+habitar (PState {term=Term _}) _ = error "habitar: no debería pasar"
+
 habitar (PState {position=n, context=c, ty=(t, tw), term=EmptyTerm empTerm}) Assumption =
   do i <- maybeToEither AssuE (findIndex (\x->snd x == tw) c)
      return $ PState {position=n, context=c, ty=(t,tw), term=Term $ empTerm $ Bound i}
@@ -21,10 +23,6 @@ habitar _ Intro = throwError IntroE1
 
 habitar st@(PState {position=n,context=c}) (Apply h) = do i <- getHypothesisValue n h
                                                           applyComm i st (c !! (n-i-1))
-                                                                                     
-habitar (PState {term=Term _}) _ = throwError CommandInvalid
-
-habitar _ _ = error "error: no debería pasar, habitar"
 
 
 -- Asumimos que las tuplas del 2º arg. de applyComm, tienen la forma correcta.
@@ -33,7 +31,7 @@ applyComm i (PState {position=n, context=c, ty=(t, t'), term=EmptyTerm empTerm})
   | t' == t2' = return $ PState {position=n, context=c, ty=(t1,t1'), term=EmptyTerm $ empTerm . (\x -> (Bound i) :@: x)}
   | otherwise = throwError ApplyE1
 applyComm i (PState {position=n, context=c, ty=(t,t'), term=EmptyTerm empTerm}) (ForAll v t1, TForAll t1') =
-  do sust <- unification t1' t'
+  do sust <- unification (t1, t1') (t,t')
      case sust of
        Nothing -> return $ PState {position=n, context=c, ty=(t,t'), term=Term $ empTerm $ (Bound i) :!: bottom}
        Just x -> return $ PState {position=n, context=c, ty=(t,t'), term=Term $ empTerm $ (Bound i) :!: x}
@@ -75,8 +73,8 @@ isValidValue :: Int -> Int -> Bool
 isValidValue n value = (value >= 0) && (value < n)
 
 --------------------------------------------------------------------
-bottom :: TType
-bottom = TForAll $ TBound 0
+bottom :: (Type, TType)
+bottom = (ForAll "a" (B "a"), TForAll (TBound 0))
 
 
 typeWithoutName :: Type -> TType
@@ -88,41 +86,43 @@ typeWithoutName' xs (Fun t t') = TFun (typeWithoutName' xs t) (typeWithoutName' 
 typeWithoutName' xs (ForAll v t) = TForAll $ typeWithoutName' (v:xs) t
 
 
-unification :: TType -> TType -> Either ProofExceptions (Maybe TType)
+unification :: (Type,TType) -> (Type,TType) -> Either ProofExceptions (Maybe (Type,TType))
 unification = unif 0 Nothing
 
-unif :: Int -> Maybe TType -> TType -> TType -> Either ProofExceptions (Maybe TType)
-unif pos sust t@(TBound n) t'
+unif :: Int -> Maybe (Type,TType) -> (Type,TType) -> (Type,TType) -> Either ProofExceptions (Maybe (Type,TType))
+unif pos sust (t1,t2@(TBound n)) tt@(tt1,tt2)
   | n == pos = case sust of
-    Nothing -> maybe (throwError Unif1) (return . return) (substitution pos t')
-    Just s -> if s == t'
-              then return (Just s)
-              else throwError Unif1
-  | otherwise = if t == t'
+    Nothing -> maybe (throwError Unif1) (return . return) (substitution pos tt)
+    Just (s,s') -> if s' == tt2
+                   then return $ Just (s,s')
+                   else throwError Unif1
+  | otherwise = if t2 == tt2
                 then return $ sust
                 else throwError Unif2
-unif _ sust (TFree n) (TFree m)
-  | n == m = return $ sust
+unif _ sust (t1,TFree n) (tt1,TFree m)
+  | n == m = return sust
   | otherwise = throwError Unif3
-unif pos sust (TFun t1 t1') (TFun t2 t2') = do res <- unif pos sust t1 t2
-                                               unif pos res t1' t2'
-unif pos sust (TForAll t) (TForAll t') = unif (pos+1) sust t t'
+unif pos sust (Fun t1 t2,TFun t1' t2') (Fun tt1 tt2, TFun tt1' tt2') =
+  do res <- unif pos sust (t1,t1') (tt1, tt1')
+     unif pos res (t2,t2') (tt2,tt2')
+unif pos sust (ForAll _ t, TForAll t') (ForAll _ tt, TForAll tt') = unif (pos+1) sust (t,t') (tt,tt')
 unif _ _ _ _ = throwError Unif4
 
 
-substitution :: Int -> TType -> Maybe TType
+substitution :: Int -> (Type, TType) -> Maybe (Type, TType)
 substitution = substitution' 0
 
-substitution' :: Int -> Int -> TType -> Maybe TType
-substitution' m n t@(TBound x)
-  | x >= n = return $ TBound (x-n)
-  | x < m = return t  
+substitution' :: Int -> Int -> (Type, TType) -> Maybe (Type, TType)
+substitution' m n (t,t'@(TBound x))
+  | x >= n = return (t,TBound (x-n))
+  | x < m = return (t,t')
   | otherwise = Nothing
-substitution' _ _ t@(TFree f) = return t
-substitution' m n (TFun t t') = do x <- substitution' m n t
-                                   y <- substitution' m n t'
-                                   return $ TFun x y
-substitution' m n (TForAll t) = substitution' (m+1) (n+1) t
+substitution' _ _ (t, t'@(TFree f)) = return (t,t')
+substitution' m n (Fun t1 t2,TFun t1' t2') = do (x,x') <- substitution' m n (t1,t1')
+                                                (y,y') <- substitution' m n (t2,t2')
+                                                return (Fun x y, TFun x' y')
+substitution' m n (ForAll v t, TForAll t') = do (x,x') <- substitution' (m+1) (n+1) (t,t')
+                                                return (ForAll v x, TForAll x')
 
 
 --------------------------------------------------------------------

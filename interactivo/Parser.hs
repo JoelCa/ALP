@@ -29,7 +29,7 @@ exprTy' = do t <- termTy
                  return (Fun t e)
               <|> return t)
           <|> do symbol "forall"
-                 t <- validIdentifier reservedWords --Algo está mal con la E de exists
+                 t <- validIdent reservedWords
                  symbol ","
                  e <- exprTy'
                  return (ForAll t e)
@@ -39,20 +39,15 @@ termTy = do char '('
             e <- exprTy'
             char ')'
             return e
-         <|> do v <- validIdentifier reservedWords
+         <|> do v <- validIdent reservedWords
                 return (B v)
-              
--- exprTac :: Parser [Tactics]
--- exprTac = do x <- termTac
---              xs <- many termTac
---              return (x:xs)
-              
+                            
 termTac :: Parser Tactic
 termTac = do symbol "assumption"
              char '.'
              return Assumption
           <|> do symbol "apply"
-                 x <- validIdentifier reservedWords
+                 x <- validIdent reservedWords
                  char '.'
                  return (Apply x)
           <|> do symbol "intro" --cambiar

@@ -30,6 +30,7 @@ prover = do minput <- getInputLine "> "
               Nothing -> return ()
               Just "-quit" -> do outputStrLn "Saliendo."
                                  return ()
+              Just "-r" -> resetProver >> prover  --"Reset"
               Just x -> catch (do command <- returnInput $ getCommand x
                                   checkCommand command) (\e -> errorMessage (e :: ProofExceptions) >> prover)
 

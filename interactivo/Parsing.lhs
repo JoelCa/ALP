@@ -39,10 +39,6 @@ Basic parsers
 > 
 > parse                         :: Parser a -> String -> [(a,String)]
 > parse (P p) inp               =  p inp
-
-                                   asdas
-                                   asd
-                                   asdsad
                                    
 Choice
 ------
@@ -123,33 +119,6 @@ Derived primitives
 > endBy p sep                   	= many (do{ x <- p; sep; return x })
 >
 
-> validIdent ::  [String] -> Parser String
-> validIdent = validIdent' True
-
-
-> validIdent' :: Bool -> [String] -> Parser String
-> validIdent' continue [] = ident
->                           <|> do when (not continue) failure
->                                  return []
-> validIdent' continue xs = do y <- item
->                              let (cont', tails) = getTail y xs
->                              ys <- validIdent' cont' tails
->                              return (y:ys)
-
-                                
-> getTail :: Char -> [String] -> (Bool, [String])
-> getTail _ [] = (True, [])
-> getTail x ([z]:ys)
->   | x == z = (False, [])
->   | otherwise = let(b, l) = getTail x ys
->                 in (b, l)
-> getTail x ((z:zs):ys)
->   | x == z = let(b, l) = getTail x ys
->              in (b, zs : l)
->   | otherwise = getTail x ys
-
-
-
 Ignoring spacing
 ----------------
 
@@ -171,5 +140,9 @@ Ignoring spacing
 > symbol                        :: String -> Parser String
 > symbol xs                     =  token (string xs)
 
-> validIdentifier :: [String] -> Parser String
-> validIdentifier = token . validIdent 
+> validIdent ::  [String] -> Parser String
+> validIdent xs = do y <- ident
+>                    when (foldl (\w x ->  (y == x) || w) False xs) failure    
+>                    return y
+
+-- usar: string-insert-rectangle, para insertar ">"

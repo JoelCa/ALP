@@ -41,7 +41,7 @@ data Term  = Bound Int
            | Term :@: Term
            | Lam TType Term
            | BLam Term
-           | Term :!: TType
+           | Term :!: (Type,TType)
            deriving (Show, Eq)
 
   -- Valores

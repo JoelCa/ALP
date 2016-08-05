@@ -39,7 +39,7 @@ checkCommand :: Command -> ProofInputState ()
 checkCommand (Ty ty) = do s <- lift get
                           when (isJust s) (throwIO PNotFinished)
                           outputStrLn $ render $ printProof 0 [] ty
-                          lift $ put $ Just $ PState {position=0, context=[], ty=(ty, typeWithoutName ty), term=EmptyTerm id}
+                          lift $ put $ Just $ PState {position=0, context=[], ty=(ty, typeWithoutName ty), term=HoldT id}
                           prover
 checkCommand (Ta ta) = do  s <- lift get
                            when (isNothing s) (throwIO PNotStarted)

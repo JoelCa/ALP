@@ -20,6 +20,8 @@ type Var = String
 data Type = B Var
           | Fun Type Type
           | ForAll Var Type
+          | And Type Type
+          | Or Type Type 
           deriving (Show, Eq)
   
   -- Tipo de los tipos localmente sin nombre
@@ -27,6 +29,8 @@ data TType = TBound Int
            | TFree Var
            | TFun TType TType
            | TForAll TType
+           | TAnd TType TType
+           | TOr TType TType
            deriving (Show, Eq)
 
   -- Términos con nombres (NO seria necesario)
@@ -54,7 +58,7 @@ type Context = [(Type,TType)]
 data Command = Ty Type | Ta Tactic deriving (Show)
 
   -- Tácticas
-data Tactic = Assumption | Apply String | Intro deriving (Show)
+data Tactic = Assumption | Apply String | Intro | Split deriving (Show)
 
 
   -- Excepciones
@@ -66,10 +70,10 @@ instance Exception ProofExceptions
 
 
   -- Estado de la prueba
-data ProofState = PState {position :: Int
-                         , context :: Context
-                         , ty :: (Type, TType)
-                         , term :: SpecialTerm
+data ProofState = PState {position :: [Int]
+                         , context :: [Context]
+                         , ty :: [(Type, TType)]
+                         , term :: [SpecialTerm]
                          }
                                     
-data SpecialTerm = EmptyTerm (Term->Term) | Term Term
+data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) | Term Term

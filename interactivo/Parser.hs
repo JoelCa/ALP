@@ -5,7 +5,7 @@ import Common
 
 type Proof = Either ProofExceptions Command
 
-reservedWords = ["forall", "exists"]
+reservedWords = ["forall", "exists","and","or"]
 
 getCommand :: String -> Proof
 getCommand s = case parse exprTy s of
@@ -27,6 +27,12 @@ exprTy' = do t <- termTy
              (do symbol "->"
                  e <- exprTy'
                  return (Fun t e)
+              <|> do symbol "and"
+                     e <- exprTy'
+                     return (And t e)
+              <|> do symbol "or"
+                     e <- exprTy'
+                     return (Or t e)
               <|> return t)
           <|> do symbol "forall"
                  t <- validIdent reservedWords
@@ -53,3 +59,6 @@ termTac = do symbol "assumption"
           <|> do symbol "intro" --cambiar
                  char '.'
                  return Intro
+          <|> do symbol "split"
+                 char '.'
+                 return Split

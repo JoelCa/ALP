@@ -5,38 +5,48 @@ import Data.Char (isDigit)
 import Data.List (findIndex, elemIndex)
 
 habitar :: ProofState -> Tactic -> Either ProofExceptions ProofState
-habitar (PState {term=Term _}) _ = error "habitar: no debería pasar"
+--habitar (PState {term=Term _}) _ = error "habitar: no debería pasar"
 
-habitar (PState {position=n, context=c, ty=(t, tw), term=EmptyTerm empTerm}) Assumption =
+habitar (PState {position=n:ns, context=c:cs, ty=(t, tw):tys, term=ts}) Assumption =
   do i <- maybeToEither AssuE (findIndex (\x->snd x == tw) c)
-     return $ PState {position=n, context=c, ty=(t,tw), term=Term $ empTerm $ Bound i}
+     return $ PState {position=ns, context=cs, ty=tys, term=simplifyTerms (Bound i) ts}
 
-habitar (PState {position=n, context=c, ty=(Fun t1 t2, TFun t1' t2'), term=EmptyTerm empTerm}) Intro =
-  return $ PState {position=n+1,context=(t1,t1'):c, ty=(t2, t2'), term=EmptyTerm $ empTerm . (\x -> Lam t1' x)}
+habitar (PState {position=n:ns, context=c:cs, ty=(Fun t1 t2, TFun t1' t2'):tys, term=ts}) Intro =
+  return $ PState {position=(n+1):ns,context=((t1,t1'):c):cs, ty=(t2, t2'):tys, term=propagateTerm (\x -> Lam t1' x) ts}
 
 -- Arreglar. Si q está libre renombrar para imprimir correctamente las hipótesis
-habitar (PState {position=n, context=c, ty=(ForAll q t, TForAll t'), term=EmptyTerm empTerm}) Intro
-  | not $ isFreeType q c = return $ PState {position=n,context=c, ty=(t, t'), term=EmptyTerm $ empTerm . (\x -> BLam x)}
+habitar (PState {position=n:ns, context=c:cs, ty=(ForAll q t, TForAll t'):tys, term=ts}) Intro
+  | not $ isFreeType q c = return $ PState {position=n:ns,context=c:cs, ty=(t, t'):tys, term=propagateTerm (\x -> BLam x) ts}
   | otherwise = throwError IntroE2
 
 habitar _ Intro = throwError IntroE1
 
-habitar st@(PState {position=n,context=c}) (Apply h) = do i <- getHypothesisValue n h
-                                                          applyComm i st (c !! (n-i-1))
+habitar st@(PState {position=n:ns,context=c:cs}) (Apply h) = do i <- getHypothesisValue n h
+                                                                applyComm i st (c !! (n-i-1))
+                                                          
+--habitar st@(PState {position=n, context=c, ty=(And t1 t2, TAnd)d, term=HoleT empTerm:ts}) Split
 
 
 -- Asumimos que las tuplas del 2º arg. de applyComm, tienen la forma correcta.
 applyComm :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
-applyComm i (PState {position=n, context=c, ty=(t, t'), term=EmptyTerm empTerm}) (Fun t1 t2, TFun t1' t2')
-  | t' == t2' = return $ PState {position=n, context=c, ty=(t1,t1'), term=EmptyTerm $ empTerm . (\x -> (Bound i) :@: x)}
+applyComm i (PState {position=n:ns, context=c:cs, ty=(t, t'):tys, term=ts}) (Fun t1 t2, TFun t1' t2')
+  | t' == t2' = return $ PState {position=n:ns, context=c:cs, ty=(t1,t1'):tys, term=propagateTerm (\x -> (Bound i) :@: x) ts}
   | otherwise = throwError ApplyE1
-applyComm i (PState {position=n, context=c, ty=(t,t'), term=EmptyTerm empTerm}) (ForAll v t1, TForAll t1') =
-  do sust <- unification (t1, t1') (t,t')
-     case sust of
-       Nothing -> return $ PState {position=n, context=c, ty=(t,t'), term=Term $ empTerm $ (Bound i) :!: bottom}
-       Just x -> return $ PState {position=n, context=c, ty=(t,t'), term=Term $ empTerm $ (Bound i) :!: x}
+applyComm i (PState {position=n:ns, context=c:cs, ty=(t,t'):tys, term=ts}) (ForAll v t1, TForAll t1') =
+  case unification (t1, t1') (t,t') of
+    Nothing -> return $ PState {position=ns, context=cs, ty=tys, term=simplifyTerms ((Bound i) :!: bottom) ts}
+    Just x -> return $ PState {position=ns, context=cs, ty=tys, term=simplifyTerms ((Bound i) :!: x) ts}
 applyComm _ _ _ = throwError ApplyE2
 
+
+simplifyTerms :: Term -> [SpecialTerm] -> [SpecialTerm]
+simplifyTerms t [HoleT et] = [Term $ et t]
+simplifyTerms t (DoubleHoleT et):ts = (HoleT $ et t):ts
+simplifyTerms t (HoleT et):(DoubleHoleT et'):ts = (HoleT et' $ et $ t):ts
+
+propagateTerm :: (Term->Term) -> [SpecialTerm] -> [SpecialTerm]
+propagateTerm et (HoleT et'):ts = (HoleT $ et' . et):ts
+propagateTerm et (DoubleHoleT et'):ts = (DoubleHoleT $ et' . et):ts
 
 isFreeType' :: Var -> TType -> Bool
 isFreeType' q (TFree p) = q == p

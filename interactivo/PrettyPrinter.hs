@@ -102,25 +102,46 @@ printTType' i bs (f:fs) (TForAll t) =  parenIf (i > 1) $
                                        text f <> 
                                        text "." <> 
                                        printTType' 1 (f:bs) fs t
+printTType' i bs fs (TAnd t u) = parenIf (i < 1) $ 
+                                 printTType' 2 bs fs t <+>
+                                 text "->" <+>
+                                 printTType' 0 bs fs u
+printTType' i bs fs (TOr t u) = parenIf (i < 1) $ 
+                                 printTType' 2 bs fs t <+>
+                                 text "->" <+>
+                                 printTType' 0 bs fs u
+
 
 printType :: Type -> Doc
 printType = printType' False
 
 printType' :: Bool -> Type -> Doc
-printType' _ (B v)           = text v
-printType' False (Fun t1 t2) = printType' True t1 <+> 
-                               text "->"          <+> 
-                               printType' False t2
+printType' _ (B v)            = text v
+printType' False (Fun t1 t2)  = printType' True t1 <+> 
+                                text "->"          <+> 
+                                printType' False t2
 printType' False (ForAll v t) = text "forall" <+>
                                 text v <>
                                 text "," <+>
                                 printType' False t
-printType' True t            = PP.parens $ printType' False t
+printType' True t             = PP.parens $ printType' False t
+printType' False (And t1 t2)  = printType' True t1 <+> 
+                                text "and"         <+> 
+                                printType' False t2
+printType' False (Or t1 t2)   = printType' True t1 <+> 
+                                text "or"         <+> 
+                                printType' False t2
 
-printProof :: Int -> Context -> Type -> Doc
-printProof n c ty = printHypothesis n c $$
-                    text "-----------------" $$
-                    printType ty
+
+printProof :: [Int] -> [Context] -> [Type] -> Doc
+printProof [] [] [] =  empty
+printProof (n:ns) (c:cs) (ty:tys) = printProof' n c ty $$
+                                    printProof ns cs tys
+                                    
+printProof' :: Int -> Context -> Type -> Doc
+printProof' n c ty = printHypothesis n c $$
+                     text "___________________" $$
+                     printType ty
 
 printHypothesis :: Int -> Context -> Doc
 printHypothesis 0 [] = empty

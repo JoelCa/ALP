@@ -38,17 +38,17 @@ prover = do minput <- getInputLine "> "
 checkCommand :: Command -> ProofInputState ()
 checkCommand (Ty ty) = do s <- lift get
                           when (isJust s) (throwIO PNotFinished)
-                          outputStrLn $ render $ printProof 0 [] ty
-                          lift $ put $ Just $ PState {position=0, context=[], ty=(ty, typeWithoutName ty), term=HoldT id}
+                          outputStrLn $ render $ printProof [0] [[]] [ty]
+                          lift $ put $ Just $ PState {position=[0], context=[[]], ty=[(ty, typeWithoutName ty)], term=[HoleT id]}
                           prover
 checkCommand (Ta ta) = do  s <- lift get
                            when (isNothing s) (throwIO PNotStarted)
                            proof <- returnInput $ habitar (fromJust s) ta
                            lift $ put $ Just proof
                            if (isFinalTerm proof)
-                             then (outputStrLn ("prueba terminada\n" ++ render (printTerm (getTermFromProof proof)))
-                                    >> resetProver)
-                             else outputStrLn $ render $ printProof (position proof) (context proof) (fst (ty proof))
+                             then ((outputStrLn $ "prueba terminada\n" ++ (render $ printTerm $ getTermFromProof proof))
+                                   >> resetProver)
+                             else outputStrLn $ render $ printProof (position proof) (context proof) (map fst (ty proof))
                            prover
 
 
@@ -56,11 +56,11 @@ resetProver :: ProofInputState ()
 resetProver = lift $ put Nothing
 
 isFinalTerm :: ProofState -> Bool
-isFinalTerm (PState {term=Term _}) = True
+isFinalTerm (PState {term=[Term _]}) = True
 isFinalTerm _ = False
 
 getTermFromProof :: ProofState -> Term
-getTermFromProof (PState {term=Term t}) = t
+getTermFromProof (PState {term=[Term t]}) = t
 getTermFromProof _ = error "getTermFromProof: no debería pasar"
 
 

@@ -24,8 +24,8 @@ habitar _ Intro = throwError IntroE1
 habitar st@(PState {position=n:ns,context=c:cs}) (Apply h) = do i <- getHypothesisValue n h
                                                                 applyComm i st (c !! (n-i-1))
                                                           
---habitar st@(PState {position=n, context=c, ty=(And t1 t2, TAnd)d, term=HoleT empTerm:ts}) Split
-
+habitar (PState {position=n:ns, context=c:cs, ty=(And t1 t2, TAnd t1' t2'):tys, term=(HoleT et):ts}) Split =
+  return $ PState {position=n:n:ns, context=c:c:cs, ty=(t1,t1'):(t2,t2'):tys, term=(DoubleHoleT $ (\x y -> et ((intro_and t1' t2') :@: x :@: y))):ts}
 
 -- Asumimos que las tuplas del 2º arg. de applyComm, tienen la forma correcta.
 applyComm :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
@@ -33,27 +33,31 @@ applyComm i (PState {position=n:ns, context=c:cs, ty=(t, t'):tys, term=ts}) (Fun
   | t' == t2' = return $ PState {position=n:ns, context=c:cs, ty=(t1,t1'):tys, term=propagateTerm (\x -> (Bound i) :@: x) ts}
   | otherwise = throwError ApplyE1
 applyComm i (PState {position=n:ns, context=c:cs, ty=(t,t'):tys, term=ts}) (ForAll v t1, TForAll t1') =
-  case unification (t1, t1') (t,t') of
-    Nothing -> return $ PState {position=ns, context=cs, ty=tys, term=simplifyTerms ((Bound i) :!: bottom) ts}
-    Just x -> return $ PState {position=ns, context=cs, ty=tys, term=simplifyTerms ((Bound i) :!: x) ts}
+  do r <- unification (t1, t1') (t,t')
+     case r of
+       Nothing -> return $ PState {position=ns, context=cs, ty=tys, term=simplifyTerms ((Bound i) :!: bottom) ts}
+       Just x -> return $ PState {position=ns, context=cs, ty=tys, term=simplifyTerms ((Bound i) :!: x) ts}
 applyComm _ _ _ = throwError ApplyE2
 
+intro_and :: TType -> TType -> Term
+intro_and t1' t2' = Lam t1' $ Lam t2' $ BLam $ Lam (TFun t1' (TFun t2' (TBound 0))) (((Bound 0) :@: (Bound 2)) :@: (Bound 1))
 
 simplifyTerms :: Term -> [SpecialTerm] -> [SpecialTerm]
 simplifyTerms t [HoleT et] = [Term $ et t]
-simplifyTerms t (DoubleHoleT et):ts = (HoleT $ et t):ts
-simplifyTerms t (HoleT et):(DoubleHoleT et'):ts = (HoleT et' $ et $ t):ts
+simplifyTerms t ((DoubleHoleT et):ts) = (HoleT $ et t):ts
+simplifyTerms t ((HoleT et):(DoubleHoleT et'):ts) = (HoleT $ (et' . et) t):ts
 
 propagateTerm :: (Term->Term) -> [SpecialTerm] -> [SpecialTerm]
-propagateTerm et (HoleT et'):ts = (HoleT $ et' . et):ts
-propagateTerm et (DoubleHoleT et'):ts = (DoubleHoleT $ et' . et):ts
+propagateTerm et ((HoleT et'):ts) = (HoleT $ et' . et):ts
+propagateTerm et ((DoubleHoleT et'):ts) = (DoubleHoleT $ et' . et):ts
 
 isFreeType' :: Var -> TType -> Bool
 isFreeType' q (TFree p) = q == p
 isFreeType' q (TBound p) = False
 isFreeType' q (TFun a b) = isFreeType' q a || isFreeType' q b
 isFreeType' q (TForAll a) = isFreeType' q a
-                
+isFreeType' q (TAnd a b) = isFreeType' q a || isFreeType' q b
+
 isFreeType :: Var -> Context -> Bool
 isFreeType q = foldl (\r x -> isFreeType' q (snd x) || r) False
 
@@ -94,6 +98,8 @@ typeWithoutName' :: [String] -> Type -> TType
 typeWithoutName' xs (B t) = maybe (TFree t) TBound (t `elemIndex` xs)
 typeWithoutName' xs (Fun t t') = TFun (typeWithoutName' xs t) (typeWithoutName' xs t')
 typeWithoutName' xs (ForAll v t) = TForAll $ typeWithoutName' (v:xs) t
+typeWithoutName' xs (And t t') = TAnd (typeWithoutName' xs t) (typeWithoutName' xs t')
+typeWithoutName' xs (Or t t') = TOr (typeWithoutName' xs t) (typeWithoutName' xs t')
 
 
 unification :: (Type,TType) -> (Type,TType) -> Either ProofExceptions (Maybe (Type,TType))
@@ -113,6 +119,12 @@ unif _ sust (t1,TFree n) (tt1,TFree m)
   | n == m = return sust
   | otherwise = throwError Unif3
 unif pos sust (Fun t1 t2,TFun t1' t2') (Fun tt1 tt2, TFun tt1' tt2') =
+  do res <- unif pos sust (t1,t1') (tt1, tt1')
+     unif pos res (t2,t2') (tt2,tt2')
+unif pos sust (And t1 t2,TAnd t1' t2') (And tt1 tt2, TAnd tt1' tt2') =
+  do res <- unif pos sust (t1,t1') (tt1, tt1')
+     unif pos res (t2,t2') (tt2,tt2')
+unif pos sust (Or t1 t2,TOr t1' t2') (Fun tt1 tt2, TFun tt1' tt2') =
   do res <- unif pos sust (t1,t1') (tt1, tt1')
      unif pos res (t2,t2') (tt2,tt2')
 unif pos sust (ForAll _ t, TForAll t') (ForAll _ tt, TForAll tt') = unif (pos+1) sust (t,t') (tt,tt')

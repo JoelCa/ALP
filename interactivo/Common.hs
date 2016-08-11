@@ -58,12 +58,12 @@ type Context = [(Type,TType)]
 data Command = Ty Type | Ta Tactic deriving (Show)
 
   -- Tácticas
-data Tactic = Assumption | Apply String | Intro | Split deriving (Show)
+data Tactic = Assumption | Apply String | Intro | Split | Elim String | CLeft | CRight deriving (Show)
 
 
   -- Excepciones
 data ProofExceptions = PNotFinished | PNotStarted | SyntaxE | AssuE | IntroE1 | IntroE2 | ApplyE1 | ApplyE2 |
-                       ApplyE3 | ApplyE4 | Unif1 | Unif2 | Unif3 | Unif4 | CommandInvalid
+                       ApplyE3 | ApplyE4 | Unif1 | Unif2 | Unif3 | Unif4 | ElimE1 | CommandInvalid
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
@@ -74,6 +74,7 @@ data ProofState = PState {position :: [Int]
                          , context :: [Context]
                          , ty :: [(Type, TType)]
                          , term :: [SpecialTerm]
+                         , subp :: Int
                          }
                                     
 data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) | Term Term

@@ -25,7 +25,6 @@ main = do args <- getArgs
 prover :: ProofInputState ()
 prover = do minput <- getInputLine "> "
             s <- lift get
-            when (isNothing s) (outputStrLn "Estado nulo")
             case minput of
               Nothing -> return ()
               Just "-quit" -> do outputStrLn "Saliendo."
@@ -38,8 +37,8 @@ prover = do minput <- getInputLine "> "
 checkCommand :: Command -> ProofInputState ()
 checkCommand (Ty ty) = do s <- lift get
                           when (isJust s) (throwIO PNotFinished)
-                          outputStrLn $ render $ printProof [0] [[]] [ty]
-                          lift $ put $ Just $ PState {position=[0], context=[[]], ty=[(ty, typeWithoutName ty)], term=[HoleT id]}
+                          outputStrLn $ render $ printProof 1 [0] [[]] [ty]
+                          lift $ put $ Just $ PState {subp=1, position=[0], context=[[]], ty=[(ty, typeWithoutName ty)], term=[HoleT id]}
                           prover
 checkCommand (Ta ta) = do  s <- lift get
                            when (isNothing s) (throwIO PNotStarted)
@@ -48,7 +47,7 @@ checkCommand (Ta ta) = do  s <- lift get
                            if (isFinalTerm proof)
                              then ((outputStrLn $ "prueba terminada\n" ++ (render $ printTerm $ getTermFromProof proof))
                                    >> resetProver)
-                             else outputStrLn $ render $ printProof (position proof) (context proof) (map fst (ty proof))
+                             else outputStrLn $ render $ printProof (subp proof) (position proof) (context proof) (map fst (ty proof))
                            prover
 
 
@@ -70,17 +69,18 @@ returnInput (Right x) = return x
 
 
 errorMessage :: ProofExceptions -> ProofInputState ()
-errorMessage SyntaxE = outputStrLn "error sintaxis"
-errorMessage PNotFinished = outputStrLn "error: prueba no terminada"
-errorMessage PNotStarted = outputStrLn "error: prueba no comenzada"
-errorMessage AssuE = outputStrLn "error: comando assumption mal aplicado"
-errorMessage IntroE1 = outputStrLn "error: comando intro mal aplicado"
-errorMessage IntroE2 = outputStrLn "error: comando intro, variable no tipo libre"
-errorMessage ApplyE1 = outputStrLn "error: comando apply mal aplicado, función no coincide tipo"
-errorMessage ApplyE2 = outputStrLn "error: comando apply mal aplicado, hipótesis no es función ni cuantificación"
-errorMessage ApplyE3 = outputStrLn "error: comando apply, hipótesis no existe"
-errorMessage Unif1 = outputStrLn "error: unificación inválida 1"
-errorMessage Unif2 = outputStrLn "error: unificación inválida 2"
-errorMessage Unif3 = outputStrLn "error: unificación inválida 3"
-errorMessage Unif4 = outputStrLn "error: unificación inválida 4"
-errorMessage CommandInvalid = outputStrLn "error: comando inválido"
+errorMessage SyntaxE = outputStrLn "error sintaxis."
+errorMessage PNotFinished = outputStrLn "error: prueba no terminada."
+errorMessage PNotStarted = outputStrLn "error: prueba no comenzada."
+errorMessage AssuE = outputStrLn "error: comando assumption mal aplicado."
+errorMessage IntroE1 = outputStrLn "error: comando intro mal aplicado."
+errorMessage IntroE2 = outputStrLn "error: comando intro, variable no tipo libre."
+errorMessage ApplyE1 = outputStrLn "error: comando apply mal aplicado, función no coincide tipo."
+errorMessage ApplyE2 = outputStrLn "error: comando apply mal aplicado, hipótesis no es función ni cuantificación."
+errorMessage ApplyE3 = outputStrLn "error: comando apply, hipótesis no existe."
+errorMessage Unif1 = outputStrLn "error: unificación inválida 1."
+errorMessage Unif2 = outputStrLn "error: unificación inválida 2."
+errorMessage Unif3 = outputStrLn "error: unificación inválida 3."
+errorMessage Unif4 = outputStrLn "error: unificación inválida 4."
+errorMessage ElimE1 = outputStrLn "error: comando elim mal aplicado."
+errorMessage CommandInvalid = outputStrLn "error: comando inválido."

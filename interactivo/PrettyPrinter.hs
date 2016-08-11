@@ -47,7 +47,8 @@ fType (TBound  _) = []
 fType (TFree n) = [n]
 fType (TFun t u) = fType t ++ fType u
 fType (TForAll t) = fType t
-
+fType (TAnd t u) = fType t ++ fType u
+fType (TOr t u) = fType t ++ fType u
 
 -- pretty-printer de términos
 printTerm :: Term -> Doc 
@@ -60,7 +61,7 @@ parenIf True d    = PP.parens d
 printTerm' :: Int -> [String] -> [String] -> [String] -> [String] -> Term -> Doc
 printTerm' _ bs _  _ _ (Bound j)         = text $ bs !! j
 printTerm' _ _  _  _ _ (Free (Global n)) = text n
-printTerm' _ _  _  _ _ (Free (Quote n))  = text "quoted"<>text (show n)
+printTerm' _ _  _  _ _ (Free (Quote n))  = text "quoted" <> text (show n)
 printTerm' i bs bts fs fts (t :@: u)     = parenIf (i < 1) $ 
                                            printTerm' 2 bs bts fs fts t <+> 
                                            printTerm' 0 bs bts fs fts u
@@ -104,11 +105,11 @@ printTType' i bs (f:fs) (TForAll t) =  parenIf (i > 1) $
                                        printTType' 1 (f:bs) fs t
 printTType' i bs fs (TAnd t u) = parenIf (i < 1) $ 
                                  printTType' 2 bs fs t <+>
-                                 text "->" <+>
+                                 text "/\\" <+>
                                  printTType' 0 bs fs u
 printTType' i bs fs (TOr t u) = parenIf (i < 1) $ 
                                  printTType' 2 bs fs t <+>
-                                 text "->" <+>
+                                 text "\\/" <+>
                                  printTType' 0 bs fs u
 
 
@@ -126,22 +127,28 @@ printType' False (ForAll v t) = text "forall" <+>
                                 printType' False t
 printType' True t             = PP.parens $ printType' False t
 printType' False (And t1 t2)  = printType' True t1 <+> 
-                                text "and"         <+> 
+                                text "/\\"         <+> 
                                 printType' False t2
 printType' False (Or t1 t2)   = printType' True t1 <+> 
-                                text "or"         <+> 
+                                text "\\/"         <+> 
                                 printType' False t2
 
 
-printProof :: [Int] -> [Context] -> [Type] -> Doc
-printProof [] [] [] =  empty
-printProof (n:ns) (c:cs) (ty:tys) = printProof' n c ty $$
-                                    printProof ns cs tys
+printProof :: Int -> [Int] -> [Context] -> [Type] -> Doc
+printProof = printSubProofs 1
+
+printSubProofs :: Int -> Int -> [Int] -> [Context] -> [Type] -> Doc
+printSubProofs _ _ [] [] [] =  empty
+printSubProofs i tp (n:ns) (c:cs) (ty:tys) = printSubProofs' i tp n c ty $$
+                                             printSubProofs (i+1) tp ns cs tys
                                     
-printProof' :: Int -> Context -> Type -> Doc
-printProof' n c ty = printHypothesis n c $$
-                     text "___________________" $$
-                     printType ty
+printSubProofs' :: Int -> Int -> Int -> Context -> Type -> Doc
+printSubProofs' 1 tp n c ty = (text $ "Hay " ++ show tp ++ " sub pruebas.\n") $$
+                              printHypothesis n c $$
+                              (text $ "___________________[1/"++ show tp ++"]") $$
+                              printType ty
+printSubProofs' i tp n c ty = (text $ "___________________["++(show i)++"/"++(show tp)++"]") $$
+                              printType ty
 
 printHypothesis :: Int -> Context -> Doc
 printHypothesis 0 [] = empty

@@ -5,7 +5,7 @@ import Common
 
 type Proof = Either ProofExceptions Command
 
-reservedWords = ["forall", "exists","and","or"]
+reservedWords = ["forall", "exists"]
 
 getCommand :: String -> Proof
 getCommand s = case parse exprTy s of
@@ -26,39 +26,53 @@ exprTy' :: Parser Type
 exprTy' = do t <- termTy
              (do symbol "->"
                  e <- exprTy'
-                 return (Fun t e)
-              <|> do symbol "and"
-                     e <- exprTy'
-                     return (And t e)
-              <|> do symbol "or"
-                     e <- exprTy'
-                     return (Or t e)
+                 return (Fun t e)              
               <|> return t)
           <|> do symbol "forall"
                  t <- validIdent reservedWords
                  symbol ","
                  e <- exprTy'
                  return (ForAll t e)
-                           
+
 termTy :: Parser Type
-termTy = do char '('
-            e <- exprTy'
-            char ')'
-            return e
-         <|> do v <- validIdent reservedWords
-                return (B v)
-                            
+termTy = do t <- termTy'
+            (do symbol $ "/" ++ [head "\\"]
+                t' <- termTy
+                return (And t t')
+             <|> do symbol $ [head "\\"] ++ "/"
+                    t' <- termTy
+                    return (Or t t')
+             <|> return t)
+            
+termTy' :: Parser Type
+termTy' = do char '('
+             e <- exprTy'
+             char ')'
+             return e
+          <|> do v <- validIdent reservedWords
+                 return (B v)
+
 termTac :: Parser Tactic
 termTac = do symbol "assumption"
              char '.'
              return Assumption
           <|> do symbol "apply"
-                 x <- validIdent reservedWords
+                 x <- identifier
                  char '.'
-                 return (Apply x)
+                 return $ Apply x
+          <|> do symbol "elim"
+                 x <- identifier
+                 char '.'
+                 return $ Elim x
           <|> do symbol "intro" --cambiar
                  char '.'
                  return Intro
           <|> do symbol "split"
                  char '.'
                  return Split
+          <|> do symbol "left"
+                 char '.'
+                 return CLeft
+          <|> do symbol "right"
+                 char '.'
+                 return CRight

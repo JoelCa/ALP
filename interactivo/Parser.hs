@@ -9,18 +9,20 @@ reservedWords = ["forall", "exists"]
 
 getCommand :: String -> Proof
 getCommand s = case parse exprTy s of
-  [(x,[])] -> return $ Ty x
+  [((x,y),[])] -> return $ Ty x y
   [(_,_)] -> Left SyntaxE
   [] -> case parse termTac s of
     [(x,[])] -> return $ Ta x
     _ -> Left SyntaxE
 
 
-exprTy :: Parser Type
+exprTy :: Parser (String,Type)
 exprTy = do symbol "Theorem"
+            name <- validIdent reservedWords
+            symbol ":"
             t <- exprTy'
             symbol "." -- NO puedo usar '\n' como fin del comando, por que symbol lo come
-            return t
+            return (name,t)
              
 exprTy' :: Parser Type
 exprTy' = do t <- termTy
@@ -76,3 +78,7 @@ termTac = do symbol "assumption"
           <|> do symbol "right"
                  char '.'
                  return CRight
+          <|> do symbol "print"
+                 x <- identifier
+                 char '.'
+                 return $ Print x

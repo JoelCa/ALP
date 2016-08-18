@@ -4,6 +4,7 @@ module Common where
 
 import Data.Typeable
 import System.Console.Haskeline.MonadException
+import Data.Map (Map)
 
   -- Tipos de los nombres
 data Name
@@ -53,28 +54,42 @@ data Value = VLam Type Term
 
   -- Contextos del tipado
 type Context = [(Type,TType)]
+type TypeContext = [String]
   
   --Comandos
-data Command = Ty Type | Ta Tactic deriving (Show)
+data Command = Ty String Type | Ta Tactic deriving (Show)
 
   -- Tácticas
-data Tactic = Assumption | Apply String | Intro | Split | Elim String | CLeft | CRight deriving (Show)
+data Tactic = Assumption | Apply String | Intro | Split | Elim String | CLeft | CRight | Print String deriving (Show)
 
 
   -- Excepciones
-data ProofExceptions = PNotFinished | PNotStarted | SyntaxE | AssuE | IntroE1 | IntroE2 | ApplyE1 | ApplyE2 |
-                       ApplyE3 | ApplyE4 | Unif1 | Unif2 | Unif3 | Unif4 | ElimE1 | CommandInvalid
+data ProofExceptions = PNotFinished | PNotStarted | PExist String |
+                       PNotExist String | SyntaxE | AssuE | IntroE1 |
+                       IntroE2 | ApplyE1 | ApplyE2 |
+                       ApplyE3 | ApplyE4 | Unif1 |
+                       Unif2 | Unif3 | Unif4 | ElimE1 |
+                       CommandInvalid
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
 
 
   -- Estado de la prueba
+data ProverState = PSt { proof :: Maybe ProofState
+                       , global :: Map String Term
+                       }
+
+
 data ProofState = PState {position :: [Int]
                          , context :: [Context]
+                         , typeContext :: [TypeContext]
                          , ty :: [(Type, TType)]
                          , term :: [SpecialTerm]
                          , subp :: Int
+                         , name :: String
                          }
+                  
+
                                     
 data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) | Term Term

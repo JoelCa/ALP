@@ -66,7 +66,7 @@ Derived primitives
 > letter                        =  sat isAlpha
 > 
 > alphanum                      :: Parser Char
-> alphanum                      =  sat isAlphaNum
+> alphanum                      =  sat (\x-> isAlphaNum x || (x == '_')) -- Modifiqué esta parte
 > 
 > char                          :: Char -> Parser Char
 > char x                        =  sat (== x)
@@ -86,7 +86,7 @@ Derived primitives
 >                                     return (v:vs)
 > 
 > ident                         :: Parser String
-> ident                         =  do x  <- alphanum -- Modifiqué esta parte
+> ident                         =  do x  <- alphanum        -- Modifiqué esta parte
 >                                     xs <- many alphanum
 >                                     return (x:xs)
 > 

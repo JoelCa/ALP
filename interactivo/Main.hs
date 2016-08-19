@@ -53,13 +53,13 @@ newProof :: String -> Type -> TType -> ProofState
 newProof name ty tty = PState {name=name, subp=1, position=[0], typeContext = [[]], context=[[]], ty=[(ty, tty)], term=[HoleT id]}
 
 renderNewProof :: Type -> String
-renderNewProof ty = render $ printProof 1 [0] [[]] [ty]
+renderNewProof ty = render $ printProof 1 [0] [[]] [[]] [ty]
 
 renderFinalTerm :: ProofState -> String
 renderFinalTerm p = render $ printTerm $ getTermFromProof p
 
 renderProof :: ProofState -> String
-renderProof p = render $ printProof (subp p) (position p) (context p) (map fst (ty p))
+renderProof p = render $ printProof (subp p) (position p) (typeContext p) (context p) (map fst (ty p))
 
 
 -- Crea una variable en base al 1º arg. "v", que no está en ninguna de las listas de variables.

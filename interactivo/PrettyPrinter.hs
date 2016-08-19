@@ -134,21 +134,31 @@ printType' False (Or t1 t2)   = printType' True t1 <+>
                                 printType' False t2
 
 
-printProof :: Int -> [Int] -> [Context] -> [Type] -> Doc
+printProof :: Int -> [Int] -> [TypeContext] -> [Context] -> [Type] -> Doc
 printProof = printSubProofs 1
 
-printSubProofs :: Int -> Int -> [Int] -> [Context] -> [Type] -> Doc
-printSubProofs _ _ [] [] [] =  empty
-printSubProofs i tp (n:ns) (c:cs) (ty:tys) = printSubProofs' i tp n c ty $$
-                                             printSubProofs (i+1) tp ns cs tys
+printSubProofs :: Int -> Int -> [Int] ->  [TypeContext] -> [Context] -> [Type] -> Doc
+printSubProofs _ _ [] [] [] [] =  empty
+printSubProofs i tp (n:ns) (tc:tcs) (c:cs) (ty:tys) = printSubProofs' i tp n tc c ty $$
+                                                      printSubProofs (i+1) tp ns tcs cs tys
                                     
-printSubProofs' :: Int -> Int -> Int -> Context -> Type -> Doc
-printSubProofs' 1 tp n c ty = (text $ "Hay " ++ show tp ++ " sub pruebas.\n") $$
-                              printHypothesis n c $$
-                              (text $ "___________________[1/"++ show tp ++"]") $$
-                              printType ty
-printSubProofs' i tp n c ty = (text $ "___________________["++(show i)++"/"++(show tp)++"]") $$
-                              printType ty
+printSubProofs' :: Int -> Int -> Int -> TypeContext -> Context -> Type -> Doc
+printSubProofs' 1 tp n tc c ty = (text $ "Hay " ++ show tp ++ " sub pruebas.\n") $$
+                                 printContext n tc c $$
+                                 (text $ "___________________[1/"++ show tp ++"]") $$
+                                 printType ty
+printSubProofs' i tp n _ _ ty = (text $ "___________________["++(show i)++"/"++(show tp)++"]") $$
+                                printType ty
+
+
+printContext :: Int -> TypeContext -> Context -> Doc
+printContext n tc c = printQuantifiers tc $$
+                      printHypothesis n c
+
+printQuantifiers :: TypeContext -> Doc
+printQuantifiers [] = empty
+printQuantifiers (q:tc) = text q $$
+                          printQuantifiers tc
 
 printHypothesis :: Int -> Context -> Doc
 printHypothesis 0 [] = empty

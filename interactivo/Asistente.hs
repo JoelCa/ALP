@@ -7,7 +7,7 @@ import Data.List (findIndex, elemIndex)
 habitar :: ProofState -> Tactic -> Either ProofExceptions ProofState
 --habitar (PState {term=Term _}) _ = error "habitar: no debería pasar"
 
-habitar (PState {name=name, subp=p, position=n:ns, typeContext=tcs, context=c:cs, ty=(t, tw):tys, term=ts}) Assumption =
+habitar (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=(t, tw):tys, term=ts}) Assumption =
   do i <- maybeToEither AssuE (findIndex (\x->snd x == tw) c)
      return $ PState {name=name, subp=p-1, position=ns, typeContext=tcs, context=cs, ty=tys, term=simplify (Bound i) ts}
 
@@ -27,31 +27,33 @@ habitar st@(PState {position=n:ns,context=c:cs}) (Elim h) = do i <- getHypothesi
                                                                elimComm i st (c !! (n-i-1))
                                                                
 habitar (PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(Or t1 t2 , TOr t1' t2'):tys, term=ts}) CLeft = 
-  return $ PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t1,t1'):tys, term=addHT (\x -> (Free $ Global "intro_or1") :@: x) ts}
+  return $ PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t1,t1'):tys,
+                   term=addHT (\x -> ((Free $ Global "intro_or1") :!: (t1,t1') :!: (t2,t2')) :@: x) ts}
 
 habitar (PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(Or t1 t2 , TOr t1' t2'):tys, term=ts}) CRight = 
-  return $ PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t2,t2'):tys, term=addHT (\x -> (Free $ Global "intro_or2") :@: x) ts}
+  return $ PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t2,t2'):tys,
+                   term=addHT (\x -> ((Free $ Global "intro_or2") :!: (t1,t1') :!: (t2,t2')) :@: x) ts}
 
-habitar (PState {name=name, subp=p, position=n:ns, typeContext=tcs, context=c:cs, ty=(And t1 t2, TAnd t1' t2'):tys, term=ts}) Split =
-  return $ PState {name=name, subp=p+1, position=n:n:ns, typeContext=tcs, context=c:c:cs, ty=(t1,t1'):(t2,t2'):tys,
-                   term=addDHT (\x y -> (Free $ Global "intro_and") :@: x :@: y) ts}
+habitar (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=(And t1 t2, TAnd t1' t2'):tys, term=ts}) Split =
+  return $ PState {name=name, subp=p+1, position=n:n:ns, typeContext=tc:tc:tcs, context=c:c:cs, ty=(t1,t1'):(t2,t2'):tys,
+                   term=addDHT (\x y -> ((Free $ Global "intro_and") :!: (t1,t1') :!: (t2,t2')) :@: x :@: y) ts}
 
 
 -- Asumimos que las tuplas del 3º arg. , tienen la forma correcta.
 elimComm :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
 elimComm i (PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t, t'):tys, term=ts}) (And t1 t2, TAnd t1' t2') =
   return $ PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(Fun t1 (Fun t2 t), TFun t1' (TFun t2' t')):tys,
-                   term=addHT (\x -> (Free $ Global "elim_and") :@: (Bound i) :@: x) ts}
-elimComm i (PState {name=name, subp=p, position=n:ns, typeContext=tcs, context=c:cs, ty=(t,t'):tys, term=ts}) (Or t1 t2, TOr t1' t2') =
-  return $ PState {name=name, subp=p+1, position=n:n:ns, typeContext=tcs, context=c:c:cs, ty=(Fun t1 t, TFun t1' t'):(Fun t2 t, TFun t2' t'):tys,
-                   term=addDHT (\x y -> (Free $ Global "elim_or") :@: (Bound i) :@: x :@: y) ts}
+                   term=addHT (\x -> ((Free $ Global "elim_and") :!: (t1,t1') :!: (t2,t2') :!: (t,t')) :@: (Bound i) :@: x) ts}
+elimComm i (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=(t,t'):tys, term=ts}) (Or t1 t2, TOr t1' t2') =
+  return $ PState {name=name, subp=p+1, position=n:n:ns, typeContext=tc:tc:tcs, context=c:c:cs, ty=(Fun t1 t, TFun t1' t'):(Fun t2 t, TFun t2' t'):tys,
+                   term=addDHT (\x y -> ((Free $ Global "elim_or") :!: (t1,t1') :!: (t2,t2') :!: (t,t')) :@: (Bound i) :@: x :@: y) ts}
 elimComm _ _ _ = throwError ElimE1
 
 applyComm :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
 applyComm i (PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t, t'):tys, term=ts}) (Fun t1 t2, TFun t1' t2')
   | t' == t2' = return $ PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t1,t1'):tys, term=addHT (\x -> (Bound i) :@: x) ts}
   | otherwise = throwError ApplyE1
-applyComm i (PState {name=name, subp=p, position=n:ns, typeContext=tcs, context=c:cs, ty=(t,t'):tys, term=ts}) (ForAll v t1, TForAll t1') =
+applyComm i (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=(t,t'):tys, term=ts}) (ForAll v t1, TForAll t1') =
   do r <- unification (t1, t1') (t,t')
      case r of
        Nothing -> return $ PState {name=name, subp=p-1, position=ns, typeContext=tcs, context=cs, ty=tys, term=simplify ((Bound i) :!: bottom) ts}

@@ -11,8 +11,7 @@ import Control.Monad.State.Strict
 import Control.Monad.IO.Class
 import Data.Maybe
 import qualified Data.Map as Map
-  
-import Data.List (findIndex, elemIndex)
+  import Data.List (findIndex, elemIndex)
 
 
 type ProverInputState a = InputT (StateT ProverState IO) a
@@ -35,7 +34,7 @@ main = do args <- getArgs
 
 
 initProverState :: ProverState
-initProverState = PSt {global=initialT, proof=Nothing}
+initProverState = PSt {global=PGlobal {terms=initialT, props=[]}, proof=Nothing}
 
 
 prover :: ProverInputState ()
@@ -49,8 +48,8 @@ prover = do minput <- getInputLine "> "
                                   checkCommand command) (\e -> errorMessage (e :: ProofExceptions) >> prover)
 
 
-newProof :: String -> Type -> TType -> ProofState
-newProof name ty tty = PState {name=name, subp=1, position=[0], typeContext = [[]], context=[[]], ty=[(ty, tty)], term=[HoleT id]}
+newProof :: String -> Type -> TType -> TypeContext -> ProofState
+newProof name ty tty ps = PState {name=name, subp=1, position=[0], typeContext = [ps], context=[[]], ty=[(ty, tty)], term=[HoleT id]}
 
 renderNewProof :: Type -> String
 renderNewProof ty = render $ printProof 1 [0] [[]] [[]] [ty]
@@ -79,11 +78,11 @@ getRename v fv rv
                 then newVar v fv rv
                 else v
 
-rename :: Type -> (Type, TType)
+rename :: Type -> [String] -> Either (Type, TType) String
 rename = (\(x,y,z) -> (y,z)) . (rename' [] [] [])
 
-rename':: [String] -> [String] -> [String] -> Type -> ([String], Type, TType)
-rename' fv rv bv (B v) = maybe (v:fv, B v, TFree v) (\i->(fv, B $ rv!!i, TBound i)) (v `elemIndex` bv)
+rename' :: [String] -> [String] -> [String] -> Type -> ([String], Type, TType)
+rename' fv rv bv (B v) = maybe (v:fv, B v, TFree v) (\i->(fv, B $ rv!!i, TFBound i)) (v `elemIndex` bv)
 rename' fv rv bv (ForAll v t) = let v' = getRename v fv rv
                                     (fv',x,y) = rename' fv (v':rv) (v:bv) t
                                 in (fv', ForAll v' x, TForAll y)
@@ -98,18 +97,44 @@ rename' fv rv bv (Or t t') = let (fv',x,y) = rename' fv rv bv t
                              in (fv'', Or x x', TOr y y')
 
 
+propRepeated2 :: [String] -> [String] -> Maybe String
+propRepeated2 _ [] = Nothing
+propRepeated2 [] _ = Nothing
+propRepeated2 (p:ps) ps'
+  | elem p ps' = return p
+  | otherwise = propRepeated2 ps ps'
+                
+propRepeated1 :: [String] -> Maybe String
+propRepeated1 [] = Nothing
+propRepeated1 (p:ps)
+  | elem p ps = return p
+  | otherwise = propRepeated1 ps
+
+
 checkCommand :: Command -> ProverInputState ()
 checkCommand (Ty name ty) = do s <- lift get
                                when (isJust $ proof s) (throwIO PNotFinished)
-                               when (Map.member name (global s)) (throwIO $ PExist name)
+                               when (Map.member name (terms $ global s)) (throwIO $ PExist name)
                                let (tyr,tty) = rename ty
-                               lift $ put $ PSt {global=global s, proof=Just $ newProof name tyr tty}
-                               outputStrLn $ renderNewProof tyr                               
+                               let p = newProof name tyr tty (props $ global s)
+                               lift $ put $ PSt {global=global s, proof=Just  p}
+                               outputStrLn $ renderProof p               
                                prover
                                
+checkCommand(Props ps) = do s <- lift get
+                            when (isJust $ proof s) (throwIO PNotFinished)
+                            let gps = props $ global s
+                            let pr1 = propRepeated1 ps
+                            let pr2 = propRepeated2 ps gps
+                            when (isJust pr1) (throwIO $ PropRepeated1 $ fromJust pr1)
+                            when (isJust pr2) (throwIO $ PropRepeated2 $ fromJust pr2)
+                            lift $ put $ PSt {global=PGlobal {terms=terms $ global s, props=ps++gps}, proof=proof s}
+                            prover
+
 checkCommand (Ta (Print x)) = do s <- lift get
-                                 when (Map.notMember x (global s)) (throwIO $ PNotExist x)
-                                 outputStrLn $ render $ printTerm $ (global s) Map.! x
+                                 let ter = terms $ global s
+                                 when (Map.notMember x ter) (throwIO $ PNotExist x)
+                                 outputStrLn $ render $ printTerm $ ter Map.! x
                                  prover
                                  
 checkCommand (Ta ta) = do  s <- lift get
@@ -130,7 +155,9 @@ resetProof = do s <- lift get
 reloadProver :: ProverInputState ()
 reloadProver = do s <- lift get
                   let p = fromJust $ proof s
-                  lift $ put $ PSt {global=Map.insert (name p) (getTermFromProof p) (global s), proof=Nothing}
+                  lift $ put $ PSt {global=PGlobal {terms=Map.insert (name p) (getTermFromProof p) (terms $ global s),
+                                                   props=props $ global s},
+                                    proof=Nothing}
 
 isFinalTerm :: ProofState -> Bool
 isFinalTerm (PState {term=[Term _]}) = True
@@ -164,3 +191,5 @@ errorMessage Unif3 = outputStrLn "error: unificación inválida 3."
 errorMessage Unif4 = outputStrLn "error: unificación inválida 4."
 errorMessage ElimE1 = outputStrLn "error: comando elim mal aplicado."
 errorMessage CommandInvalid = outputStrLn "error: comando inválido."
+errorMessage (PropRepeated1 s) = outputStrLn $ "error: proposición \""++ s ++"\" repetida."
+errorMessage (PropRepeated2 s) = outputStrLn $ "error: proposición \""++ s ++"\" ya existe."

@@ -43,7 +43,7 @@ ftv (BLam t)  = ftv t
 
 
 fType :: TType -> [String]
-fType (TBound  _) = []
+fType (TFBound  _) = []
 fType (TFree n) = [n]
 fType (TFun t u) = fType t ++ fType u
 fType (TForAll t) = fType t
@@ -92,7 +92,7 @@ printTType t = printTType' 1 [] (typeVars \\ fType t) t
 
 -- Chequear si es necesario usar parenIf
 printTType' :: Int -> [String] -> [String] -> TType -> Doc
-printTType' _ bs _ (TBound n) = text $ bs !! n
+printTType' _ bs _ (TFBound n) = text $ bs !! n
 printTType' _ bs _ (TFree n) = text n
 printTType' i bs fs (TFun t u) = parenIf (i < 1) $ 
                                  printTType' 2 bs fs t <+>
@@ -157,15 +157,21 @@ printContext n tc c = printQuantifiers tc $$
 
 printQuantifiers :: TypeContext -> Doc
 printQuantifiers [] = empty
-printQuantifiers (q:tc) = text q $$
+printQuantifiers (q:tc) = text q <+>
+                          text ":" <+>
+                          text "Prop" $$
                           printQuantifiers tc
 
 printHypothesis :: Int -> Context -> Doc
 printHypothesis 0 [] = empty
-printHypothesis 1 [(x,y)] = text "H0: " <>
-                        printType x
+printHypothesis 1 [(x,y)] = text "H0" <+>
+                            text ":" <+>
+                            printType x
 printHypothesis n ((x,y):xs) 
   | n > 0 = printHypothesis (n-1) xs $$
-            text "H" <> text (show (n-1)) <>  text ": " <> printType x
+            text "H" <>
+            text (show (n-1)) <+> 
+            text ":" <+>
+            printType x
   | otherwise = error "error: printHypothesis, no debería pasar"
 printHypothesis _ _ = error "error: printHypothesis, no debería pasar"

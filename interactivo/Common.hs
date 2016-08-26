@@ -21,15 +21,18 @@ type Var = String
 data Type = B Var
           | Fun Type Type
           | ForAll Var Type
+          | Exists Var Type
           | And Type Type
           | Or Type Type 
           deriving (Show, Eq)
   
   -- Tipo de los tipos localmente sin nombre
-data TType = TBound Int
+data TType = TFBound Int
+           | TEBound Int
            | TFree Var
            | TFun TType TType
            | TForAll TType
+           | TExists Type
            | TAnd TType TType
            | TOr TType TType
            deriving (Show, Eq)
@@ -57,7 +60,7 @@ type Context = [(Type,TType)]
 type TypeContext = [String]
   
   --Comandos
-data Command = Ty String Type | Ta Tactic deriving (Show)
+data Command = Ty String Type | Ta Tactic | Props [String] deriving (Show)
 
   -- Tácticas
 data Tactic = Assumption | Apply String | Intro | Split | Elim String | CLeft | CRight | Print String deriving (Show)
@@ -69,7 +72,7 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String |
                        IntroE2 | ApplyE1 | ApplyE2 |
                        ApplyE3 | ApplyE4 | Unif1 |
                        Unif2 | Unif3 | Unif4 | ElimE1 |
-                       CommandInvalid
+                       CommandInvalid | PropRepeated1 String | PropRepeated2 String
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
@@ -77,8 +80,12 @@ instance Exception ProofExceptions
 
   -- Estado de la prueba
 data ProverState = PSt { proof :: Maybe ProofState
-                       , global :: Map String Term
+                       , global :: ProverGlobal
                        }
+                   
+data ProverGlobal = PGlobal { props :: [String]
+                         , terms :: Map String Term
+                         }
 
 
 data ProofState = PState {position :: [Int]

@@ -63,24 +63,24 @@ applyComm _ _ _ = throwError ApplyE2
 
 
 intro_and :: Term
-intro_and = BLam $ BLam $ Lam (TFBound 1) $ Lam (TFBound 0) $ BLam $ Lam (TFun (TFBound 2) (TFun (TFBound 1) (TFBound 0)))
+intro_and = BLam $ BLam $ Lam (TBound 1) $ Lam (TBound 0) $ BLam $ Lam (TFun (TBound 2) (TFun (TBound 1) (TBound 0)))
             (((Bound 0) :@: (Bound 2)) :@: (Bound 1))
             
 elim_and :: Term
-elim_and = BLam $ BLam $ BLam $ Lam (TAnd (TFBound 2) (TFBound 1)) $ Lam (TFun (TFBound 2) (TFun (TFBound 1) (TFBound 0)))
-           (Bound 1) :!: (B "c", TFBound 0) :@: (Bound 0)
+elim_and = BLam $ BLam $ BLam $ Lam (TAnd (TBound 2) (TBound 1)) $ Lam (TFun (TBound 2) (TFun (TBound 1) (TBound 0)))
+           (Bound 1) :!: (B "c", TBound 0) :@: (Bound 0)
 
 intro_or1 ::Term
-intro_or1 = BLam $ BLam $ Lam (TFBound 1) $ BLam $ Lam (TFun (TFBound 2) (TFBound 0)) $ Lam (TFun (TFBound 1) (TFBound 0))
+intro_or1 = BLam $ BLam $ Lam (TBound 1) $ BLam $ Lam (TFun (TBound 2) (TBound 0)) $ Lam (TFun (TBound 1) (TBound 0))
             (Bound 1) :@: (Bound 2)
 
 intro_or2 ::Term
-intro_or2 = BLam $ BLam $ Lam (TFBound 0) $ BLam $ Lam (TFun (TFBound 2) (TFBound 0)) $ Lam (TFun (TFBound 1) (TFBound 0))
+intro_or2 = BLam $ BLam $ Lam (TBound 0) $ BLam $ Lam (TFun (TBound 2) (TBound 0)) $ Lam (TFun (TBound 1) (TBound 0))
             (Bound 0) :@: (Bound 2)
 
 elim_or :: Term
-elim_or = BLam $ BLam $ BLam $ Lam (TOr (TFBound 2) (TFBound 1)) $ Lam (TFun (TFBound 2) (TFBound 0)) $
-          Lam (TFun (TFBound 1) (TFBound 0)) $ (Bound 2) :!: (B "c", TFBound 0) :@: (Bound 1) :@: (Bound 0)
+elim_or = BLam $ BLam $ BLam $ Lam (TOr (TBound 2) (TBound 1)) $ Lam (TFun (TBound 2) (TBound 0)) $
+          Lam (TFun (TBound 1) (TBound 0)) $ (Bound 2) :!: (B "c", TBound 0) :@: (Bound 1) :@: (Bound 0)
 
 
 simplify :: Term -> [SpecialTerm] -> [SpecialTerm]
@@ -98,11 +98,13 @@ addDHT et ((DoubleHoleT et'):ts) = (DoubleHoleT et):(DoubleHoleT et'):ts
 
 isFreeType' :: Var -> TType -> Bool
 isFreeType' q (TFree p) = q == p
-isFreeType' q (TFBound p) = False
+isFreeType' q (TBound p) = False
 isFreeType' q (TFun a b) = isFreeType' q a || isFreeType' q b
 isFreeType' q (TForAll a) = isFreeType' q a
+isFreeType' q (TExists a) = isFreeType' q a
 isFreeType' q (TAnd a b) = isFreeType' q a || isFreeType' q b
 
+--Creo que no es necesaria
 isFreeType :: Var -> Context -> Bool
 isFreeType q = foldl (\r x -> isFreeType' q (snd x) || r) False
 
@@ -135,14 +137,14 @@ isValidValue n value = (value >= 0) && (value < n)
 --------------------------------------------------------------------
 
 bottom :: (Type, TType)
-bottom = (ForAll "a" (B "a"), TForAll (TFBound 0))
+bottom = (ForAll "a" (B "a"), TForAll (TBound 0))
 
 
 typeWithoutName :: Type -> TType
 typeWithoutName = typeWithoutName' []
 
 typeWithoutName' :: [String] -> Type -> TType
-typeWithoutName' xs (B t) = maybe (TFree t) TFBound (t `elemIndex` xs)
+typeWithoutName' xs (B t) = maybe (TFree t) TBound (t `elemIndex` xs)
 typeWithoutName' xs (Fun t t') = TFun (typeWithoutName' xs t) (typeWithoutName' xs t')
 typeWithoutName' xs (ForAll v t) = TForAll $ typeWithoutName' (v:xs) t
 typeWithoutName' xs (And t t') = TAnd (typeWithoutName' xs t) (typeWithoutName' xs t')
@@ -153,7 +155,7 @@ unification :: (Type,TType) -> (Type,TType) -> Either ProofExceptions (Maybe (Ty
 unification = unif 0 Nothing
 
 unif :: Int -> Maybe (Type,TType) -> (Type,TType) -> (Type,TType) -> Either ProofExceptions (Maybe (Type,TType))
-unif pos sust (t1,t2@(TFBound n)) tt@(tt1,tt2)
+unif pos sust (t1,t2@(TBound n)) tt@(tt1,tt2)
   | n == pos = case sust of
     Nothing -> maybe (throwError Unif1) (return . return) (substitution pos tt)
     Just (s,s') -> if s' == tt2
@@ -182,8 +184,8 @@ substitution :: Int -> (Type, TType) -> Maybe (Type, TType)
 substitution = substitution' 0
 
 substitution' :: Int -> Int -> (Type, TType) -> Maybe (Type, TType)
-substitution' m n (t,t'@(TFBound x))
-  | x >= n = return (t,TFBound (x-n))
+substitution' m n (t,t'@(TBound x))
+  | x >= n = return (t,TBound (x-n))
   | x < m = return (t,t')
   | otherwise = Nothing
 substitution' _ _ (t, t'@(TFree f)) = return (t,t')

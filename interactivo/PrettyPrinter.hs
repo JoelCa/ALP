@@ -43,10 +43,11 @@ ftv (BLam t)  = ftv t
 
 
 fType :: TType -> [String]
-fType (TFBound  _) = []
+fType (TBound  _) = []
 fType (TFree n) = [n]
 fType (TFun t u) = fType t ++ fType u
 fType (TForAll t) = fType t
+fType (TExists t) = fType t
 fType (TAnd t u) = fType t ++ fType u
 fType (TOr t u) = fType t ++ fType u
 
@@ -92,7 +93,7 @@ printTType t = printTType' 1 [] (typeVars \\ fType t) t
 
 -- Chequear si es necesario usar parenIf
 printTType' :: Int -> [String] -> [String] -> TType -> Doc
-printTType' _ bs _ (TFBound n) = text $ bs !! n
+printTType' _ bs _ (TBound n) = text $ bs !! n
 printTType' _ bs _ (TFree n) = text n
 printTType' i bs fs (TFun t u) = parenIf (i < 1) $ 
                                  printTType' 2 bs fs t <+>
@@ -102,6 +103,11 @@ printTType' i bs (f:fs) (TForAll t) =  parenIf (i > 1) $
                                        text "forall" <+> 
                                        text f <> 
                                        text "." <> 
+                                       printTType' 1 (f:bs) fs t
+printTType' i bs (f:fs) (TExists t) =  parenIf (i > 1) $
+                                       text "exists" <+>
+                                       text f <>
+                                       text "." <>
                                        printTType' 1 (f:bs) fs t
 printTType' i bs fs (TAnd t u) = parenIf (i < 1) $ 
                                  printTType' 2 bs fs t <+>
@@ -122,6 +128,10 @@ printType' False (Fun t1 t2)  = printType' True t1 <+>
                                 text "->"          <+> 
                                 printType' False t2
 printType' False (ForAll v t) = text "forall" <+>
+                                text v <>
+                                text "," <+>
+                                printType' False t
+printType' False (Exists v t) = text "exists" <+>
                                 text v <>
                                 text "," <+>
                                 printType' False t

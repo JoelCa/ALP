@@ -11,7 +11,7 @@ import Control.Monad.State.Strict
 import Control.Monad.IO.Class
 import Data.Maybe
 import qualified Data.Map as Map
-  import Data.List (findIndex, elemIndex)
+import Data.List (findIndex, elemIndex)
 
 
 type ProverInputState a = InputT (StateT ProverState IO) a
@@ -78,23 +78,38 @@ getRename v fv rv
                 then newVar v fv rv
                 else v
 
-rename :: Type -> [String] -> Either (Type, TType) String
-rename = (\(x,y,z) -> (y,z)) . (rename' [] [] [])
+getRenameWhitException :: [String] -> Type -> Either ProofExceptions (Type, TType)
+getRenameWhitException fv t =
+  case rename fv t of
+    Left s -> Left $ PropNotExists s
+    Right x -> Right x
+  
 
-rename' :: [String] -> [String] -> [String] -> Type -> ([String], Type, TType)
-rename' fv rv bv (B v) = maybe (v:fv, B v, TFree v) (\i->(fv, B $ rv!!i, TFBound i)) (v `elemIndex` bv)
-rename' fv rv bv (ForAll v t) = let v' = getRename v fv rv
-                                    (fv',x,y) = rename' fv (v':rv) (v:bv) t
-                                in (fv', ForAll v' x, TForAll y)
-rename' fv rv bv (Fun t t') = let (fv',x,y) = rename' fv rv bv t
-                                  (fv'',x',y') = rename' fv' rv bv t'
-                              in (fv'', Fun x x', TFun y y')
-rename' fv rv bv (And t t') = let (fv',x,y) = rename' fv rv bv t
-                                  (fv'',x',y') = rename' fv' rv bv t'
-                              in (fv'', And x x', TAnd y y')
-rename' fv rv bv (Or t t') = let (fv',x,y) = rename' fv rv bv t
-                                 (fv'',x',y') = rename' fv' rv bv t'
-                             in (fv'', Or x x', TOr y y')
+rename :: [String] -> Type -> Either String (Type, TType)
+rename fv = rename' fv [] []
+
+rename' :: [String] -> [String] -> [String] -> Type -> Either String (Type, TType)
+rename' fv rv bv (B v) =
+  case v `elemIndex` bv of
+    Just i -> return (B $ rv!!i, TBound i)
+    Nothing -> if elem v fv
+               then return (B v, TFree v)
+               else Left v
+rename' fv rv bv (ForAll v t) = do let v' = getRename v fv rv
+                                   (x,y) <- rename' fv (v':rv) (v:bv) t
+                                   return (ForAll v' x, TForAll y)
+rename' fv rv bv (Exists v t) = do let v' = getRename v fv rv
+                                   (x,y) <- rename' fv (v':rv) (v:bv) t
+                                   return (Exists v' x, TExists y)
+rename' fv rv bv (Fun t t') = do (x,y) <- rename' fv rv bv t
+                                 (x',y') <- rename' fv rv bv t'
+                                 return (Fun x x', TFun y y')
+rename' fv rv bv (And t t') = do (x,y) <- rename' fv rv bv t
+                                 (x',y') <- rename' fv rv bv t'
+                                 return (And x x', TAnd y y')
+rename' fv rv bv (Or t t') = do (x,y) <- rename' fv rv bv t
+                                (x',y') <- rename' fv rv bv t'
+                                return  (Or x x', TOr y y')
 
 
 propRepeated2 :: [String] -> [String] -> Maybe String
@@ -115,7 +130,7 @@ checkCommand :: Command -> ProverInputState ()
 checkCommand (Ty name ty) = do s <- lift get
                                when (isJust $ proof s) (throwIO PNotFinished)
                                when (Map.member name (terms $ global s)) (throwIO $ PExist name)
-                               let (tyr,tty) = rename ty
+                               (tyr,tty) <- returnInput $ getRenameWhitException (props $ global s) ty
                                let p = newProof name tyr tty (props $ global s)
                                lift $ put $ PSt {global=global s, proof=Just  p}
                                outputStrLn $ renderProof p               
@@ -193,3 +208,4 @@ errorMessage ElimE1 = outputStrLn "error: comando elim mal aplicado."
 errorMessage CommandInvalid = outputStrLn "error: comando inválido."
 errorMessage (PropRepeated1 s) = outputStrLn $ "error: proposición \""++ s ++"\" repetida."
 errorMessage (PropRepeated2 s) = outputStrLn $ "error: proposición \""++ s ++"\" ya existe."
+errorMessage (PropNotExists s) = outputStrLn $ "error: proposición \""++ s ++"\" no existe en el entorno."

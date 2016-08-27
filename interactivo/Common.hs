@@ -27,12 +27,11 @@ data Type = B Var
           deriving (Show, Eq)
   
   -- Tipo de los tipos localmente sin nombre
-data TType = TFBound Int
-           | TEBound Int
+data TType = TBound Int
            | TFree Var
            | TFun TType TType
            | TForAll TType
-           | TExists Type
+           | TExists TType
            | TAnd TType TType
            | TOr TType TType
            deriving (Show, Eq)
@@ -72,7 +71,8 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String |
                        IntroE2 | ApplyE1 | ApplyE2 |
                        ApplyE3 | ApplyE4 | Unif1 |
                        Unif2 | Unif3 | Unif4 | ElimE1 |
-                       CommandInvalid | PropRepeated1 String | PropRepeated2 String
+                       CommandInvalid | PropRepeated1 String | PropRepeated2 String |
+                       PropNotExists String
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions

@@ -3,6 +3,7 @@ module Asistente where
 import Common
 import Data.Char (isDigit)
 import Data.List (findIndex, elemIndex)
+import Control.Monad (unless)
 
 habitar :: ProofState -> Tactic -> Either ProofExceptions ProofState
 --habitar (PState {term=Term _}) _ = error "habitar: no debería pasar"
@@ -21,7 +22,7 @@ habitar (PState {name=name, subp=p, position=ns, typeContext=tc:tcs, context=c:c
 habitar _ Intro = throwError IntroE1
 
 habitar st@(PState {position=n:ns,context=c:cs}) (Apply h) = do i <- getHypothesisValue n h
-                                                                applyComm i st (c !! (n-i-1))
+                                                                applyComm (n-i-1) st (c !! (n-i-1))
                                                           
 habitar st@(PState {position=n:ns,context=c:cs}) (Elim h) = do i <- getHypothesisValue n h
                                                                elimComm i st (c !! (n-i-1))
@@ -56,10 +57,37 @@ elimComm i (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, contex
                    term=addDHT (\x y -> ((Free $ Global "elim_or") :!: (t1,t1') :!: (t2,t2') :!: (t,t')) :@: (Bound i) :@: x :@: y) ts}
 elimComm _ _ _ = throwError ElimE1
 
+getFinalType :: TType -> (TType, Int)
+getFinalType (TFun x y) = let (f, n) = getFinalType y
+                                  in (f, n+1)
+getFinalType x = (x, 0)
+
+repeatHead :: Int -> [a] -> [a]
+repeatHead _ [] = error "error: repeatHead"
+repeatHead n xs
+  | n == 0 = xs
+  | n > 0 = head xs : (repeatHead (n-1) xs )
+  | n < 0 = error "error: repeatHead"
+            
+getArgsType :: (Type, TType) -> [(Type, TType)]
+getArgsType (Fun t1 t2, TFun t1' t2') = (t1,t1') : getArgsType (t2, t2')
+getArgsType _ = []
+
+getApplyTerms :: Int -> Int -> [SpecialTerm] -> [SpecialTerm]
+getApplyTerms 1 i ts = addHT (\x -> (Bound i) :@: x) ts
+getApplyTerms 2 i ts = addDHT (\x y -> ((Bound i) :@: x) :@: y) ts
+getApplyTerms n i ts = addDHT (\x y -> x :@: y) $ getApplyTerms (n-1) i ts
+
 applyComm :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
-applyComm i (PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t, t'):tys, term=ts}) (Fun t1 t2, TFun t1' t2')
-  | t' == t2' = return $ PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t1,t1'):tys, term=addHT (\x -> (Bound i) :@: x) ts}
-  | otherwise = throwError ApplyE1
+applyComm i (PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t, t'):tys, term=ts}) ht@(Fun t1 t2, TFun t1' t2') =
+  do let (ft, n) = getFinalType $ snd ht
+     unless (t' == ft) (throwError ApplyE1)
+     return $ PState {name=name, subp=p+n-1,
+                      position=repeatHead (n-1) ns,
+                      typeContext=repeatHead (n-1) tcs,
+                      context=repeatHead (n-1) cs,
+                      ty=getArgsType ht ++ tys,
+                      term=getApplyTerms n i ts}
 applyComm i (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=(t,t'):tys, term=ts}) (ForAll v t1, TForAll t1') =
   do r <- unification (t1, t1') (t,t')
      case r of
@@ -183,6 +211,7 @@ unif pos sust (Or t1 t2,TOr t1' t2') (Fun tt1 tt2, TFun tt1' tt2') =
   do res <- unif pos sust (t1,t1') (tt1, tt1')
      unif pos res (t2,t2') (tt2,tt2')
 unif pos sust (ForAll _ t, TForAll t') (ForAll _ tt, TForAll tt') = unif (pos+1) sust (t,t') (tt,tt')
+unif pos sust (Exists _ t, TExists t') (Exists _ tt, TExists tt') = unif (pos+1) sust (t,t') (tt,tt')
 unif _ _ _ _ = throwError Unif4
 
 
@@ -191,7 +220,6 @@ substitution = substitution' 0
 
 substitution' :: Int -> Int -> (Type, TType) -> Maybe (Type, TType)
 substitution' m n (t,t'@(TBound x))
-  | x >= n = return (t,TBound (x-n))
   | x < m = return (t,t')
   | otherwise = Nothing
 substitution' _ _ (t, t'@(TFree f)) = return (t,t')
@@ -200,10 +228,11 @@ substitution' m n (Fun t1 t2,TFun t1' t2') = do (x,x') <- substitution' m n (t1,
                                                 return (Fun x y, TFun x' y')
 substitution' m n (ForAll v t, TForAll t') = do (x,x') <- substitution' (m+1) (n+1) (t,t')
                                                 return (ForAll v x, TForAll x')
+substitution' m n (Exists v t, TExists t') = do (x,x') <- substitution' (m+1) (n+1) (t,t')
+                                                return (Exists v x, TExists x')
 
 
 --------------------------------------------------------------------
--- Chequear que el renombre, NO rompa la unificación.
 renameBounds :: String -> TType -> TType
 renameBounds = renameBounds' 0
 

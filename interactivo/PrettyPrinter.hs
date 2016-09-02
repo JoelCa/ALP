@@ -59,13 +59,15 @@ parenIf :: Bool -> Doc -> Doc
 parenIf False d   = d
 parenIf True d    = PP.parens d
 
+
+--Arreglar paréntesis de :@:
 printTerm' :: Int -> [String] -> [String] -> [String] -> [String] -> Term -> Doc
 printTerm' _ bs _  _ _ (Bound j)         = text $ bs !! j
 printTerm' _ _  _  _ _ (Free (Global n)) = text n
 printTerm' _ _  _  _ _ (Free (Quote n))  = text "quoted" <> text (show n)
 printTerm' i bs bts fs fts (t :@: u)     = parenIf (i < 1) $ 
-                                           printTerm' 2 bs bts fs fts t <+> 
-                                           printTerm' 0 bs bts fs fts u
+                                           printTerm' 0 bs bts fs fts t <+> 
+                                           printTerm' 2 bs bts fs fts u
 printTerm' i bs bts (f:fs) fts (Lam t u) = parenIf (i > 1) $ 
                                            text "\\" <> 
                                            text f <> 

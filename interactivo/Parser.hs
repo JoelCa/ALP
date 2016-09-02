@@ -69,6 +69,7 @@ termTac = assumptionParser
           <|> applyParser
           <|> elimParser
           <|> introParser
+          <|> introsParser
           <|> splitParser
           <|> leftParser
           <|> rightParser
@@ -81,6 +82,9 @@ assumptionParser = tacticZeroArg "assumption" Assumption
 
 introParser :: Parser Tactic
 introParser = tacticZeroArg "intro" Intro
+
+introsParser :: Parser Tactic
+introsParser = tacticZeroArg "intros" Intros
 
 splitParser :: Parser Tactic
 splitParser = tacticZeroArg "split" Split

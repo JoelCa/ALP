@@ -19,6 +19,8 @@ habitar (PState {name=name, subp=p, position=ns, typeContext=tc:tcs, context=c:c
   | not $ isFreeType q c = return PState {name=name, subp=p, position=ns, typeContext=(q:tc):tcs, context=c:cs, ty=(t, renameBounds q t'):tys, term=addHT (\x -> BLam x) ts}
   | otherwise = throwError IntroE2
 
+habitar st Intros = introsComm False st
+
 habitar _ Intro = throwError IntroE1
 
 habitar st@(PState {position=n:ns,context=c:cs}) (Apply h) = do i <- getHypothesisValue n h
@@ -46,6 +48,14 @@ habitar (PState {name=name, subp=p, position=ns, typeContext=tc:tcs, context=c:c
      r <- getRenameTypeWhitException tc z
      return $ PState {name=name, subp=p, position=ns, typeContext=tc:tcs, context=c:cs, ty=(r,z'):tys, term=addHT (\x -> (Free $ Global "intro_exists") :@: x) ts}
 
+
+introsComm :: Bool -> ProofState -> Either ProofExceptions ProofState
+introsComm False st = do st' <- habitar st Intro
+                         introsComm True st
+introsComm True st =
+  case habitar st Intro of
+    Right x -> introsComm True x
+    Left x -> Right st
 
 -- Asumimos que las tuplas del 3º arg. , tienen la forma correcta.
 elimComm :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
@@ -76,7 +86,7 @@ getArgsType _ = []
 getApplyTerms :: Int -> Int -> [SpecialTerm] -> [SpecialTerm]
 getApplyTerms 1 i ts = addHT (\x -> (Bound i) :@: x) ts
 getApplyTerms 2 i ts = addDHT (\x y -> ((Bound i) :@: x) :@: y) ts
-getApplyTerms n i ts = addDHT (\x y -> x :@: y) $ getApplyTerms (n-1) i ts
+getApplyTerms n i ts =  getApplyTerms (n-1) i $ addDHT (\x y -> x :@: y) ts
 
 applyComm :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
 applyComm i (PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t, t'):tys, term=ts}) ht@(Fun t1 t2, TFun t1' t2') =

@@ -62,7 +62,7 @@ type TypeContext = [String]
 data Command = Ty String Type | Ta Tactic | Props [String] deriving (Show)
 
   -- Tácticas
-data Tactic = Assumption | Apply String | Intro | Split
+data Tactic = Assumption | Apply String | Intro | Intros | Split
             | Elim String | CLeft | CRight | Print String 
             | CExists Type
             deriving (Show)

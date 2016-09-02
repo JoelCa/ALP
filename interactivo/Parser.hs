@@ -65,30 +65,59 @@ termTy' = do char '('
                  return (B v)
 
 termTac :: Parser Tactic
-termTac = do symbol "assumption"
-             char '.'
-             return Assumption
-          <|> do symbol "apply"
-                 x <- identifier
-                 char '.'
-                 return $ Apply x
-          <|> do symbol "elim"
-                 x <- identifier
-                 char '.'
-                 return $ Elim x
-          <|> do symbol "intro" --cambiar
-                 char '.'
-                 return Intro
-          <|> do symbol "split"
-                 char '.'
-                 return Split
-          <|> do symbol "left"
-                 char '.'
-                 return CLeft
-          <|> do symbol "right"
-                 char '.'
-                 return CRight
-          <|> do symbol "print"
-                 x <- identifier
-                 char '.'
-                 return $ Print x
+termTac = assumptionParser
+          <|> applyParser
+          <|> elimParser
+          <|> introParser
+          <|> splitParser
+          <|> leftParser
+          <|> rightParser
+          <|> existsParser
+          <|> printParser   
+
+
+assumptionParser :: Parser Tactic
+assumptionParser = tacticZeroArg "assumption" Assumption
+
+introParser :: Parser Tactic
+introParser = tacticZeroArg "intro" Intro
+
+splitParser :: Parser Tactic
+splitParser = tacticZeroArg "split" Split
+
+leftParser :: Parser Tactic
+leftParser = tacticZeroArg "left" CLeft
+
+rightParser :: Parser Tactic
+rightParser = tacticZeroArg "right" CRight
+
+applyParser :: Parser Tactic
+applyParser = tacticIdentArg "apply" Apply
+
+elimParser :: Parser Tactic
+elimParser = tacticIdentArg "elim" Elim
+
+printParser :: Parser Tactic
+printParser = tacticIdentArg "print" Print
+
+existsParser :: Parser Tactic
+existsParser = tacticTypeArg "exists" CExists
+
+
+
+tacticZeroArg :: String -> Tactic -> Parser Tactic
+tacticZeroArg s tac = do symbol s
+                         char '.'
+                         return tac
+
+tacticIdentArg :: String -> (String -> Tactic) -> Parser Tactic
+tacticIdentArg s tac = do symbol s
+                          x <- identifier
+                          char '.'
+                          return $ tac x
+          
+tacticTypeArg :: String -> (Type -> Tactic) -> Parser Tactic
+tacticTypeArg s tac = do symbol "exists"
+                         t <- exprTy'
+                         char '.'
+                         return $ tac t          

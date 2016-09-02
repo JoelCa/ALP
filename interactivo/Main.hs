@@ -61,57 +61,6 @@ renderProof :: ProofState -> String
 renderProof p = render $ printProof (subp p) (position p) (typeContext p) (context p) (map fst (ty p))
 
 
--- Crea una variable en base al 1º arg. "v", que no está en ninguna de las listas de variables.
--- Sabemos que "v" ocurre en el 2º arg. "xs".
-newVar :: String -> [String] -> [String] -> String
-newVar v xs ys
-  | elem v' xs = newVar v' xs ys
-  | otherwise = if elem v' ys
-                then newVar v' ys xs
-                else v'
-  where v' = v++"0"
-
-getRename :: String -> [String] -> [String] -> String
-getRename v fv rv 
-  | elem v rv = newVar v rv fv
-  | otherwise = if elem v fv
-                then newVar v fv rv
-                else v
-
-getRenameWhitException :: [String] -> Type -> Either ProofExceptions (Type, TType)
-getRenameWhitException fv t =
-  case rename fv t of
-    Left s -> Left $ PropNotExists s
-    Right x -> Right x
-  
-
-rename :: [String] -> Type -> Either String (Type, TType)
-rename fv = rename' fv [] []
-
-rename' :: [String] -> [String] -> [String] -> Type -> Either String (Type, TType)
-rename' fv rv bv (B v) =
-  case v `elemIndex` bv of
-    Just i -> return (B $ rv!!i, TBound i)
-    Nothing -> if elem v fv
-               then return (B v, TFree v)
-               else Left v
-rename' fv rv bv (ForAll v t) = do let v' = getRename v fv rv
-                                   (x,y) <- rename' fv (v':rv) (v:bv) t
-                                   return (ForAll v' x, TForAll y)
-rename' fv rv bv (Exists v t) = do let v' = getRename v fv rv
-                                   (x,y) <- rename' fv (v':rv) (v:bv) t
-                                   return (Exists v' x, TExists y)
-rename' fv rv bv (Fun t t') = do (x,y) <- rename' fv rv bv t
-                                 (x',y') <- rename' fv rv bv t'
-                                 return (Fun x x', TFun y y')
-rename' fv rv bv (And t t') = do (x,y) <- rename' fv rv bv t
-                                 (x',y') <- rename' fv rv bv t'
-                                 return (And x x', TAnd y y')
-rename' fv rv bv (Or t t') = do (x,y) <- rename' fv rv bv t
-                                (x',y') <- rename' fv rv bv t'
-                                return  (Or x x', TOr y y')
-
-
 propRepeated2 :: [String] -> [String] -> Maybe String
 propRepeated2 _ [] = Nothing
 propRepeated2 [] _ = Nothing

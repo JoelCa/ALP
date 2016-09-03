@@ -66,8 +66,8 @@ printTerm' _ bs _  _ _ (Bound j)         = text $ bs !! j
 printTerm' _ _  _  _ _ (Free (Global n)) = text n
 printTerm' _ _  _  _ _ (Free (Quote n))  = text "quoted" <> text (show n)
 printTerm' i bs bts fs fts (t :@: u)     = parenIf (i < 1) $ 
-                                           printTerm' 0 bs bts fs fts t <+> 
-                                           printTerm' 2 bs bts fs fts u
+                                           printTerm' 2 bs bts fs fts t <+> 
+                                           printTerm' 0 bs bts fs fts u
 printTerm' i bs bts (f:fs) fts (Lam t u) = parenIf (i > 1) $ 
                                            text "\\" <> 
                                            text f <> 
@@ -80,8 +80,9 @@ printTerm' i bs bts fs (f':fts) (BLam u) = parenIf (i > 1) $  -- Chequear "paren
                                            text f' <> 
                                            text "." <> 
                                            printTerm' 1 bs (f':bts) fs fts u
-printTerm' i bs bts fs fts (t :!: (ty,ty')) = printTerm' 2 bs bts fs fts t <+> -- Chequear valores de "i"
-                                              printType ty
+printTerm' i bs bts fs fts (t :!: (ty,ty')) = parenIf (i < 1) $
+                                              printTerm' 2 bs bts fs fts t <+> -- Chequear valores de "i"
+                                              (parenIf True $ printType ty)  -- Arreglar
 printTerm' _ _ _ [] _ (Lam _ _)          = error "prinTerm': no hay nombres para elegir"
 printTerm' _ _ _ _ [] (BLam _)           = error "prinTerm': no hay nombres para elegir"
 

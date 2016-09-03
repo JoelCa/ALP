@@ -4,6 +4,7 @@ import Common
 import Data.Char (isDigit)
 import Data.List (findIndex, elemIndex)
 import Control.Monad (unless)
+import qualified Data.Map as M (Map, lookup, insert, empty)
 
 habitar :: ProofState -> Tactic -> Either ProofExceptions ProofState
 --habitar (PState {term=Term _}) _ = error "habitar: no debería pasar"
@@ -48,6 +49,13 @@ habitar (PState {name=name, subp=p, position=ns, typeContext=tc:tcs, context=c:c
      r <- getRenameTypeWhitException tc z
      return $ PState {name=name, subp=p, position=ns, typeContext=tc:tcs, context=c:cs, ty=(r,z'):tys, term=addHT (\x -> (Free $ Global "intro_exists") :@: x) ts}
 
+habitar (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=(t, t'):tys, term=ts}) (Cut x) =
+  return $ PState {name=name, subp=p+1, position=n:n:ns, typeContext=tc:tc:tcs, context=c:c:cs, ty=(x,x'):(Fun x t,TFun x' t'):tys,
+                   term=addDHT (\x y -> y :@: x) ts}
+  where x' = typeWithoutName x
+
+
+
 
 introsComm :: Bool -> ProofState -> Either ProofExceptions ProofState
 introsComm False st = do st' <- habitar st Intro
@@ -67,10 +75,15 @@ elimComm i (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, contex
                    term=addDHT (\x y -> ((Free $ Global "elim_or") :!: (t1,t1') :!: (t2,t2') :!: (t,t')) :@: (Bound i) :@: x :@: y) ts}
 elimComm _ _ _ = throwError ElimE1
 
-getFinalType :: TType -> (TType, Int)
-getFinalType (TFun x y) = let (f, n) = getFinalType y
-                                  in (f, n+1)
+getFinalType :: (Type, TType) -> ((Type, TType), Int)
+getFinalType (Fun _ y, TFun _ y') = let (f, n) = getFinalType (y,y')
+                                     in (f, n+1)
 getFinalType x = (x, 0)
+
+getFinalTypeForAll :: TType -> (TType, Int)
+getFinalTypeForAll (TForAll x) = let (f, n) = getFinalTypeForAll x
+                                 in (f, n+1)
+getFinalTypeForAll x = (x,0)
 
 repeatHead :: Int -> [a] -> [a]
 repeatHead _ [] = error "error: repeatHead"
@@ -89,21 +102,35 @@ getApplyTerms 2 i ts = addDHT (\x y -> ((Bound i) :@: x) :@: y) ts
 getApplyTerms n i ts =  getApplyTerms (n-1) i $ addDHT (\x y -> x :@: y) ts
 
 applyComm :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
-applyComm i (PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t, t'):tys, term=ts}) ht@(Fun t1 t2, TFun t1' t2') =
-  do let (ft, n) = getFinalType $ snd ht
-     unless (t' == ft) (throwError ApplyE1)
+applyComm i (PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t, t'):tys, term=ts}) ht@(Fun _ _, TFun _ _) =
+  do let ((ft,ft'), n) = getFinalType ht
+     unless (t' == ft') (throwError $ ApplyE1 ft t)
      return $ PState {name=name, subp=p+n-1,
                       position=repeatHead (n-1) ns,
                       typeContext=repeatHead (n-1) tcs,
                       context=repeatHead (n-1) cs,
                       ty=getArgsType ht ++ tys,
                       term=getApplyTerms n i ts}
-applyComm i (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=(t,t'):tys, term=ts}) (ForAll v t1, TForAll t1') =
-  do r <- unification (t1, t1') (t,t')
-     case r of
-       Nothing -> return $ PState {name=name, subp=p-1, position=ns, typeContext=tcs, context=cs, ty=tys, term=simplify ((Bound i) :!: bottom) ts}
-       Just x -> return $ PState {name=name, subp=p-1, position=ns, typeContext=tcs, context=cs, ty=tys, term=simplify ((Bound i) :!: x) ts}
-applyComm _ _ _ = throwError ApplyE2
+applyComm i (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=(t,t'):tys, term=ts}) ht@(ForAll _ _, TForAll _) =
+  do let (ft, n) = getFinalTypeForAll $ snd ht
+     r <- unification n ft (t,t')
+     return $ PState {name=name, subp=p-1, position=ns, typeContext=tcs, context=cs, ty=tys, term=simplify (applyTypeTerm (n-1) r (Bound i)) ts}
+applyComm i (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=(t,t'):tys, term=ts}) (t1, t1')
+  | t' == t1' = return $ PState {name=name, subp=p-1, position=ns, typeContext=tcs, context=cs, ty=tys, term=simplify (Bound i) ts}
+  | otherwise = throwError $ ApplyE1 t1 t
+
+
+applyTypeTerm :: Int -> M.Map Int (Type, TType) -> Term -> Term
+applyTypeTerm n sust t
+  | n < 0 = error "error: applyTypeTerm, no deberia pasar"
+  | otherwise =
+    case M.lookup n sust of
+      Nothing -> if n == 0
+                 then t :!: bottom
+                 else applyTypeTerm (n-1) sust (t :!: bottom)
+      Just x -> if n == 0
+                then t :!: x
+                else applyTypeTerm (n-1) sust (t :!: x)
 
 
 intro_and :: Term
@@ -158,8 +185,8 @@ getHypothesisValue n h
   | isDefault h = let x = getValue h
                   in if isValidValue n x
                      then return x
-                     else throwError ApplyE3
-  | otherwise = throwError ApplyE3
+                     else throwError ApplyE2
+  | otherwise = throwError ApplyE2
 
 isDefault :: String -> Bool
 isDefault ('H':xs) = isNumber xs
@@ -195,34 +222,34 @@ typeWithoutName' xs (And t t') = TAnd (typeWithoutName' xs t) (typeWithoutName' 
 typeWithoutName' xs (Or t t') = TOr (typeWithoutName' xs t) (typeWithoutName' xs t')
 
 
-unification :: (Type,TType) -> (Type,TType) -> Either ProofExceptions (Maybe (Type,TType))
-unification = unif 0 Nothing
+unification :: Int -> TType -> (Type,TType) -> Either ProofExceptions (M.Map Int (Type,TType))
+unification n = unif 0 n M.empty
 
-unif :: Int -> Maybe (Type,TType) -> (Type,TType) -> (Type,TType) -> Either ProofExceptions (Maybe (Type,TType))
-unif pos sust (t1,t2@(TBound n)) tt@(tt1,tt2)
-  | n == pos = case sust of
-    Nothing -> maybe (throwError Unif1) (return . return) (substitution pos tt)
+unif :: Int -> Int -> M.Map Int (Type,TType) -> TType -> (Type,TType) -> Either ProofExceptions (M.Map Int (Type,TType))
+unif pos n sust t@(TBound i) tt@(tt1,tt2)
+  | (pos <= i) && (i < n) = case M.lookup i sust of
+    Nothing -> maybe (throwError Unif1) (\s -> return $ M.insert i s sust) (substitution pos tt)
     Just (s,s') -> if s' == tt2
-                   then return $ Just (s,s')
+                   then return sust
                    else throwError Unif1
-  | otherwise = if t2 == tt2
+  | otherwise = if t == tt2
                 then return $ sust
                 else throwError Unif2
-unif _ sust (t1,TFree n) (tt1,TFree m)
-  | n == m = return sust
+unif _ _ sust (TFree x) (B _, TFree y)
+  | x == y = return sust
   | otherwise = throwError Unif3
-unif pos sust (Fun t1 t2,TFun t1' t2') (Fun tt1 tt2, TFun tt1' tt2') =
-  do res <- unif pos sust (t1,t1') (tt1, tt1')
-     unif pos res (t2,t2') (tt2,tt2')
-unif pos sust (And t1 t2,TAnd t1' t2') (And tt1 tt2, TAnd tt1' tt2') =
-  do res <- unif pos sust (t1,t1') (tt1, tt1')
-     unif pos res (t2,t2') (tt2,tt2')
-unif pos sust (Or t1 t2,TOr t1' t2') (Fun tt1 tt2, TFun tt1' tt2') =
-  do res <- unif pos sust (t1,t1') (tt1, tt1')
-     unif pos res (t2,t2') (tt2,tt2')
-unif pos sust (ForAll _ t, TForAll t') (ForAll _ tt, TForAll tt') = unif (pos+1) sust (t,t') (tt,tt')
-unif pos sust (Exists _ t, TExists t') (Exists _ tt, TExists tt') = unif (pos+1) sust (t,t') (tt,tt')
-unif _ _ _ _ = throwError Unif4
+unif pos n sust (TFun t1' t2') (Fun tt1 tt2, TFun tt1' tt2') =
+  do res <- unif pos n sust t1' (tt1, tt1')
+     unif pos n res t2' (tt2,tt2')
+unif pos n sust (TAnd t1' t2') (And tt1 tt2, TAnd tt1' tt2') =
+  do res <- unif pos n sust t1' (tt1, tt1')
+     unif pos n res t2' (tt2,tt2')
+unif pos n sust (TOr t1' t2') (Or tt1 tt2, TOr tt1' tt2') =
+  do res <- unif pos n sust t1' (tt1, tt1')
+     unif pos n res t2' (tt2,tt2')
+unif pos n sust (TForAll t') (ForAll _ tt, TForAll tt') = unif (pos+1) (n+1) sust t' (tt,tt')
+unif pos n sust (TExists t') (Exists _ tt, TExists tt') = unif (pos+1) (n+1) sust t' (tt,tt')
+unif _ _ _ _ _ = throwError Unif4
 
 
 substitution :: Int -> (Type, TType) -> Maybe (Type, TType)

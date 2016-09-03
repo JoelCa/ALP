@@ -4,7 +4,7 @@ import Asistente
 import Parser
 import Common hiding (State)
 import Text.PrettyPrint.HughesPJ (render)
-import PrettyPrinter (printTerm, printProof)
+import PrettyPrinter (printTerm, printProof, printType)
 import System.Console.Haskeline.MonadException
 import Control.Monad.Trans.Class
 import Control.Monad.State.Strict
@@ -106,7 +106,7 @@ checkCommand (Ta ta) = do  s <- lift get
                            p <- returnInput $ habitar (fromJust $ proof s) ta
                            lift $ put $ PSt {global=global s, proof=Just p}
                            if (isFinalTerm p)
-                             then ((outputStrLn $ "Prueba completa.\n" ++ renderFinalTerm p)
+                             then ((outputStrLn $ "Prueba completa.\n" ++ renderFinalTerm p ++ "\n" ++ show (getTermFromProof p) ++ "\n") --Borrar SHOW
                                    >> reloadProver)
                              else outputStrLn $ renderProof p
                            prover
@@ -146,9 +146,9 @@ errorMessage (PNotExist s) = outputStrLn $ "error: " ++ s ++ " no existe."
 errorMessage AssuE = outputStrLn "error: comando assumption mal aplicado."
 errorMessage IntroE1 = outputStrLn "error: comando intro mal aplicado."
 errorMessage IntroE2 = outputStrLn "error: comando intro, variable no tipo libre."
-errorMessage ApplyE1 = outputStrLn "error: comando apply mal aplicado, función no coincide tipo."
-errorMessage ApplyE2 = outputStrLn "error: comando apply mal aplicado, hipótesis no es función ni cuantificación."
-errorMessage ApplyE3 = outputStrLn "error: comando apply, hipótesis no existe."
+errorMessage (ApplyE1 t1 t2) =
+  outputStrLn $ "error: comando apply mal aplicado, \"" ++ (render $ printType t1) ++  "\" no coincide con \"" ++ (render $ printType t2) ++ "\"."
+errorMessage ApplyE2 = outputStrLn "error: comando apply, hipótesis no existe."
 errorMessage Unif1 = outputStrLn "error: unificación inválida 1."
 errorMessage Unif2 = outputStrLn "error: unificación inválida 2."
 errorMessage Unif3 = outputStrLn "error: unificación inválida 3."

@@ -64,15 +64,14 @@ data Command = Ty String Type | Ta Tactic | Props [String] deriving (Show)
   -- Tácticas
 data Tactic = Assumption | Apply String | Intro | Intros | Split
             | Elim String | CLeft | CRight | Print String 
-            | CExists Type
+            | CExists Type | Cut Type
             deriving (Show)
 
 
   -- Excepciones
 data ProofExceptions = PNotFinished | PNotStarted | PExist String |
                        PNotExist String | SyntaxE | AssuE | IntroE1 |
-                       IntroE2 | ApplyE1 | ApplyE2 |
-                       ApplyE3 | ApplyE4 | Unif1 |
+                       IntroE2 | ApplyE1 Type Type | ApplyE2 | Unif1 |
                        Unif2 | Unif3 | Unif4 | ElimE1 |
                        CommandInvalid | PropRepeated1 String | PropRepeated2 String |
                        PropNotExists String

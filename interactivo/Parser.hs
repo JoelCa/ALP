@@ -74,7 +74,8 @@ termTac = assumptionParser
           <|> leftParser
           <|> rightParser
           <|> existsParser
-          <|> printParser   
+          <|> printParser
+          <|> cutParser
 
 
 assumptionParser :: Parser Tactic
@@ -107,6 +108,9 @@ printParser = tacticIdentArg "print" Print
 existsParser :: Parser Tactic
 existsParser = tacticTypeArg "exists" CExists
 
+cutParser :: Parser Tactic
+cutParser = tacticTypeArg "cut" Cut
+
 
 
 tacticZeroArg :: String -> Tactic -> Parser Tactic
@@ -121,7 +125,7 @@ tacticIdentArg s tac = do symbol s
                           return $ tac x
           
 tacticTypeArg :: String -> (Type -> Tactic) -> Parser Tactic
-tacticTypeArg s tac = do symbol "exists"
+tacticTypeArg s tac = do symbol s
                          t <- exprTy'
                          char '.'
                          return $ tac t          

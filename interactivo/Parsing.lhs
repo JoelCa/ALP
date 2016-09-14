@@ -8,8 +8,8 @@ Modificado por Mauro Jaskelioff
 >
 > import Data.Char
 > import Control.Monad
+> import Control.Applicative hiding (many)
 >
-> infixr 1 <|>
 
 The monad of parsers
 --------------------
@@ -25,6 +25,22 @@ The monad of parsers
 >    p `mplus` q                =  P (\inp -> case parse p inp of
 >                                                []        -> parse q inp
 >                                                x         -> x)
+> 
+> instance Functor Parser where
+>   fmap = liftM
+>   
+> instance Applicative Parser where
+>   pure                        = return
+>   (<*>)                       = ap
+
+
+Choice
+------
+
+> instance Alternative Parser where
+>   empty                       = mzero
+>   (<|>)                       = mplus
+
 
 Basic parsers
 -------------
@@ -40,11 +56,6 @@ Basic parsers
 > parse                         :: Parser a -> String -> [(a,String)]
 > parse (P p) inp               =  p inp
                                    
-Choice
-------
-
-> (<|>)                         :: Parser a -> Parser a -> Parser a
-> p <|> q                       =  p `mplus` q
 
 Derived primitives
 ------------------
@@ -98,7 +109,7 @@ Derived primitives
 > int                           =  do char '-'
 >                                     n <- nat
 >                                     return (-n)
->                                   <|> nat
+>                                  <|> nat
 > 
 > space                         :: Parser ()
 > space                         =  do many (sat isSpace)

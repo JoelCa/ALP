@@ -56,7 +56,6 @@ habitar (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c
 
 
 
-
 introsComm :: Bool -> ProofState -> Either ProofExceptions ProofState
 introsComm False st = do st' <- habitar st Intro
                          introsComm True st
@@ -73,7 +72,44 @@ elimComm i (PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs,
 elimComm i (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=(t,t'):tys, term=ts}) (Or t1 t2, TOr t1' t2') =
   return $ PState {name=name, subp=p+1, position=n:n:ns, typeContext=tc:tc:tcs, context=c:c:cs, ty=(Fun t1 t, TFun t1' t'):(Fun t2 t, TFun t2' t'):tys,
                    term=addDHT (\x y -> ((Free $ Global "elim_or") :!: (t1,t1') :!: (t2,t2') :!: (t,t')) :@: (Bound i) :@: x :@: y) ts}
+elimComm i (PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t, t'):tys, term=ts}) (Exists v t1, TExists t1') =
+  return $ PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(tyExists (head tcs) v t1 t, TForAll $ TFun t1' t' ):tys,
+                   term=addHT (\x -> (elim_exists t1' (t,t')) :@: (Bound i) :@: x) ts}
 elimComm _ _ _ = throwError ElimE1
+
+
+tyExists :: TypeContext -> String -> Type -> Type -> Type
+tyExists fv v t1 t2 = let v' = getNewVar fv (getBoundsList t1) (getBoundsList t2) v
+                      in ForAll v' $ Fun (replaceBound v v' t1) t2
+
+replaceBound :: String -> String -> Type -> Type
+replaceBound v v' (B n)
+  | n == v = B v'
+  | otherwise = B n
+replaceBound v v' (Fun t1 t2) = Fun (replaceBound v v' t1) (replaceBound v v' t2)
+replaceBound v v' (And t1 t2) = And (replaceBound v v' t1) (replaceBound v v' t2)
+replaceBound v v' (Or t1 t2) = Or (replaceBound v v' t1) (replaceBound v v' t2)
+replaceBound v v' (ForAll x t) = ForAll x $ replaceBound v v' t
+replaceBound v v' (Exists x t) = Exists x $ replaceBound v v' t
+
+-- Sabemos que v no aparece en bv1 ni en fv
+getNewVar :: TypeContext -> TypeContext -> TypeContext -> String -> String
+getNewVar fv bv1 bv2 v
+  | elem v bv2 = let v' = getRename v fv bv2
+                 in getNewVar fv bv2 bv1 v'
+  | otherwise = v
+    
+
+getBoundsList :: Type -> TypeContext
+getBoundsList (ForAll v t) = v : getBoundsList t
+getBoundsList (Exists v t) = v : getBoundsList t
+getBoundsList (B _) = []
+getBoundsList (And t1 t2) = getBoundsList t1 ++ getBoundsList t2
+getBoundsList (Or t1 t2) = getBoundsList t1 ++ getBoundsList t2
+getBoundsList (Fun t1 t2) = getBoundsList t1 ++ getBoundsList t2
+
+
+
 
 getFinalType :: (Type, TType) -> ((Type, TType), Int)
 getFinalType (Fun _ y, TFun _ y') = let (f, n) = getFinalType (y,y')
@@ -132,6 +168,12 @@ applyTypeTerm n sust t
                 then t :!: x
                 else applyTypeTerm (n-1) sust (t :!: x)
 
+
+intro_exists :: TType -> TType -> (Type, TType) -> Term
+intro_exists s_a0 s a0 = Lam s_a0 $ BLam $ Lam (TForAll $ TFun s (TBound 1)) $ (Bound 0 :!: a0) :@: (Bound 1)      
+
+elim_exists :: TType -> (Type, TType) -> Term
+elim_exists s (b, b') = BLam $ Lam (TExists s) $ Lam (TForAll $ TFun s b') $ (Bound 1 :!: (b, b')) :@: (Bound 0)
 
 intro_and :: Term
 intro_and = BLam $ BLam $ Lam (TBound 1) $ Lam (TBound 0) $ BLam $ Lam (TFun (TBound 2) (TFun (TBound 1) (TBound 0)))
@@ -218,6 +260,7 @@ typeWithoutName' :: [String] -> Type -> TType
 typeWithoutName' xs (B t) = maybe (TFree t) TBound (t `elemIndex` xs)
 typeWithoutName' xs (Fun t t') = TFun (typeWithoutName' xs t) (typeWithoutName' xs t')
 typeWithoutName' xs (ForAll v t) = TForAll $ typeWithoutName' (v:xs) t
+typeWithoutName' xs (Exists v t) = TExists $ typeWithoutName' (v:xs) t
 typeWithoutName' xs (And t t') = TAnd (typeWithoutName' xs t) (typeWithoutName' xs t')
 typeWithoutName' xs (Or t t') = TOr (typeWithoutName' xs t) (typeWithoutName' xs t')
 

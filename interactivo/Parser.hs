@@ -2,6 +2,7 @@ module Parser where
 
 import Parsing
 import Common
+import Control.Applicative
 
 type Proof = Either ProofExceptions Command
 

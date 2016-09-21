@@ -16,6 +16,10 @@ import Data.List (findIndex, elemIndex)
 
 type ProverInputState a = InputT (StateT ProverState IO) a
 
+instance MonadState ProverState ProverInputState where
+     get = lift . get
+     put = lift . put
+
 initialT' = [("intro_and", intro_and),
              ("elim_and", elim_and),
              ("intro_or1", intro_or1),

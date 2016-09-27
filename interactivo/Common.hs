@@ -86,8 +86,8 @@ data ProverState = PSt { proof :: Maybe ProofState
                        }
                    
 data ProverGlobal = PGlobal { props :: [String]
-                         , terms :: Map String Term
-                         }
+                            , terms :: Map String Term
+                            }
 
 
 data ProofState = PState {position :: [Int]

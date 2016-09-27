@@ -42,7 +42,7 @@ habitar (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c
   return $ PState {name=name, subp=p+1, position=n:n:ns, typeContext=tc:tc:tcs, context=c:c:cs, ty=(t1,t1'):(t2,t2'):tys,
                    term=addDHT (\x y -> ((Free $ Global "intro_and") :!: (t1,t1') :!: (t2,t2')) :@: x :@: y) ts}
 
--- TERMINAR: hacer "intro_exists"
+
 habitar (PState {name=name, subp=p, position=ns, typeContext=tc:tcs, context=c:cs, ty=(Exists q t, TExists t'):tys, term=ts}) (CExists x)=
   do (y,y') <- getRenameWhitException tc x
      let (z,z') = replace (t,t') (y,y') 
@@ -116,21 +116,31 @@ getFinalType (Fun _ y, TFun _ y') = let (f, n) = getFinalType (y,y')
                                      in (f, n+1)
 getFinalType x = (x, 0)
 
+compareTypes :: (Type, TType) -> (Type, TType) -> Either ProofExceptions Int
+compareTypes (Fun _ y1, TFun _ y1') t
+  | y1' == snd t = return 1
+  | otherwise = do n <- compareTypes (y1, y1') t
+                   return $ n + 1
+compareTypes (x, _) (y, _) = throwError $ ApplyE1 x y
+
+
 getFinalTypeForAll :: TType -> (TType, Int)
 getFinalTypeForAll (TForAll x) = let (f, n) = getFinalTypeForAll x
                                  in (f, n+1)
 getFinalTypeForAll x = (x,0)
 
 repeatHead :: Int -> [a] -> [a]
-repeatHead _ [] = error "error: repeatHead"
+repeatHead _ [] = error "error: repeatHead."
 repeatHead n xs
   | n == 0 = xs
   | n > 0 = head xs : (repeatHead (n-1) xs )
-  | n < 0 = error "error: repeatHead"
+  | n < 0 = error "error: repeatHead."
             
-getArgsType :: (Type, TType) -> [(Type, TType)]
-getArgsType (Fun t1 t2, TFun t1' t2') = (t1,t1') : getArgsType (t2, t2')
-getArgsType _ = []
+getArgsType :: Int -> (Type, TType) -> [(Type, TType)]
+getArgsType n (Fun t1 t2, TFun t1' t2')
+  | n == 0 = []
+  | n > 0 = (t1,t1') : getArgsType (n-1) (t2, t2')
+  | otherwise = error "error: getArgsType, no debería pasar."
 
 getApplyTerms :: Int -> Int -> [SpecialTerm] -> [SpecialTerm]
 getApplyTerms 1 i ts = addHT (\x -> (Bound i) :@: x) ts
@@ -138,22 +148,25 @@ getApplyTerms 2 i ts = addDHT (\x y -> ((Bound i) :@: x) :@: y) ts
 getApplyTerms n i ts =  getApplyTerms (n-1) i $ addDHT (\x y -> x :@: y) ts
 
 applyComm :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
-applyComm i (PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t, t'):tys, term=ts}) ht@(Fun _ _, TFun _ _) =
-  do let ((ft,ft'), n) = getFinalType ht
-     unless (t' == ft') (throwError $ ApplyE1 ft t)
+applyComm i st@(PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=(t,t'):tys, term=ts}) ht@(t1, t1')
+  | t' == t1' = return $ PState {name=name, subp=p-1, position=ns, typeContext=tcs, context=cs, ty=tys, term=simplify (Bound i) ts}
+  | otherwise = applyComm' i st ht
+
+
+applyComm' :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
+applyComm' i (PState {name=name, subp=p, position=ns, typeContext=tcs, context=cs, ty=(t, t'):tys, term=ts}) ht@(Fun _ _, TFun _ _) =
+  do n <- compareTypes ht (t,t')
      return $ PState {name=name, subp=p+n-1,
                       position=repeatHead (n-1) ns,
                       typeContext=repeatHead (n-1) tcs,
                       context=repeatHead (n-1) cs,
-                      ty=getArgsType ht ++ tys,
+                      ty=getArgsType n ht ++ tys,
                       term=getApplyTerms n i ts}
-applyComm i (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=(t,t'):tys, term=ts}) ht@(ForAll _ _, TForAll _) =
+applyComm' i (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=(t,t'):tys, term=ts}) ht@(ForAll _ _, TForAll _) =
   do let (ft, n) = getFinalTypeForAll $ snd ht
      r <- unification n ft (t,t')
      return $ PState {name=name, subp=p-1, position=ns, typeContext=tcs, context=cs, ty=tys, term=simplify (applyTypeTerm (n-1) r (Bound i)) ts}
-applyComm i (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=(t,t'):tys, term=ts}) (t1, t1')
-  | t' == t1' = return $ PState {name=name, subp=p-1, position=ns, typeContext=tcs, context=cs, ty=tys, term=simplify (Bound i) ts}
-  | otherwise = throwError $ ApplyE1 t1 t
+
 
 
 applyTypeTerm :: Int -> M.Map Int (Type, TType) -> Term -> Term
@@ -173,7 +186,7 @@ intro_exists :: TType -> TType -> (Type, TType) -> Term
 intro_exists s_a0 s a0 = Lam s_a0 $ BLam $ Lam (TForAll $ TFun s (TBound 1)) $ (Bound 0 :!: a0) :@: (Bound 1)      
 
 elim_exists :: TType -> (Type, TType) -> Term
-elim_exists s (b, b') = BLam $ Lam (TExists s) $ Lam (TForAll $ TFun s b') $ (Bound 1 :!: (b, b')) :@: (Bound 0)
+elim_exists s (b, b') = Lam (TExists s) $ Lam (TForAll $ TFun s b') $ (Bound 1 :!: (b, b')) :@: (Bound 0)
 
 intro_and :: Term
 intro_and = BLam $ BLam $ Lam (TBound 1) $ Lam (TBound 0) $ BLam $ Lam (TFun (TBound 2) (TFun (TBound 1) (TBound 0)))

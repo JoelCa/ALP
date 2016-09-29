@@ -53,16 +53,16 @@ prover = do minput <- getInputLine "> "
 
 
 newProof :: String -> Type -> TType -> TypeContext -> ProofState
-newProof name ty tty ps = PState {name=name, subp=1, position=[0], typeContext = [ps], context=[[]], ty=[(ty, tty)], term=[HoleT id]}
+newProof name ty tty ps = PState {name=name, subp=1, position=[0], typeContext = [ps], context=[[]], ty=[Just (ty, tty)], term=[HoleT id]}
 
 renderNewProof :: Type -> String
-renderNewProof ty = render $ printProof 1 [0] [[]] [[]] [ty]
+renderNewProof ty = render $ printProof 1 [0] [[]] [[]] [Just ty]
 
 renderFinalTerm :: ProofState -> String
 renderFinalTerm p = render $ printTerm $ getTermFromProof p
 
 renderProof :: ProofState -> String
-renderProof p = render $ printProof (subp p) (position p) (typeContext p) (context p) (map fst (ty p))
+renderProof p = render $ printProof (subp p) (position p) (typeContext p) (context p) (map (maybe Nothing (Just . fst)) (ty p))
 
 
 propRepeated2 :: [String] -> [String] -> Maybe String
@@ -112,7 +112,7 @@ checkCommand (Ta ta) = do  s <- lift get
                            if (isFinalTerm p)
                              then ((outputStrLn $ "Prueba completa.\n" ++ renderFinalTerm p ++ "\n" ++ show (getTermFromProof p) ++ "\n") --Borrar SHOW
                                    >> reloadProver)
-                             else outputStrLn $ renderProof p
+                             else (outputStrLn (renderProof p) >> (outputStrLn $ show $ length $ term p))
                            prover
 
 resetProof :: ProverInputState ()
@@ -162,3 +162,4 @@ errorMessage CommandInvalid = outputStrLn "error: comando inválido."
 errorMessage (PropRepeated1 s) = outputStrLn $ "error: proposición \""++ s ++"\" repetida."
 errorMessage (PropRepeated2 s) = outputStrLn $ "error: proposición \""++ s ++"\" ya existe."
 errorMessage (PropNotExists s) = outputStrLn $ "error: proposición \""++ s ++"\" no existe en el entorno."
+errorMessage ExactE = outputStrLn "error: no es posible aplicar el comando exact."

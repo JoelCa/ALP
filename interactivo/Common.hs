@@ -62,9 +62,10 @@ type TypeContext = [String]
 data Command = Ty String Type | Ta Tactic | Props [String] deriving (Show)
 
   -- Tácticas
+-- Arreglar el Exact para que tome lambda términos
 data Tactic = Assumption | Apply String | Intro | Intros | Split
             | Elim String | CLeft | CRight | Print String 
-            | CExists Type | Cut Type
+            | CExists Type | Cut Type | Exact Type
             deriving (Show)
 
 
@@ -74,7 +75,7 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String |
                        IntroE2 | ApplyE1 Type Type | ApplyE2 | Unif1 |
                        Unif2 | Unif3 | Unif4 | ElimE1 |
                        CommandInvalid | PropRepeated1 String | PropRepeated2 String |
-                       PropNotExists String
+                       PropNotExists String | ExactE
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
@@ -93,12 +94,14 @@ data ProverGlobal = PGlobal { props :: [String]
 data ProofState = PState {position :: [Int]
                          , context :: [Context]
                          , typeContext :: [TypeContext]
-                         , ty :: [(Type, TType)]
+                         , ty :: [Maybe (Type, TType)]
                          , term :: [SpecialTerm]
                          , subp :: Int
                          , name :: String
                          }
-                  
 
                                     
-data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) | Term Term
+data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) |
+                   Term Term | TypeH TypeHole
+
+data TypeHole = HTe ((Type, TType) -> Term) | HTy ((Type, TType) -> TypeHole)

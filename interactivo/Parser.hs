@@ -77,6 +77,7 @@ termTac = assumptionParser
           <|> existsParser
           <|> printParser
           <|> cutParser
+          <|> exactParser
 
 
 assumptionParser :: Parser Tactic
@@ -112,6 +113,8 @@ existsParser = tacticTypeArg "exists" CExists
 cutParser :: Parser Tactic
 cutParser = tacticTypeArg "cut" Cut
 
+exactParser :: Parser Tactic
+exactParser = tacticTypeArg "exact" Exact
 
 
 tacticZeroArg :: String -> Tactic -> Parser Tactic

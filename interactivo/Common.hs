@@ -36,10 +36,12 @@ data TType = TBound Int
            | TOr TType TType
            deriving (Show, Eq)
 
-  -- Términos con nombres (NO seria necesario)
+  -- Términos con nombres
 data LamTerm  =  LVar String
               |  Abs String Type LamTerm
               |  App LamTerm LamTerm
+              |  BAbs Type LamTerm
+              |  BApp LamTerm Type
               deriving (Show, Eq)
 
   -- Términos pseudo localmente sin nombres

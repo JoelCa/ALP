@@ -503,6 +503,26 @@ replace' _ _ _ = error "error: replace' no debería pasar."
 
 
 --------------------------------------------------------------------
+--TERMINAR
+termWithName :: Term -> Type -> LamTerm
+termWithName' t = termWithName [] (vars \\ fv t) t
+
+termWithName' :: [String] -> [String] -> Term -> Type -> LamTer
+termWithName' (b:bs) fs (Bound i) (B t) = LVar $ bs !! j
+termWithName' bs fs (Free (Global n)) (B t)
+  | n == t = LVar n
+  | otherwise = error "error: termWithName', no debería pasar"
+termWithName' bs (f:fs) (Lam tt te) (Fun t1 t2) = Abs f t1 $ termWithName' bs fs te t2
+termWithName' bs fs (te1 :@: te2) t = 
+
+
+
+
+
+
+
+
+--------------------------------------------------------------------
 
 
 maybeToEither :: e -> Maybe a -> Either e a

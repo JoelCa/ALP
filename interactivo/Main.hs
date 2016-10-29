@@ -85,7 +85,7 @@ checkCommand (Ty name ty) = do s <- lift get
                                when (Map.member name (terms $ global s)) (throwIO $ PExist name)
                                (tyr,tty) <- returnInput $ getRenameWhitException (props $ global s) ty
                                let p = newProof name tyr tty (props $ global s)
-                               lift $ put $ PSt {global=global s, proof=Just  p}
+                               lift $ put $ PSt {global=global s, proof=Just p}
                                outputStrLn $ renderProof p               
                                prover
                                

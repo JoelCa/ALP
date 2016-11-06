@@ -7,7 +7,6 @@ import Control.Monad (unless)
 import qualified Data.Map as M (Map, lookup, insert, empty, size)
 
 habitar :: ProofState -> Tactic -> Either ProofExceptions ProofState
---habitar (PState {term=Term _}) _ = error "habitar: no debería pasar"
 
 habitar (PState {name=name, subp=p, position=n:ns, typeContext=tc:tcs, context=c:cs, ty=Just (t, tw):tys, term=ts}) Assumption =
   do i <- maybeToEither AssuE (findIndex (\x->snd x == tw) c)
@@ -504,16 +503,16 @@ replace' _ _ _ = error "error: replace' no debería pasar."
 
 --------------------------------------------------------------------
 --TERMINAR
-termWithName :: Term -> Type -> LamTerm
-termWithName' t = termWithName [] (vars \\ fv t) t
+-- termWithName :: Term -> Type -> LamTerm
+-- termWithName' t = termWithName [] (vars \\ fv t) t
 
-termWithName' :: [String] -> [String] -> Term -> Type -> LamTer
-termWithName' (b:bs) fs (Bound i) (B t) = LVar $ bs !! j
-termWithName' bs fs (Free (Global n)) (B t)
-  | n == t = LVar n
-  | otherwise = error "error: termWithName', no debería pasar"
-termWithName' bs (f:fs) (Lam tt te) (Fun t1 t2) = Abs f t1 $ termWithName' bs fs te t2
-termWithName' bs fs (te1 :@: te2) t = 
+-- termWithName' :: [String] -> [String] -> Term -> Type -> LamTer
+-- termWithName' (b:bs) fs (Bound i) (B t) = LVar $ bs !! j
+-- termWithName' bs fs (Free (Global n)) (B t)
+--   | n == t = LVar n
+--   | otherwise = error "error: termWithName', no debería pasar"
+-- termWithName' bs (f:fs) (Lam tt te) (Fun t1 t2) = Abs f t1 $ termWithName' bs fs te t2
+-- termWithName' bs fs (te1 :@: te2) t = 
 
 
 

@@ -93,13 +93,14 @@ data ProverGlobal = PGlobal { props :: [String]
                             }
 
 
-data ProofState = PState {position :: [Int]
+data ProofState = PState { position :: [Int]
                          , context :: [Context]
                          , typeContext :: [TypeContext]
                          , ty :: [Maybe (Type, TType)]
                          , term :: [SpecialTerm]
                          , subp :: Int
                          , name :: String
+                         , tyFromCut :: [Type]
                          }
 
                                     

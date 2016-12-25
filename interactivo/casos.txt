@@ -1,0 +1,12 @@
+Casos probados:
+
+Props p.
+
+- Theorem t1 : (forall x, x -> x) -> (exists x, x -> x) -> (exists x, x -> x).
+Para chequear que el para todo unifica con el existe.
+- Theorem t2 : p -> (exists x, p -> x) -> (exists y, y).
+Para chequear eliminación de existe. ARREGLAR pretty printer del término.
+- Theorem t3: (exists y, forall x, x -> y) -> (forall x, exists y, x -> y).
+Para chequear eliminación de existe. NO chequee el lambda termino.
+- Theorem t4: (forall x, forall y, forall z, y -> y) -> (p -> p).
+Para ver que los tipos "vacios" se instancian correctamente.

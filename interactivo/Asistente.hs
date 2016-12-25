@@ -259,44 +259,8 @@ getBoundsList (And t1 t2) = getBoundsList t1 ++ getBoundsList t2
 getBoundsList (Or t1 t2) = getBoundsList t1 ++ getBoundsList t2
 getBoundsList (Fun t1 t2) = getBoundsList t1 ++ getBoundsList t2
 
-
-getFinalType :: (Type, TType) -> ((Type, TType), Int)
-getFinalType (Fun _ y, TFun _ y') = let (f, n) = getFinalType (y,y')
-                                     in (f, n+1)
-getFinalType x = (x, 0)
-
-compareTypes :: (Type, TType) -> (Type, TType) -> Either ProofExceptions Int
-compareTypes (Fun _ y1, TFun _ y1') t
-  | y1' == snd t = return 1
-  | otherwise = do n <- compareTypes (y1, y1') t
-                   return $ n + 1
-compareTypes (x, _) (y, _) = throwError $ ApplyE1 x y
-
-
-getFinalTypeForAll :: TType -> (TType, Int)
-getFinalTypeForAll (TForAll x) = let (f, n) = getFinalTypeForAll x
-                                 in (f, n+1)
-getFinalTypeForAll x = (x,0)
-
-
-repeatHead :: Int -> [a] -> [a]
-repeatHead _ [] = error "error: repeatHead."
-repeatHead n xs
-  | n == 0 = xs
-  | n > 0 = head xs : (repeatHead (n-1) xs )
-  | n < 0 = error "error: repeatHead."
-            
-getArgsType :: Int -> (Type, TType) -> [Maybe (Type, TType)]
-getArgsType n (Fun t1 t2, TFun t1' t2')
-  | n == 0 = []
-  | n > 0 = Just (t1,t1') : getArgsType (n-1) (t2, t2')
-  | otherwise = error "error: getArgsType, no debería pasar."
-
-getApplyTerms :: Int -> Int -> [SpecialTerm] -> [SpecialTerm]
-getApplyTerms 1 i ts = addHT (\x -> (Bound i) :@: x) ts
-getApplyTerms 2 i ts = addDHT (\x y -> ((Bound i) :@: x) :@: y) ts
-getApplyTerms n i ts =  getApplyTerms (n-1) i $ addDHT (\x y -> x :@: y) ts
-
+----------------------------------------------------------------------------------------------------------------------
+--Comando APPLY
 
 applyComm :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
 applyComm i st@(PState {name=name,
@@ -332,8 +296,8 @@ applyComm' i (PState {name=name,
                       typeContext=repeatHead (n-1) tcs,
                       context=repeatHead (n-1) cs,
                       tyFromCut = cut,
-                      ty=getArgsType n ht ++ tys,
-                      term=getApplyTerms n i ts}
+                      ty=getTypesFun n ht ++ tys,
+                      term=getApplyTermFun n i ts}
 applyComm' i (PState {name=name,
                       subp=p,
                       position=ns,
@@ -342,7 +306,7 @@ applyComm' i (PState {name=name,
                       tyFromCut = cut,
                       ty=Just (t,t'):tys,
                       term=ts}) ht@(ForAll _ _, TForAll _) =
-  do let (ft, n) = getFinalTypeForAll $ snd ht
+  do let (ft, n) = getNestedTypeForAll $ snd ht
      r <- unification n ft (t,t')
      let m = n - M.size r
      return $ PState {name=name,
@@ -353,6 +317,45 @@ applyComm' i (PState {name=name,
                       tyFromCut = cut,
                       ty=getTypesForAll m tys,
                       term=getApplyTermForAll (n-1) r (Bound i) ts}
+
+----------------------------------------------------------------------------------------------------------------------
+-- Funciones auxiliares para la función applyComm'
+
+compareTypes :: (Type, TType) -> (Type, TType) -> Either ProofExceptions Int
+compareTypes (Fun _ y1, TFun _ y1') t
+  | y1' == snd t = return 1
+  | otherwise = do n <- compareTypes (y1, y1') t
+                   return $ n + 1
+compareTypes (x, _) (y, _) = throwError $ ApplyE1 x y
+
+repeatHead :: Int -> [a] -> [a]
+repeatHead _ [] = error "error: repeatHead."
+repeatHead n xs
+  | n == 0 = xs
+  | n > 0 = head xs : (repeatHead (n-1) xs )
+  | n < 0 = error "error: repeatHead."
+
+getTypesFun :: Int -> (Type, TType) -> [Maybe (Type, TType)]
+getTypesFun n (Fun t1 t2, TFun t1' t2')
+  | n == 0 = []
+  | n > 0 = Just (t1,t1') : getTypesFun (n-1) (t2, t2')
+  | otherwise = error "error: getTypesFun, no debería pasar."
+
+--Retorna el tipo más anidado de una "función", junto con la cantidad de tipos anidados.
+getNestedTypeFun :: (Type, TType) -> ((Type, TType), Int)
+getNestedTypeFun (Fun _ y, TFun _ y') = let (f, n) = getNestedTypeFun (y,y')
+                                     in (f, n+1)
+getNestedTypeFun x = (x, 0)
+
+getNestedTypeForAll :: TType -> (TType, Int)
+getNestedTypeForAll (TForAll x) = let (f, n) = getNestedTypeForAll x
+                                 in (f, n+1)
+getNestedTypeForAll x = (x,0)
+
+getApplyTermFun :: Int -> Int -> [SpecialTerm] -> [SpecialTerm]
+getApplyTermFun 1 i ts = addHT (\x -> (Bound i) :@: x) ts
+getApplyTermFun 2 i ts = addDHT (\x y -> ((Bound i) :@: x) :@: y) ts
+getApplyTermFun n i ts =  getApplyTermFun (n-1) i $ addDHT (\x y -> x :@: y) ts
 
 repeatOrSubstract :: Int -> [a] -> [a]
 repeatOrSubstract m xs
@@ -370,38 +373,51 @@ getTypesForAll m tys = repeatElem m Nothing tys
                  
 
 getApplyTermForAll :: Int -> M.Map Int (Type, TType) -> Term -> [SpecialTerm] -> [SpecialTerm]
-getApplyTermForAll n sust t ts = case applyTypeTerm n sust t of
+getApplyTermForAll n sust t ts = case termForAll n t sust of
                                   Term x -> simplify x ts
                                   TypeH x -> TypeH x : ts
                                   _ -> error "error: getApplyTermForAll, no debería pasar"
 
 
+termForAll :: Int -> Term -> M.Map Int (Type, TType) -> SpecialTerm
+termForAll n t = termForAll' 0 n (Term t)
 
-applyTypeTerm :: Int -> M.Map Int (Type, TType) -> Term -> SpecialTerm
-applyTypeTerm n sust t
-  | n < 0 = error "error: applyTypeTerm, no deberia pasar."
+termForAll' :: Int -> Int -> SpecialTerm -> M.Map Int (Type, TType)  -> SpecialTerm
+termForAll' n m t sust
+  | n < 0 = error "error: termForAll, no deberia pasar."
   | otherwise =
     case M.lookup n sust of
-      Nothing -> if n == 0
-                 then TypeH $ HTe (\ty -> t :!: ty)
-                 else case applyTypeTerm (n-1) sust t of
-                       Term te -> TypeH $ HTe (\ty -> te :!: ty)
-                       TypeH x -> TypeH $ newTypeHole x
-                       _ -> error "error: applyTypeTerm, no debería pasar."
-      Just x -> if n == 0
-                then Term $ t :!: x
-                else applyTypeTerm (n-1) sust (t :!: x)
+      Nothing ->let tt = TypeH $ addTypeHole t
+                in if n == m
+                   then tt
+                   else termForAll' (n+1) m tt sust
+      Just x -> let tt = addTypeTermST t x
+                in if n == m
+                   then tt
+                   else termForAll' (n+1) m tt sust
 
-newTypeHole :: TypeHole -> TypeHole
-newTypeHole x = HTy $ \ty -> newTypeHole' x ty
+--addTypeHole añade al lambda término de su primer arg., una instancia de tipo "vacia".
+--Retorna el TypeHole con la instacia "vacia".
+addTypeHole :: SpecialTerm -> TypeHole
+addTypeHole (Term te) = HTe $ \y -> te :!: y
+addTypeHole (TypeH hte) = HTy $ \y -> addTypeTerm hte y
+addTypeHole _ = error "error: newTypeHole, no debería pasar."
 
---newTypeHole' añade al lambda término de su primer arg. (desempaquetando el TypeHole), una instancia de tipo,
+--addTypeTermST añade al lambda término de su primer arg., una instancia de tipo "vacia".
+--Retorna el SpecialTerm con la instacia "vacia".
+addTypeTermST :: SpecialTerm -> (Type, TType) -> SpecialTerm
+addTypeTermST (Term te) x = Term $ te :!: x
+addTypeTermST (TypeH hte) x = TypeH $ addTypeTerm hte x
+addTypeTermST _ _ = error "error: addTypeTerm, no debería pasar."
+
+--addTypeTerm añade al lambda término de su primer arg. (desempaquetando el TypeHole), una instancia de tipo,
 --con el tipo de su segundo argumento. Retorna el TypeHole con esta nueva instancia de tipo, respetando la misma
 --estructura del TypeHole de su primer arg.
-newTypeHole' :: TypeHole -> (Type, TType) -> TypeHole
-newTypeHole' (HTe ht) ty = HTe (\ty' -> ht ty' :!: ty)
-newTypeHole' (HTy ht) ty = HTy (\ty' -> newTypeHole' (ht ty') ty)
+addTypeTerm :: TypeHole -> (Type, TType) -> TypeHole
+addTypeTerm (HTe h) x = HTe $ \y -> h y :!: x
+addTypeTerm (HTy h) x = HTy $ \y -> addTypeTerm (h y) x
 
+----------------------------------------------------------------------------------------------------------------------
 
 intro_exists :: TType -> TType -> (Type, TType) -> Term
 intro_exists s_a0 s a0 = Lam s_a0 $ BLam $ Lam (TForAll $ TFun s (TBound 1)) $ (Bound 0 :!: a0) :@: (Bound 1)      

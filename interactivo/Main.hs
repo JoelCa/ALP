@@ -149,7 +149,6 @@ errorMessage (PExist s) = outputStrLn $ "error: " ++ s ++ " ya existe."
 errorMessage (PNotExist s) = outputStrLn $ "error: " ++ s ++ " no existe."
 errorMessage AssuE = outputStrLn "error: comando assumption mal aplicado."
 errorMessage IntroE1 = outputStrLn "error: comando intro mal aplicado."
-errorMessage IntroE2 = outputStrLn "error: comando intro, variable no tipo libre."
 errorMessage (ApplyE1 t1 t2) =
   outputStrLn $ "error: comando apply mal aplicado, \"" ++ (render $ printType t1) ++  "\" no coincide con \"" ++ (render $ printType t2) ++ "\"."
 errorMessage ApplyE2 = outputStrLn "error: comando apply, hipótesis no existe."

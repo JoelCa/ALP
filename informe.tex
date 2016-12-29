@@ -1,0 +1,106 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[left=1.5cm,top=2.0cm,right=1.5cm,bottom=2.0cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[spanish]{babel}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{amssymb}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+\newdimen\nodeDist
+\nodeDist=35mm
+
+\newcommand\tab[1][0.5cm]{\hspace*{#1}}
+
+\title{}
+\author{}
+
+\begin{document}
+
+\maketitle
+
+\begin{center}
+\section*{Análisis de lenguajes de programación} 
+\end{center}
+
+\newpage{\pagestyle{empty}\cleardoublepage}
+
+\section{Data types}
+
+\begin{verbatim}
+data ProofState = PState { position :: [Int]
+                         , context :: [Context]
+                         , typeContext :: [TypeContext]
+                         , ty :: [Maybe (Type, TType)]
+                         , term :: [SpecialTerm]
+                         , subp :: Int
+                         , name :: String
+                         , tyFromCut :: [Type]
+                         }
+\end{verbatim}
+
+\begin{itemize}
+  \item position: cantidad de variables de términos ligadas, para cada prueba.
+  \item context: contexto de variables de términos, para cada prueba.
+  \item typeContext: contexto de variables de tipo, para cada prueba.
+  \item ty: tipos objetivos de las pruebas no concluidas.
+  \item term: representa al lambda término, el cual se va construyendo por partes.
+  \item subp: cantidad de pruebas no terminadas.
+  \item name: ?.
+  \item tyFromCut: ?.
+\end{itemize}
+
+
+\begin{verbatim}
+data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) |
+                   Term Term | TypeH TypeHole
+
+data TypeHole = HTe ((Type, TType) -> Term) | HTy ((Type, TType) -> TypeHole)
+\end{verbatim}
+
+El data type \texttt{SpecialTerm} representa a un lamba término que puede tener dos tipos de agujero: lambda términos o tipos, de manera
+exclusiva, es decir solo puede tener un solo tipo de agujero.
+
+El data type \texttt{TypeHole} representa agujeros de tipos en un lambda término.
+
+
+\section{Observaciones}
+\begin{itemize}
+  \item El comando \texttt{apply} puede actuar como el comando \texttt{assumption}.
+  \item Cuando aplicamos el comando \texttt{intro} sobre un goal con ``para todo'', las variables
+  ligadas al/los para todo/s, pasan a ser libres en el nuevo goal. 
+  \item La substitución que encuentra el algoritmo de unificación es un termino cerrado.
+  \item Sean $\Gamma_{t}$ el contexto de tipos inicial, y $\alpha$ un tipo dado por el usuario. Luego, $FV(\alpha) \subseteq \Gamma_{t}$.
+  Además, si $FV(\alpha) \cap BV(\alpha) \neq  \emptyset$, se encuentra mediante substituciones de variables de tipos ligadas, un tipo $\alpha'$ 
+  equivalente a $\alpha$, tal que $FV(\alpha') \cap BV(\alpha') = \emptyset$, y $FV(\alpha') = FV(\alpha)$.
+  
+  El contexto de tipos inicial, se define a partir del comando \texttt{Props}.
+  
+  \item Al implementar el comando \texttt{intro} sobre un "para todo", no es necesario chequear que no la variable de tipo ligada no se encuentre
+  en el contexto de tipos, pues ya sabemos que no está allí, gracias al renombramiento de variables de tipos ligadas.
+
+\end{itemize}
+
+
+\section{Lo que falta}
+\begin{itemize}
+  \item Entender el lambda términos de constructores lógicos, más allá de la implicancia.
+  \item Incluir la eliminación e introducción de bottom.
+\end{itemize}
+
+
+
+
+
+
+
+
+
+
+
+
+\end{document}

@@ -77,7 +77,7 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String |
                        ApplyE1 Type Type | ApplyE2 | Unif1 |
                        Unif2 | Unif3 | Unif4 | ElimE1 |
                        CommandInvalid | PropRepeated1 String | PropRepeated2 String |
-                       PropNotExists String | ExactE
+                       PropNotExists String | ExactE | PSE
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions

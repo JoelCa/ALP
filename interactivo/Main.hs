@@ -142,7 +142,7 @@ returnInput (Right x) = return x
 
 
 errorMessage :: ProofExceptions -> ProverInputState ()
-errorMessage SyntaxE = outputStrLn "error sintaxis."
+errorMessage SyntaxE = outputStrLn "error de sintaxis."
 errorMessage PNotFinished = outputStrLn "error: prueba no terminada."
 errorMessage PNotStarted = outputStrLn "error: prueba no comenzada."
 errorMessage (PExist s) = outputStrLn $ "error: " ++ s ++ " ya existe."
@@ -162,3 +162,4 @@ errorMessage (PropRepeated1 s) = outputStrLn $ "error: proposición \""++ s ++"\
 errorMessage (PropRepeated2 s) = outputStrLn $ "error: proposición \""++ s ++"\" ya existe."
 errorMessage (PropNotExists s) = outputStrLn $ "error: proposición \""++ s ++"\" no existe en el entorno."
 errorMessage ExactE = outputStrLn "error: no es posible aplicar el comando exact."
+errorMessage PSE = outputStrLn "error: operación sobre el estado interno inválida"

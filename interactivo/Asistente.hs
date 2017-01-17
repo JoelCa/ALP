@@ -5,25 +5,20 @@ import Data.Char (isDigit)
 import Data.List (findIndex, elemIndex)
 import Control.Monad (unless)
 import qualified Data.Map as M (Map, lookup, insert, empty, size)
+import Data.Maybe (fromJust)
+import ProofState hiding (throwError)
 
 habitar :: ProofState -> Tactic -> Either ProofExceptions ProofState
-habitar (PState {name=name,
-                 subp=p,
-                 position=n:ns,
-                 typeContext=tc:tcs,
-                 context=c:cs,
-                 tyFromCut = cut,
-                 ty=Just (t, tw):tys,
-                 term=ts}) Assumption =
-  do i <- maybeToEither AssuE (findIndex (\x->snd x == tw) c)
-     return $ PState {name=name,
-                      subp=p-1,
-                      position=ns,
-                      typeContext=tcs,
-                      context=cs,
-                      tyFromCut = cut,
-                      ty=tys,
-                      term=simplify (Bound i) ts}
+habitar ps Assumption = do x <- getType ps
+                           let (t, tw) = fromJust x
+                           c <- getContext ps
+                           i <- maybeToEither AssuE (findIndex (\x->snd x == tw) c)
+                           s <- addTerm ps (simplify (Bound i))
+                           finishSubProof s
+habitar ps Intro = do x <- getType ps
+                      introComm ps x
+
+                           
 habitar (PState {name=name,
                  subp=p,
                  position=n:ns,
@@ -168,8 +163,59 @@ habitar (PState {ty=Just _ : tys}) (Exact x) = throwError ExactE
 
 
 ----------------------------------------------------------------------------------------------------------------------
--- Comando INTRO
+-- Comando INTRO e INTROS
 
+introComm :: ProofState -> Maybe (Type, TType) -> Either ProofExceptions ProofState
+introComm ps (Just (Fun t1 t2, TFun t1' t2')) =
+  do n <- getPosition ps
+     c <- getContext ps
+     s <- incrementPosition ps
+     s' <- addContext s (t1,t1')
+     s'' <- replaceType s' (Just (t2, t2'))
+     addTerm s'' $ addHT (\x -> Lam t1' x) (term ps)
+introComm ps (Just (ForAll q t, TForAll t')) =
+  do tc <- getTypeContext ps
+     replaceTypeContext
+
+
+habitar (PState {name=name,
+                 subp=p,
+                 position=ns,
+                 typeContext=tc:tcs,
+                 context=c:cs,
+                 tyFromCut = cut,
+                 ty=Just (ForAll q t, TForAll t'):tys,
+                 term=ts}) Intro =
+  return PState {name=name,
+                  subp=p,
+                  position=ns,
+                  typeContext=(q:tc):tcs,
+                  context=c:cs,
+                  tyFromCut = cut,
+                  ty=Just (t, renameBounds q t'):tys,
+                  term=addHT (\x -> BLam x) ts}
+
+
+-- habitar (PState {name=name,
+--                  subp=p,
+--                  position=n:ns,
+--                  typeContext=tcs,
+--                  context=c:cs,
+--                  tyFromCut = cut,
+--                  ty=Just (Fun t1 t2, TFun t1' t2'):tys,
+--                  term=ts}) Intro =
+--   return $ PState {name=name,
+--                    subp=p,
+--                    position=(n+1):ns,
+--                    typeContext=tcs,
+--                    context=((t1,t1'):c):cs,
+--                    tyFromCut = cut,
+--                    ty=Just (t2, t2'):tys,
+--                    term=addHT (\x -> Lam t1' x) ts}
+
+
+
+    
 introsComm :: ProofState -> Either ProofExceptions ProofState
 introsComm st =
   case habitar st Intro of

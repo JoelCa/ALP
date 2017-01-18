@@ -334,8 +334,17 @@ applyComm' i ht@(Fun _ _, TFun _ _) =
      modifyType (\tys -> getTypesFun n ht ++ tail tys)
      modifyTerm (\ts -> getApplyTermFun n i ts)
 applyComm' i ht@(ForAll _ _, TForAll _) =
-  do
- 
+  do x <- getType
+     let (ft, n) = getNestedTypeForAll $ snd ht
+     r <- eitherToStateExceptions $ unification n ft (fromJust x)
+     let m = n - M.size r
+     modifySubP (\p -> p+m-1)
+     modifyPosition (\ns -> repeatOrSubstract m ns)
+     modifyTypeCont (\tcs -> repeatOrSubstract m tcs)
+     modifyContext (\cs -> repeatOrSubstract m cs)
+     modifyType (\tys -> getTypesForAll m (tail tys))
+     modifyTerm (\ts -> getApplyTermForAll (n-1) r (Bound i) ts)
+--applyComm' _ _ = throw 
                         
 -- applyComm' :: Int -> (Type, TType) -> StateExceptions ()
 -- applyComm' i (PState {name=name,
@@ -393,11 +402,12 @@ repeatHead n xs
 
 getTypesFun :: Int -> (Type, TType) -> [Maybe (Type, TType)]
 getTypesFun n (Fun t1 t2, TFun t1' t2')
-  | n == 0 = []
   | n > 0 = Just (t1,t1') : getTypesFun (n-1) (t2, t2')
-  | otherwise = error "error: getTypesFun, no debería pasar."
+  | otherwise = error "error: getTypesFun, no debería pasar 1."
+getTypesFun 0 _ = []
+getTypesFun _ _ = error $ "error: getTypesFun, no debería pasar 2."
 
---Retorna el tipo más anidado de una "función", junto con la cantidad de tipos anidados.
+-- Retorna el tipo más anidado de una "función", junto con la cantidad de tipos anidados.
 getNestedTypeFun :: (Type, TType) -> ((Type, TType), Int)
 getNestedTypeFun (Fun _ y, TFun _ y') = let (f, n) = getNestedTypeFun (y,y')
                                         in (f, n+1)
@@ -452,23 +462,23 @@ termForAll' n m t sust
                    then tt
                    else termForAll' (n+1) m tt sust
 
---addTypeHole añade al lambda término de su primer arg., una instancia de tipo "vacia".
---Retorna el TypeHole con la instacia "vacia".
+-- addTypeHole añade al lambda término de su primer arg., una instancia de tipo "vacia".
+-- Retorna el TypeHole con la instacia "vacia".
 addTypeHole :: SpecialTerm -> TypeHole
 addTypeHole (Term te) = HTe $ \y -> te :!: y
 addTypeHole (TypeH hte) = HTy $ \y -> addTypeTerm hte y
 addTypeHole _ = error "error: newTypeHole, no debería pasar."
 
---addTypeTermST añade al lambda término de su primer arg., una instancia de tipo "vacia".
---Retorna el SpecialTerm con la instacia "vacia".
+-- addTypeTermST añade al lambda término de su primer arg., una instancia de tipo "vacia".
+-- Retorna el SpecialTerm con la instacia "vacia".
 addTypeTermST :: SpecialTerm -> (Type, TType) -> SpecialTerm
 addTypeTermST (Term te) x = Term $ te :!: x
 addTypeTermST (TypeH hte) x = TypeH $ addTypeTerm hte x
 addTypeTermST _ _ = error "error: addTypeTerm, no debería pasar."
 
---addTypeTerm añade al lambda término de su primer arg. (desempaquetando el TypeHole), una instancia de tipo,
---con el tipo de su segundo argumento. Retorna el TypeHole con esta nueva instancia de tipo, respetando la misma
---estructura del TypeHole de su primer arg.
+-- addTypeTerm añade al lambda término de su primer arg. (desempaquetando el TypeHole), una instancia de tipo,
+-- con el tipo de su segundo argumento. Retorna el TypeHole con esta nueva instancia de tipo, respetando la misma
+-- estructura del TypeHole de su primer arg.
 addTypeTerm :: TypeHole -> (Type, TType) -> TypeHole
 addTypeTerm (HTe h) x = HTe $ \y -> h y :!: x
 addTypeTerm (HTy h) x = HTy $ \y -> addTypeTerm (h y) x
@@ -777,6 +787,9 @@ maybeToStateExceptions :: ProofExceptions -> Maybe a -> StateExceptions a
 maybeToStateExceptions excep Nothing = throw excep
 maybeToStateExceptions _ (Just val) = return val
 
+eitherToStateExceptions :: Either ProofExceptions a -> StateExceptions a
+eitherToStateExceptions (Left e) = throw e
+eitherToStateExceptions (Right x) = return x
 
 throwError :: e -> Either e a
 throwError x = Left x

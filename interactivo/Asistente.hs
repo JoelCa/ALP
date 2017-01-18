@@ -10,17 +10,19 @@ import ProofState hiding (throwError)
 
 habitar :: Tactic -> StateExceptions ()
 habitar Assumption = do x <- getType
-                        let (t, tw) = fromJust x
+                        let (_, tw) = fromJust x
                         c <- getContext
                         i <- maybeToStateExceptions AssuE (findIndex (\x->snd x == tw) c)
-                        addTerm (simplify (Bound i))
+                        modifyTerm $ simplify (Bound i)
                         finishSubProof                        
 habitar Intro = do x <- getType
                    introComm x
 habitar Intros = introsComm
-
--- habitar st@(PState {position=n:ns,context=c:cs}) (Apply h) = do i <- getHypothesisValue n h
---                                                                 applyComm (n-i-1) st (c !! (n-i-1))                                                          
+habitar (Apply h) = do n <- getPosition
+                       i <- getHypothesisValue n h
+                       c <- getContext
+                       applyComm (n-i-1) (c !! (n-i-1))
+                       
 -- habitar st@(PState {position=n:ns,context=c:cs}) (Elim h) = do i <- getHypothesisValue n h
 --                                                                elimComm i st (c !! (n-i-1))                                                               
 -- habitar (PState {name=name,
@@ -136,11 +138,11 @@ introComm (Just (Fun t1 t2, TFun t1' t2')) =
   do incrementPosition
      addContext (t1,t1')
      replaceType $ Just (t2, t2')
-     addTerm $ addHT (\x -> Lam t1' x)
+     modifyTerm $ addHT (\x -> Lam t1' x)
 introComm (Just (ForAll q t, TForAll t')) =
   do addTypeContext q
      replaceType $ Just (t, renameBounds q t')
-     addTerm $ addHT (\x -> BLam x)
+     modifyTerm $ addHT (\x -> BLam x)
 introComm _ = throw IntroE1
 
 -- habitar (PState {name=name,
@@ -292,71 +294,95 @@ getBoundsList (Fun t1 t2) = getBoundsList t1 ++ getBoundsList t2
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando APPLY
 
-applyComm :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
-applyComm i st@(PState {name=name,
-                        subp=p,
-                        position=n:ns,
-                        typeContext=tc:tcs,
-                        context=c:cs,
-                        tyFromCut = cut,
-                        ty=Just (t,t'):tys,
-                        term=ts}) ht@(t1, t1')
-  | t' == t1' = return $ PState {name=name,
-                                 subp=p-1,
-                                 position=ns,
-                                 typeContext=tcs,
-                                 context=cs,
-                                 tyFromCut = cut,
-                                 ty=tys,
-                                 term=simplify (Bound i) ts}
-  | otherwise = applyComm' i st ht
-                
-applyComm' :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
-applyComm' i (PState {name=name,
-                      subp=p,
-                      position=ns,
-                      typeContext=tcs,
-                      context=cs,
-                      tyFromCut = cut,
-                      ty=Just (t, t'):tys,
-                      term=ts}) ht@(Fun _ _, TFun _ _) =
-  do n <- compareTypes ht (t,t')
-     return $ PState {name=name, subp=p+n-1,
-                      position=repeatHead (n-1) ns,
-                      typeContext=repeatHead (n-1) tcs,
-                      context=repeatHead (n-1) cs,
-                      tyFromCut = cut,
-                      ty=getTypesFun n ht ++ tys,
-                      term=getApplyTermFun n i ts}
-applyComm' i (PState {name=name,
-                      subp=p,
-                      position=ns,
-                      typeContext=tcs,
-                      context=cs,
-                      tyFromCut = cut,
-                      ty=Just (t,t'):tys,
-                      term=ts}) ht@(ForAll _ _, TForAll _) =
-  do let (ft, n) = getNestedTypeForAll $ snd ht
-     r <- unification n ft (t,t')
-     let m = n - M.size r
-     return $ PState {name=name,
-                      subp=p+m-1,
-                      position=repeatOrSubstract m ns,
-                      typeContext=repeatOrSubstract m tcs,
-                      context=repeatOrSubstract m cs,
-                      tyFromCut = cut,
-                      ty=getTypesForAll m tys,
-                      term=getApplyTermForAll (n-1) r (Bound i) ts}
+applyComm :: Int -> (Type, TType) -> StateExceptions ()
+applyComm i ht@(_, t') = do x <- getType
+                            let (_, t1') = fromJust x
+                            if t' == t1'
+                              then
+                              do modifyTerm $ simplify (Bound i)
+                                 finishSubProof
+                              else
+                              applyComm' i ht
+
+-- applyComm :: Int -> (Type, TType) -> StateExceptions ()
+-- applyComm i st@(PState {name=name,
+--                         subp=p,
+--                         position=n:ns,
+--                         typeContext=tc:tcs,
+--                         context=c:cs,
+--                         tyFromCut = cut,
+--                         ty=Just (t,t'):tys,
+--                         term=ts}) ht@(t1, t1')
+--   | t' == t1' = return $ PState {name=name,
+--                                  subp=p-1,
+--                                  position=ns,
+--                                  typeContext=tcs,
+--                                  context=cs,
+--                                  tyFromCut = cut,
+--                                  ty=tys,
+--                                  term=simplify (Bound i) ts}
+--   | otherwise = applyComm' i st ht
+
+applyComm' :: Int -> (Type, TType) -> StateExceptions ()
+applyComm' i ht@(Fun _ _, TFun _ _) =
+  do x <- getType
+     n <- compareTypes ht (fromJust x)
+     modifySubP (\p -> p+n-1)
+     modifyPosition (\ns -> repeatHead (n-1) ns)
+     modifyTypeCont (\tcs -> repeatHead (n-1) tcs)
+     modifyContext (\cs -> repeatHead (n-1) cs)
+     modifyType (\tys -> getTypesFun n ht ++ tail tys)
+     modifyTerm (\ts -> getApplyTermFun n i ts)
+applyComm' i ht@(ForAll _ _, TForAll _) =
+  do
+ 
+                        
+-- applyComm' :: Int -> (Type, TType) -> StateExceptions ()
+-- applyComm' i (PState {name=name,
+--                       subp=p,
+--                       position=ns,
+--                       typeContext=tcs,
+--                       context=cs,
+--                       tyFromCut = cut,
+--                       ty=Just (t, t'):tys,
+--                       term=ts}) ht@(Fun _ _, TFun _ _) =
+--   do n <- compareTypes ht (t,t')
+--      return $ PState {name=name, subp=p+n-1,
+--                       position=repeatHead (n-1) ns,
+--                       typeContext=repeatHead (n-1) tcs,
+--                       context=repeatHead (n-1) cs,
+--                       tyFromCut = cut,
+--                       ty=getTypesFun n ht ++ tys,
+--                       term=getApplyTermFun n i ts}
+-- applyComm' i (PState {name=name,
+--                       subp=p,
+--                       position=ns,
+--                       typeContext=tcs,
+--                       context=cs,
+--                       tyFromCut = cut,
+--                       ty=Just (t,t'):tys,
+--                       term=ts}) ht@(ForAll _ _, TForAll _) =
+--   do let (ft, n) = getNestedTypeForAll $ snd ht
+--      r <- unification n ft (t,t')
+--      let m = n - M.size r
+--      return $ PState {name=name,
+--                       subp=p+m-1,
+--                       position=repeatOrSubstract m ns,
+--                       typeContext=repeatOrSubstract m tcs,
+--                       context=repeatOrSubstract m cs,
+--                       tyFromCut = cut,
+--                       ty=getTypesForAll m tys,
+--                       term=getApplyTermForAll (n-1) r (Bound i) ts}
 
 
 -- Funciones auxiliares para la función applyComm'
 
-compareTypes :: (Type, TType) -> (Type, TType) -> Either ProofExceptions Int
+compareTypes :: (Type, TType) -> (Type, TType) -> StateExceptions Int
 compareTypes (Fun _ y1, TFun _ y1') t
   | y1' == snd t = return 1
   | otherwise = do n <- compareTypes (y1, y1') t
                    return $ n + 1
-compareTypes (x, _) (y, _) = throwError $ ApplyE1 x y
+compareTypes (x, _) (y, _) = throw $ ApplyE1 x y
 
 repeatHead :: Int -> [a] -> [a]
 repeatHead _ [] = error "error: repeatHead."
@@ -572,13 +598,13 @@ isFreeType :: Var -> Context -> Bool
 isFreeType q = foldl (\r x -> isFreeType' q (snd x) || r) False
 
 
-getHypothesisValue :: Int -> String -> Either ProofExceptions Int
+getHypothesisValue :: Int -> String -> StateExceptions Int
 getHypothesisValue n h
   | isDefault h = let x = getValue h
                   in if isValidValue n x
                      then return x
-                     else throwError ApplyE2
-  | otherwise = throwError ApplyE2
+                     else throw ApplyE2
+  | otherwise = throw ApplyE2
 
 isDefault :: String -> Bool
 isDefault ('H':xs) = isNumber xs

@@ -58,9 +58,6 @@ getPosition = getAttribute position
 getTypeContext :: StateExceptions TypeContext
 getTypeContext = getAttribute typeContext
 
-addTerm :: ([SpecialTerm] -> [SpecialTerm]) -> StateExceptions ()
-addTerm f = modify (\ps -> ps {term = f $ term ps})
-
 incrementPosition :: StateExceptions ()
 incrementPosition = modify incrementPosition'
   
@@ -80,7 +77,26 @@ addTypeContext' :: String -> ProofState -> ProofState
 addTypeContext' x ps@(PState {typeContext=tc:tcs})= ps {typeContext = (x:tc):tcs}
 
 replaceType :: Maybe (Type, TType) -> StateExceptions ()
-replaceType x = modify (\ps -> ps {ty = x : tail (ty ps)})
+replaceType x = modifyType (\tys -> x : tail tys)
+
+modifySubP :: (Int -> Int) -> StateExceptions ()
+modifySubP f = modify (\ps -> ps {subp = f $ subp ps})
+
+modifyPosition :: ([Int] -> [Int]) -> StateExceptions ()
+modifyPosition f = modify (\ps -> ps {position = f $ position ps})
+
+modifyTypeCont :: ([TypeContext] -> [TypeContext]) -> StateExceptions ()
+modifyTypeCont f = modify (\ps -> ps {typeContext = f $ typeContext ps})
+
+modifyContext :: ([Context] -> [Context]) -> StateExceptions ()
+modifyContext f = modify (\ps -> ps {context = f $ context ps})
+
+modifyTerm :: ([SpecialTerm] -> [SpecialTerm]) -> StateExceptions ()
+modifyTerm f = modify (\ps -> ps {term = f $ term ps})
+
+modifyType :: ([Maybe (Type, TType)] -> [Maybe (Type, TType)]) -> StateExceptions ()
+modifyType f = modify (\ps -> ps {ty = f $ ty ps})
+
 
 finishSubProof :: StateExceptions ()
 finishSubProof = modify finishSubProof'

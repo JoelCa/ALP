@@ -12,6 +12,7 @@ import Control.Monad.IO.Class
 import Data.Maybe
 import qualified Data.Map as Map
 import Data.List (findIndex, elemIndex)
+import ProofState (runStateExceptions)
 
 
 type ProverInputState a = InputT (StateT ProverState IO) a
@@ -53,7 +54,7 @@ prover = do minput <- getInputLine "> "
 
 
 newProof :: String -> Type -> TType -> TypeContext -> ProofState
-newProof name ty tty ps = PState {name=name, subp=1, position=[0], typeContext = [ps], context=[[]], ty=[Just (ty, tty)], term=[HoleT id]}
+newProof name ty tty ps = PState {name=name, subp=1, position=[0], typeContext = [ps], context=[[]], ty=[Just (ty, tty)], term=[HoleT id], tyFromCut=[]}
 
 renderNewProof :: Type -> String
 renderNewProof ty = render $ printProof 1 [0] [[]] [[]] [Just ty]
@@ -107,7 +108,7 @@ checkCommand (Ta (Print x)) = do s <- lift get
                                  
 checkCommand (Ta ta) = do  s <- lift get
                            when (isNothing $ proof s) (throwIO PNotStarted)
-                           p <- returnInput $ habitar (fromJust $ proof s) ta
+                           (_ , p) <- returnInput $ runStateExceptions (habitar ta) (fromJust $ proof s)
                            lift $ put $ PSt {global=global s, proof=Just p}
                            if (isFinalTerm p)
                              then ((outputStrLn $ "Prueba completa.\n" ++ renderFinalTerm p ++ "\n" ++ show (getTermFromProof p) ++ "\n") --Borrar SHOW

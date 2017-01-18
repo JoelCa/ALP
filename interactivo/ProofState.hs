@@ -1,7 +1,7 @@
 module ProofState where
 
 import Common
-import Control.Monad.State.Lazy
+import Control.Monad
 
 newtype StateExceptions a = StateExceptions { runStateExceptions :: ProofState -> Either ProofExceptions (a, ProofState) }
 
@@ -10,6 +10,15 @@ instance Monad StateExceptions where
   m >>= f = StateExceptions (\s -> case runStateExceptions m s of
                                      Right (a,b) -> runStateExceptions (f a) b
                                      Left e -> Left e)
+
+get :: StateExceptions ProofState
+get = StateExceptions (\s -> Right (s, s))
+
+set :: ProofState -> StateExceptions ()
+set s = StateExceptions (\_ -> Right ((), s))  
+
+modify :: (ProofState -> ProofState) -> StateExceptions ()
+modify f = StateExceptions (\s -> Right ((), f s))
 
 instance Applicative StateExceptions where
   pure  = return
@@ -20,69 +29,80 @@ instance Functor StateExceptions where
 
 class Monad m => MonadException m where
   throw :: ProofExceptions -> m a
+  catch :: m a -> (ProofExceptions -> m a) -> m a
 
 instance MonadException StateExceptions where
   throw e = StateExceptions (\_ -> Left e)
+  catch m f = StateExceptions (\s -> case runStateExceptions m s of
+                                       Left e -> runStateExceptions (f e) s
+                                       Right x -> Right x)
 
 
-getType :: ProofState -> Either ProofExceptions (Maybe (Type, TType))
-getType ps = let x = ty ps
-             in if null x
-                then throwError PSE
-                else return $ head x
 
-getContext :: ProofState -> Either ProofExceptions Context
-getContext ps = let x = context ps
-                in if null x
-                   then throwError PSE
-                   else return $ head x
+getAttribute :: (ProofState -> [a]) -> StateExceptions a
+getAttribute f = do ps <- get
+                    let x = f ps
+                    if null x
+                      then throw PSE
+                      else return $ head x
 
-getPosition :: ProofState -> Either ProofExceptions Int
-getPosition ps = let x = position ps
-                 in if null x
-                    then throwError PSE
-                    else return $ head x
+getType :: StateExceptions (Maybe (Type, TType))
+getType = getAttribute ty
 
-getTypeContext :: ProofState -> Either ProofExceptions TypeContext
-getTypeContext ps = let x = typeContext ps
-                    in if null x
-                       then throwError PSE
-                       else return $ head x
+getContext :: StateExceptions Context
+getContext = getAttribute context
 
-addTerm :: ProofState ->  ([SpecialTerm] -> [SpecialTerm]) -> Either ProofExceptions ProofState
-addTerm ps f = return $ ps {term = f $ term ps}
+getPosition :: StateExceptions Int
+getPosition = getAttribute position
 
-incrementPosition :: ProofState -> Either ProofExceptions ProofState
-incrementPosition ps@(PState {position=n:ns}) = return $ ps {position = (n+1):ns}
+getTypeContext :: StateExceptions TypeContext
+getTypeContext = getAttribute typeContext
 
-addContext :: ProofState -> (Type,TType) -> Either ProofExceptions ProofState
-addContext ps@(PState {context=c:cs}) x = return $ ps {context = (x:c):cs}
+addTerm :: ([SpecialTerm] -> [SpecialTerm]) -> StateExceptions ()
+addTerm f = modify (\ps -> ps {term = f $ term ps})
 
-replaceType :: ProofState -> Maybe (Type, TType) -> Either ProofExceptions ProofState
-replaceType ps x = return $ ps {ty = x : tail (ty ps)}
+incrementPosition :: StateExceptions ()
+incrementPosition = modify incrementPosition'
+  
+incrementPosition' :: ProofState -> ProofState
+incrementPosition' ps@(PState {position=n:ns}) = ps {position = (n+1):ns}
 
-finishSubProof :: ProofState ->  Either ProofExceptions ProofState
-finishSubProof ps@(PState {subp=p,
-                           position=n:ns,
-                           typeContext=tc:tcs,
-                           context=c:cs,
-                           ty=ty:tys}) =
-  return $ ps {subp=p-1,
-               position=ns,
-               typeContext=tcs,
-               context=cs,
-               ty=tys}
+addContext :: (Type,TType) -> StateExceptions ()
+addContext x = modify (addContext' x)
 
-throwError :: e -> Either e a
-throwError x = Left x
+addContext' :: (Type,TType) -> ProofState -> ProofState
+addContext' x ps@(PState {context=c:cs})= ps {context = (x:c):cs}
 
+addTypeContext :: String -> StateExceptions ()
+addTypeContext x = modify (addTypeContext' x)
+
+addTypeContext' :: String -> ProofState -> ProofState
+addTypeContext' x ps@(PState {typeContext=tc:tcs})= ps {typeContext = (x:tc):tcs}
+
+replaceType :: Maybe (Type, TType) -> StateExceptions ()
+replaceType x = modify (\ps -> ps {ty = x : tail (ty ps)})
+
+finishSubProof :: StateExceptions ()
+finishSubProof = modify finishSubProof'
+
+finishSubProof' :: ProofState ->  ProofState
+finishSubProof' ps@(PState {subp=p,
+                            position=n:ns,
+                            typeContext=tc:tcs,
+                            context=c:cs,
+                            ty=ty:tys}) =
+  ps {subp=p-1,
+      position=ns,
+      typeContext=tcs,
+      context=cs,
+      ty=tys}
 
 ------------------------------------------------------------------------------
 -- PRUEBA!
 
-type PStateExceptions = StateT ProofState (Either ProofExceptions)
+-- type PStateExceptions = StateT ProofState (Either ProofExceptions)
 
-hola :: State (Int, Int) (Either ProofExceptions (Int, Int))
-hola = do put (1, 4)
-          s <- get
-          return (return s)
+-- hola :: State (Int, Int) (Either ProofExceptions (Int, Int))
+-- hola = do put (1, 4)
+--           s <- get
+--           return (return s)

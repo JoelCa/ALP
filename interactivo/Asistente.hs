@@ -8,194 +8,157 @@ import qualified Data.Map as M (Map, lookup, insert, empty, size)
 import Data.Maybe (fromJust)
 import ProofState hiding (throwError)
 
-habitar :: ProofState -> Tactic -> Either ProofExceptions ProofState
-habitar ps Assumption = do x <- getType ps
-                           let (t, tw) = fromJust x
-                           c <- getContext ps
-                           i <- maybeToEither AssuE (findIndex (\x->snd x == tw) c)
-                           s <- addTerm ps (simplify (Bound i))
-                           finishSubProof s
-habitar ps Intro = do x <- getType ps
-                      introComm ps x
+habitar :: Tactic -> StateExceptions ()
+habitar Assumption = do x <- getType
+                        let (t, tw) = fromJust x
+                        c <- getContext
+                        i <- maybeToStateExceptions AssuE (findIndex (\x->snd x == tw) c)
+                        addTerm (simplify (Bound i))
+                        finishSubProof                        
+habitar Intro = do x <- getType
+                   introComm x
+habitar Intros = introsComm
 
-                           
-habitar (PState {name=name,
-                 subp=p,
-                 position=n:ns,
-                 typeContext=tcs,
-                 context=c:cs,
-                 tyFromCut = cut,
-                 ty=Just (Fun t1 t2, TFun t1' t2'):tys,
-                 term=ts}) Intro =
-  return $ PState {name=name,
-                   subp=p,
-                   position=(n+1):ns,
-                   typeContext=tcs,
-                   context=((t1,t1'):c):cs,
-                   tyFromCut = cut,
-                   ty=Just (t2, t2'):tys,
-                   term=addHT (\x -> Lam t1' x) ts}
-habitar (PState {name=name,
-                 subp=p,
-                 position=ns,
-                 typeContext=tc:tcs,
-                 context=c:cs,
-                 tyFromCut = cut,
-                 ty=Just (ForAll q t, TForAll t'):tys,
-                 term=ts}) Intro =
-  return PState {name=name,
-                  subp=p,
-                  position=ns,
-                  typeContext=(q:tc):tcs,
-                  context=c:cs,
-                  tyFromCut = cut,
-                  ty=Just (t, renameBounds q t'):tys,
-                  term=addHT (\x -> BLam x) ts}
-habitar st Intros = introsComm st
-habitar _ Intro = throwError IntroE1
-habitar st@(PState {position=n:ns,context=c:cs}) (Apply h) = do i <- getHypothesisValue n h
-                                                                applyComm (n-i-1) st (c !! (n-i-1))                                                          
-habitar st@(PState {position=n:ns,context=c:cs}) (Elim h) = do i <- getHypothesisValue n h
-                                                               elimComm i st (c !! (n-i-1))                                                               
-habitar (PState {name=name,
-                 subp=p,
-                 position=ns,
-                 typeContext=tcs,
-                 context=cs,
-                 tyFromCut = cut,
-                 ty=Just (Or t1 t2 , TOr t1' t2'):tys,
-                 term=ts}) CLeft = 
-  return $ PState {name=name,
-                   subp=p,
-                   position=ns,
-                   typeContext=tcs,
-                   context=cs,
-                   tyFromCut = cut,
-                   ty=Just (t1,t1'):tys,
-                   term=addHT (\x -> ((Free $ Global "intro_or1") :!: (t1,t1') :!: (t2,t2')) :@: x) ts}
-habitar (PState {name=name,
-                 subp=p,
-                 position=ns,
-                 typeContext=tcs,
-                 context=cs,
-                 tyFromCut = cut,
-                 ty=Just (Or t1 t2 , TOr t1' t2'):tys,
-                 term=ts}) CRight = 
-  return $ PState {name=name,
-                   subp=p,
-                   position=ns,
-                   typeContext=tcs,
-                   context=cs,
-                   tyFromCut = cut,
-                   ty=Just (t2,t2'):tys,
-                   term=addHT (\x -> ((Free $ Global "intro_or2") :!: (t1,t1') :!: (t2,t2')) :@: x) ts}
-habitar (PState {name=name,
-                 subp=p,
-                 position=n:ns,
-                 typeContext=tc:tcs,
-                 context=c:cs,
-                 tyFromCut = cut,
-                 ty=Just (And t1 t2, TAnd t1' t2'):tys,
-                 term=ts}) Split =
-  return $ PState {name=name,
-                   subp=p+1,
-                   position=n:n:ns,
-                   typeContext=tc:tc:tcs,
-                   context=c:c:cs,
-                   tyFromCut = cut,
-                   ty=Just (t1,t1') : Just (t2,t2') : tys,
-                   term=addDHT (\x y -> ((Free $ Global "intro_and") :!: (t1,t1') :!: (t2,t2')) :@: x :@: y) ts}
-habitar (PState {name=name,
-                 subp=p,
-                 position=ns,
-                 typeContext=tc:tcs,
-                 context=c:cs,
-                 tyFromCut = cut,
-                 ty=Just (Exists q t, TExists t'):tys,
-                 term=ts}) (CExists x) =
-  do (y,y') <- getRenameWhitException tc x
-     let (z,z') = replace (t,t') (y,y') 
-     r <- getRenameTypeWhitException tc z
-     return $ PState {name=name,
-                      subp=p,
-                      position=ns,
-                      typeContext=tc:tcs,
-                      context=c:cs,
-                      tyFromCut = cut,
-                      ty=Just (r,z'):tys,
-                      term=addHT (\x -> (Free $ Global "intro_exists") :@: x) ts}
-habitar (PState {name=name,
-                 subp=p,
-                 position=n:ns,
-                 typeContext=tc:tcs,
-                 context=c:cs,
-                 tyFromCut = cut,
-                 ty=Just (t, t'):tys,
-                 term=ts}) (Cut x) =
-  return $ PState {name=name,
-                   subp=p+1,
-                   position=n:n:ns,
-                   typeContext=tc:tc:tcs,
-                   context=c:c:cs,
-                   tyFromCut = x:cut,
-                   ty=Just (x,x') : Just (Fun x t,TFun x' t') : tys,
-                   term=addDHT (\x y -> y :@: x) ts}
-  where x' = typeWithoutName x
---Modificar Exact
-habitar (PState {name=name,
-                 subp=p,
-                 position=n:ns,
-                 typeContext=tc:tcs,
-                 context=c:cs,
-                 tyFromCut = cut,
-                 ty=Nothing:tys,
-                 term=ts}) (Exact x) =
-  return $ PState {name=name,
-                   subp=p-1,
-                   position=ns,
-                   typeContext=tcs,
-                   context=cs,
-                   tyFromCut = cut,
-                   ty=tys,
-                   term= simplifyTypeInTerm (x,x') ts}
-  where x' = typeWithoutName x
-habitar (PState {ty=Just _ : tys}) (Exact x) = throwError ExactE
+-- habitar st@(PState {position=n:ns,context=c:cs}) (Apply h) = do i <- getHypothesisValue n h
+--                                                                 applyComm (n-i-1) st (c !! (n-i-1))                                                          
+-- habitar st@(PState {position=n:ns,context=c:cs}) (Elim h) = do i <- getHypothesisValue n h
+--                                                                elimComm i st (c !! (n-i-1))                                                               
+-- habitar (PState {name=name,
+--                  subp=p,
+--                  position=ns,
+--                  typeContext=tcs,
+--                  context=cs,
+--                  tyFromCut = cut,
+--                  ty=Just (Or t1 t2 , TOr t1' t2'):tys,
+--                  term=ts}) CLeft = 
+--   return $ PState {name=name,
+--                    subp=p,
+--                    position=ns,
+--                    typeContext=tcs,
+--                    context=cs,
+--                    tyFromCut = cut,
+--                    ty=Just (t1,t1'):tys,
+--                    term=addHT (\x -> ((Free $ Global "intro_or1") :!: (t1,t1') :!: (t2,t2')) :@: x) ts}
+-- habitar (PState {name=name,
+--                  subp=p,
+--                  position=ns,
+--                  typeContext=tcs,
+--                  context=cs,
+--                  tyFromCut = cut,
+--                  ty=Just (Or t1 t2 , TOr t1' t2'):tys,
+--                  term=ts}) CRight = 
+--   return $ PState {name=name,
+--                    subp=p,
+--                    position=ns,
+--                    typeContext=tcs,
+--                    context=cs,
+--                    tyFromCut = cut,
+--                    ty=Just (t2,t2'):tys,
+--                    term=addHT (\x -> ((Free $ Global "intro_or2") :!: (t1,t1') :!: (t2,t2')) :@: x) ts}
+-- habitar (PState {name=name,
+--                  subp=p,
+--                  position=n:ns,
+--                  typeContext=tc:tcs,
+--                  context=c:cs,
+--                  tyFromCut = cut,
+--                  ty=Just (And t1 t2, TAnd t1' t2'):tys,
+--                  term=ts}) Split =
+--   return $ PState {name=name,
+--                    subp=p+1,
+--                    position=n:n:ns,
+--                    typeContext=tc:tc:tcs,
+--                    context=c:c:cs,
+--                    tyFromCut = cut,
+--                    ty=Just (t1,t1') : Just (t2,t2') : tys,
+--                    term=addDHT (\x y -> ((Free $ Global "intro_and") :!: (t1,t1') :!: (t2,t2')) :@: x :@: y) ts}
+-- habitar (PState {name=name,
+--                  subp=p,
+--                  position=ns,
+--                  typeContext=tc:tcs,
+--                  context=c:cs,
+--                  tyFromCut = cut,
+--                  ty=Just (Exists q t, TExists t'):tys,
+--                  term=ts}) (CExists x) =
+--   do (y,y') <- getRenameWhitException tc x
+--      let (z,z') = replace (t,t') (y,y') 
+--      r <- getRenameTypeWhitException tc z
+--      return $ PState {name=name,
+--                       subp=p,
+--                       position=ns,
+--                       typeContext=tc:tcs,
+--                       context=c:cs,
+--                       tyFromCut = cut,
+--                       ty=Just (r,z'):tys,
+--                       term=addHT (\x -> (Free $ Global "intro_exists") :@: x) ts}
+-- habitar (PState {name=name,
+--                  subp=p,
+--                  position=n:ns,
+--                  typeContext=tc:tcs,
+--                  context=c:cs,
+--                  tyFromCut = cut,
+--                  ty=Just (t, t'):tys,
+--                  term=ts}) (Cut x) =
+--   return $ PState {name=name,
+--                    subp=p+1,
+--                    position=n:n:ns,
+--                    typeContext=tc:tc:tcs,
+--                    context=c:c:cs,
+--                    tyFromCut = x:cut,
+--                    ty=Just (x,x') : Just (Fun x t,TFun x' t') : tys,
+--                    term=addDHT (\x y -> y :@: x) ts}
+--   where x' = typeWithoutName x
+-- --Modificar Exact
+-- habitar (PState {name=name,
+--                  subp=p,
+--                  position=n:ns,
+--                  typeContext=tc:tcs,
+--                  context=c:cs,
+--                  tyFromCut = cut,
+--                  ty=Nothing:tys,
+--                  term=ts}) (Exact x) =
+--   return $ PState {name=name,
+--                    subp=p-1,
+--                    position=ns,
+--                    typeContext=tcs,
+--                    context=cs,
+--                    tyFromCut = cut,
+--                    ty=tys,
+--                    term= simplifyTypeInTerm (x,x') ts}
+--   where x' = typeWithoutName x
+-- habitar (PState {ty=Just _ : tys}) (Exact x) = throwError ExactE
 
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando INTRO e INTROS
 
-introComm :: ProofState -> Maybe (Type, TType) -> Either ProofExceptions ProofState
-introComm ps (Just (Fun t1 t2, TFun t1' t2')) =
-  do n <- getPosition ps
-     c <- getContext ps
-     s <- incrementPosition ps
-     s' <- addContext s (t1,t1')
-     s'' <- replaceType s' (Just (t2, t2'))
-     addTerm s'' $ addHT (\x -> Lam t1' x) (term ps)
-introComm ps (Just (ForAll q t, TForAll t')) =
-  do tc <- getTypeContext ps
-     replaceTypeContext
+introComm :: Maybe (Type, TType) -> StateExceptions ()
+introComm (Just (Fun t1 t2, TFun t1' t2')) =
+  do incrementPosition
+     addContext (t1,t1')
+     replaceType $ Just (t2, t2')
+     addTerm $ addHT (\x -> Lam t1' x)
+introComm (Just (ForAll q t, TForAll t')) =
+  do addTypeContext q
+     replaceType $ Just (t, renameBounds q t')
+     addTerm $ addHT (\x -> BLam x)
+introComm _ = throw IntroE1
 
-
-habitar (PState {name=name,
-                 subp=p,
-                 position=ns,
-                 typeContext=tc:tcs,
-                 context=c:cs,
-                 tyFromCut = cut,
-                 ty=Just (ForAll q t, TForAll t'):tys,
-                 term=ts}) Intro =
-  return PState {name=name,
-                  subp=p,
-                  position=ns,
-                  typeContext=(q:tc):tcs,
-                  context=c:cs,
-                  tyFromCut = cut,
-                  ty=Just (t, renameBounds q t'):tys,
-                  term=addHT (\x -> BLam x) ts}
-
-
+-- habitar (PState {name=name,
+--                  subp=p,
+--                  position=ns,
+--                  typeContext=tc:tcs,
+--                  context=c:cs,
+--                  tyFromCut = cut,
+--                  ty=Just (ForAll q t, TForAll t'):tys,
+--                  term=ts}) Intro =
+--   return PState {name=name,
+--                   subp=p,
+--                   position=ns,
+--                   typeContext=(q:tc):tcs,
+--                   context=c:cs,
+--                   tyFromCut = cut,
+--                   ty=Just (t, renameBounds q t'):tys,
+--                   term=addHT (\x -> BLam x) ts}
 -- habitar (PState {name=name,
 --                  subp=p,
 --                  position=n:ns,
@@ -213,14 +176,11 @@ habitar (PState {name=name,
 --                    ty=Just (t2, t2'):tys,
 --                    term=addHT (\x -> Lam t1' x) ts}
 
-
-
-    
-introsComm :: ProofState -> Either ProofExceptions ProofState
-introsComm st =
-  case habitar st Intro of
-    Right x -> introsComm x
-    Left x -> return st
+-- Implementamos el comando INTROS, como una secuencia de comandos INTRO.
+-- Cuando falla el último INTRO, se recupera el estado previo al error mediante catch.
+introsComm :: StateExceptions ()
+introsComm = catch (do habitar Intro
+                       introsComm) (\e -> return ())
 
 -- Función auxiliar para el comando intro, con "para todo".
 renameBounds :: String -> TType -> TType
@@ -786,6 +746,11 @@ rename' fv rv bv (Or t t') = do (x,y) <- rename' fv rv bv t
 maybeToEither :: e -> Maybe a -> Either e a
 maybeToEither errorval Nothing = throwError errorval
 maybeToEither _ (Just normalval) = return normalval
+
+maybeToStateExceptions :: ProofExceptions -> Maybe a -> StateExceptions a
+maybeToStateExceptions excep Nothing = throw excep
+maybeToStateExceptions _ (Just val) = return val
+
 
 throwError :: e -> Either e a
 throwError x = Left x

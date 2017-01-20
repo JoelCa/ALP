@@ -10,3 +10,8 @@ Para chequear eliminación de existe. ARREGLAR pretty printer del término.
 Para chequear eliminación de existe. NO chequee el lambda termino.
 - Theorem t4: (forall x, forall y, forall z, y -> y) -> (p -> p).
 Para ver que los tipos "vacios" se instancian correctamente.
+- Theorem t5: (forall a, (forall c, a)  -> (forall c, a)) -> (forall c, p) -> (forall c, p).
+Arreglado. Cambiamos la forma con que se añadían las susbtituciones a la estructura Map.
+- Theorem t6: (forall a, forall b, a -> b) -> p -> q.
+Arreglado. Se Generaba un lambda término con las instancias al reves. La solución es es la misma
+del teorema t5.

@@ -9,8 +9,7 @@ import Data.Maybe (fromJust)
 import ProofState hiding (throwError)
 
 habitar :: Tactic -> StateExceptions ()
-habitar Assumption = do x <- getType
-                        let (_, tw) = fromJust x
+habitar Assumption = do (_,tw) <- fmap fromJust getType
                         c <- getContext
                         i <- maybeToStateExceptions AssuE (findIndex (\x->snd x == tw) c)
                         modifyTerm $ simplify (Bound i)
@@ -21,10 +20,12 @@ habitar Intros = introsComm
 habitar (Apply h) = do n <- getPosition
                        i <- getHypothesisValue n h
                        c <- getContext
-                       applyComm (n-i-1) (c !! (n-i-1))
-                       
--- habitar st@(PState {position=n:ns,context=c:cs}) (Elim h) = do i <- getHypothesisValue n h
---                                                                elimComm i st (c !! (n-i-1))                                                               
+                       applyComm (n-i-1) (c !! (n-i-1))                       
+habitar (Elim h) = do n <- getPosition
+                      i <- getHypothesisValue n h
+                      c <- getContext
+                      elimComm i (c !! (n-i-1))
+                      
 -- habitar (PState {name=name,
 --                  subp=p,
 --                  position=ns,
@@ -135,7 +136,7 @@ habitar (Apply h) = do n <- getPosition
 
 introComm :: Maybe (Type, TType) -> StateExceptions ()
 introComm (Just (Fun t1 t2, TFun t1' t2')) =
-  do incrementPosition
+  do incrementPosition (+ 1)
      addContext (t1,t1')
      replaceType $ Just (t2, t2')
      modifyTerm $ addHT (\x -> Lam t1' x)
@@ -203,57 +204,32 @@ renameBounds' n v t@(TFree x) = t
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando ELIM
 
--- Asumimos que las tuplas del 3º arg. , tienen la forma correcta.
-elimComm :: Int -> ProofState -> (Type, TType) -> Either ProofExceptions ProofState
-elimComm i (PState {name=name,
-                    subp=p,
-                    position=ns,
-                    typeContext=tcs,
-                    context=cs,
-                    tyFromCut = cut,
-                    ty=Just (t, t'):tys,
-                    term=ts}) (And t1 t2, TAnd t1' t2') =
-  return $ PState {name=name,
-                   subp=p,
-                   position=ns,
-                   typeContext=tcs,
-                   context=cs,
-                   tyFromCut = cut,
-                   ty=Just (Fun t1 (Fun t2 t), TFun t1' (TFun t2' t')):tys,
-                   term=addHT (\x -> ((Free $ Global "elim_and") :!: (t1,t1') :!: (t2,t2') :!: (t,t')) :@: (Bound i) :@: x) ts}
-elimComm i (PState {name=name,
-                    subp=p,
-                    position=n:ns,
-                    typeContext=tc:tcs,
-                    context=c:cs,
-                    tyFromCut = cut,
-                    ty=Just (t,t'):tys,
-                    term=ts}) (Or t1 t2, TOr t1' t2') =
-  return $ PState {name=name,
-                   subp=p+1,
-                   position=n:n:ns,
-                   typeContext=tc:tc:tcs,
-                   context=c:c:cs,
-                   tyFromCut = cut,
-                   ty=Just (Fun t1 t, TFun t1' t') : Just (Fun t2 t, TFun t2' t') : tys,
-                   term=addDHT (\x y -> ((Free $ Global "elim_or") :!: (t1,t1') :!: (t2,t2') :!: (t,t')) :@: (Bound i) :@: x :@: y) ts}
-elimComm i (PState {name=name,
-                    subp=p,
-                    position=ns,
-                    typeContext=tcs,
-                    context=cs,
-                    tyFromCut = cut,
-                    ty=Just (t, t'):tys,
-                    term=ts}) (Exists v t1, TExists t1') =
-  return $ PState {name=name,
-                   subp=p,
-                   position=ns,
-                   typeContext=tcs,
-                   context=cs,
-                   tyFromCut = cut,
-                   ty=Just (tyExists (head tcs) v t1 t, TForAll $ TFun t1' t'):tys,
-                   term=addHT (\x -> (elim_exists t1' (t,t')) :@: (Bound i) :@: x) ts}
-elimComm _ _ _ = throwError ElimE1
+--CHEQUEAR lambda términos
+-- Asumimos que las tuplas del 2º arg. , tienen la forma correcta.
+elimComm :: Int -> (Type, TType) -> StateExceptions ()
+elimComm i (And t1 t2, TAnd t1' t2') =
+  do (t,t') <- fmap fromJust getType
+     replaceType $ Just (Fun t1 (Fun t2 t), TFun t1' (TFun t2' t'))
+     modifyTerm $ addHT (\x -> ((Free $ Global "elim_and")
+                                 :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
+                               :@: (Bound i) :@: x)
+elimComm i (Or t1 t2, TOr t1' t2') =
+  do (t,t') <- fmap fromJust getType
+     modifySubP (+ 1)
+     modifyPosition $ repeatOrSubstract 2
+     modifyTypeCont $ repeatOrSubstract 2
+     modifyContext $ repeatOrSubstract 2
+     modifyType (\tys -> Just (Fun t1 t, TFun t1' t') :
+                         Just (Fun t2 t, TFun t2' t') : tail tys)
+     modifyTerm $ addDHT (\x y -> ((Free $ Global "elim_or")
+                                    :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
+                                  :@: (Bound i) :@: x :@: y)
+elimComm i (Exists v t1, TExists t1') =
+  do (t,t') <- fmap fromJust getType
+     tc <- getTypeContext
+     replaceType $ Just (tyExists tc v t1 t, TForAll $ TFun t1' t')
+     modifyTerm $ addHT (\x -> (elim_exists t1' (t,t')) :@: (Bound i) :@: x)
+elimComm _ _ = throw ElimE1
 
 
 -- Funciones auxiliares para la función elimComm
@@ -294,16 +270,6 @@ getBoundsList (Fun t1 t2) = getBoundsList t1 ++ getBoundsList t2
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando APPLY
 
-applyComm :: Int -> (Type, TType) -> StateExceptions ()
-applyComm i ht@(_, t') = do x <- getType
-                            let (_, t1') = fromJust x
-                            if t' == t1'
-                              then
-                              do modifyTerm $ simplify (Bound i)
-                                 finishSubProof
-                              else
-                              applyComm' i ht
-
 -- applyComm :: Int -> (Type, TType) -> StateExceptions ()
 -- applyComm i st@(PState {name=name,
 --                         subp=p,
@@ -323,28 +289,36 @@ applyComm i ht@(_, t') = do x <- getType
 --                                  term=simplify (Bound i) ts}
 --   | otherwise = applyComm' i st ht
 
-applyComm' :: Int -> (Type, TType) -> StateExceptions ()
-applyComm' i ht@(Fun _ _, TFun _ _) =
-  do x <- getType
-     n <- compareTypes ht (fromJust x)
-     modifySubP (\p -> p+n-1)
-     modifyPosition (\ns -> repeatHead (n-1) ns)
-     modifyTypeCont (\tcs -> repeatHead (n-1) tcs)
-     modifyContext (\cs -> repeatHead (n-1) cs)
+applyComm :: Int -> (Type, TType) -> StateExceptions ()
+applyComm i ht@(Fun _ _, TFun _ _) =
+  do x <- fmap fromJust getType
+     n <- compareTypes ht x
+     modifySubP (+ (n-1))
+     modifyPosition $ repeatOrSubstract n
+     modifyTypeCont $ repeatOrSubstract n
+     modifyContext $ repeatOrSubstract n
      modifyType (\tys -> getTypesFun n ht ++ tail tys)
-     modifyTerm (\ts -> getApplyTermFun n i ts)
-applyComm' i ht@(ForAll _ _, TForAll _) =
-  do x <- getType
-     let (ft, n) = getNestedTypeForAll $ snd ht
-     r <- eitherToStateExceptions $ unification n ft (fromJust x)
+     modifyTerm $ getApplyTermFun n i
+applyComm i ht@(ForAll _ _, TForAll _) =
+  do x <- fmap fromJust getType
+     let equal = snd ht == snd x
+     let (ft, n) = getNestedTypeForAll equal (snd ht)
+     r <- eitherToStateExceptions $ unification equal n ft x
      let m = n - M.size r
-     modifySubP (\p -> p+m-1)
-     modifyPosition (\ns -> repeatOrSubstract m ns)
-     modifyTypeCont (\tcs -> repeatOrSubstract m tcs)
-     modifyContext (\cs -> repeatOrSubstract m cs)
+     modifySubP (+ (m-1))
+     modifyPosition $ repeatOrSubstract m
+     modifyTypeCont $ repeatOrSubstract m
+     modifyContext $ repeatOrSubstract m
      modifyType (\tys -> getTypesForAll m (tail tys))
-     modifyTerm (\ts -> getApplyTermForAll (n-1) r (Bound i) ts)
---applyComm' _ _ = throw 
+     modifyTerm $ getApplyTermForAll n r (Bound i)
+applyComm i ht@(t, t') =
+  do (t1, t1') <- fmap fromJust getType
+     if t' == t1'
+       then
+       do modifyTerm $ simplify (Bound i)
+          finishSubProof
+       else
+       throw $ ApplyE1 t t1
                         
 -- applyComm' :: Int -> (Type, TType) -> StateExceptions ()
 -- applyComm' i (PState {name=name,
@@ -387,11 +361,16 @@ applyComm' i ht@(ForAll _ _, TForAll _) =
 -- Funciones auxiliares para la función applyComm'
 
 compareTypes :: (Type, TType) -> (Type, TType) -> StateExceptions Int
-compareTypes (Fun _ y1, TFun _ y1') t
+compareTypes x@(_,t') y@(_,t)
+ | t' == t = return 0
+ | otherwise =  compareTypes' x y
+
+compareTypes' :: (Type, TType) -> (Type, TType) -> StateExceptions Int
+compareTypes' (Fun _ y1, TFun _ y1') t
   | y1' == snd t = return 1
-  | otherwise = do n <- compareTypes (y1, y1') t
+  | otherwise = do n <- compareTypes' (y1, y1') t
                    return $ n + 1
-compareTypes (x, _) (y, _) = throw $ ApplyE1 x y
+compareTypes' (x, _) (y, _) = throw $ ApplyE1 x y
 
 repeatHead :: Int -> [a] -> [a]
 repeatHead _ [] = error "error: repeatHead."
@@ -408,17 +387,23 @@ getTypesFun 0 _ = []
 getTypesFun _ _ = error $ "error: getTypesFun, no debería pasar 2."
 
 -- Retorna el tipo más anidado de una "función", junto con la cantidad de tipos anidados.
-getNestedTypeFun :: (Type, TType) -> ((Type, TType), Int)
-getNestedTypeFun (Fun _ y, TFun _ y') = let (f, n) = getNestedTypeFun (y,y')
-                                        in (f, n+1)
-getNestedTypeFun x = (x, 0)
+-- getNestedTypeFun :: (Type, TType) -> ((Type, TType), Int)
+-- getNestedTypeFun (Fun _ y, TFun _ y') = let (f, n) = getNestedTypeFun (y,y')
+--                                         in (f, n+1)
+-- getNestedTypeFun x = (x, 0)
 
-getNestedTypeForAll :: TType -> (TType, Int)
-getNestedTypeForAll (TForAll x) = let (f, n) = getNestedTypeForAll x
+getNestedTypeForAll :: Bool -> TType -> (TType, Int)
+getNestedTypeForAll flag x
+  | flag = (x, 0)
+  | otherwise = getNestedTypeForAll' x
+
+getNestedTypeForAll' :: TType -> (TType, Int)
+getNestedTypeForAll' (TForAll x) = let (f, n) = getNestedTypeForAll' x
                                   in (f, n+1)
-getNestedTypeForAll x = (x,0)
+getNestedTypeForAll' x = (x,0)
 
 getApplyTermFun :: Int -> Int -> [SpecialTerm] -> [SpecialTerm]
+getApplyTermFun 0 i ts = simplify (Bound i) ts
 getApplyTermFun 1 i ts = addHT (\x -> (Bound i) :@: x) ts
 getApplyTermFun 2 i ts = addDHT (\x y -> ((Bound i) :@: x) :@: y) ts
 getApplyTermFun n i ts = getApplyTermFun (n-1) i $ addDHT (\x y -> x :@: y) ts
@@ -446,11 +431,14 @@ getApplyTermForAll n sust t ts = case termForAll n t sust of
 
 
 termForAll :: Int -> Term -> M.Map Int (Type, TType) -> SpecialTerm
-termForAll n t = termForAll' 0 n (Term t)
+termForAll n t sust
+  | n == 0 = Term t
+  | n > 0 = termForAll' 0 (n-1) (Term t) sust
+  | otherwise = error "error: termForAll, no deberia pasar."
 
 termForAll' :: Int -> Int -> SpecialTerm -> M.Map Int (Type, TType)  -> SpecialTerm
 termForAll' n m t sust
-  | n < 0 = error "error: termForAll, no deberia pasar."
+  | n < 0 = error "error: termForAll', no deberia pasar."
   | otherwise =
     case M.lookup n sust of
       Nothing ->let tt = TypeH $ addTypeHole t
@@ -651,17 +639,22 @@ typeWithoutName' xs (And t t') = TAnd (typeWithoutName' xs t) (typeWithoutName' 
 typeWithoutName' xs (Or t t') = TOr (typeWithoutName' xs t) (typeWithoutName' xs t')
 
 
-unification :: Int -> TType -> (Type,TType) -> Either ProofExceptions (M.Map Int (Type,TType))
-unification n = unif 0 n M.empty
+unification :: Bool -> Int -> TType -> (Type,TType) ->
+  Either ProofExceptions (M.Map Int (Type,TType))
+unification True _ = \ _ _ -> return M.empty
+unification False n = unif 0 n M.empty
 
-unif :: Int -> Int -> M.Map Int (Type,TType) -> TType -> (Type,TType) -> Either ProofExceptions (M.Map Int (Type,TType))
+unif :: Int -> Int -> M.Map Int (Type,TType) -> TType -> (Type,TType) ->
+  Either ProofExceptions (M.Map Int (Type,TType))
 unif pos n sust t@(TBound i) tt@(tt1,tt2)
   | (pos <= i) && (i < n) =
-    case M.lookup i sust of
-     Nothing -> maybe (throwError Unif1) (\s -> return $ M.insert i s sust) (substitution tt)
-     Just (s,s') -> if s' == tt2
-                    then return sust
-                    else throwError Unif1
+    let k = n - 1 - i
+    in case M.lookup k sust of
+         Nothing -> maybe (throwError Unif1)
+                    (\s -> return $ M.insert k s sust) (substitution tt)
+         Just (s,s') -> if s' == tt2
+                        then return sust
+                        else throwError Unif1
   | otherwise = if t == tt2
                 then return $ sust
                 else throwError Unif2
@@ -790,6 +783,11 @@ maybeToStateExceptions _ (Just val) = return val
 eitherToStateExceptions :: Either ProofExceptions a -> StateExceptions a
 eitherToStateExceptions (Left e) = throw e
 eitherToStateExceptions (Right x) = return x
+
+pred :: Int -> Int
+pred n
+  | n <= 0 = 0
+  | n > 0 = n-1
 
 throwError :: e -> Either e a
 throwError x = Left x

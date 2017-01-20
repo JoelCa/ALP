@@ -58,11 +58,11 @@ getPosition = getAttribute position
 getTypeContext :: StateExceptions TypeContext
 getTypeContext = getAttribute typeContext
 
-incrementPosition :: StateExceptions ()
-incrementPosition = modify incrementPosition'
+incrementPosition :: (Int -> Int) -> StateExceptions ()
+incrementPosition f = modify $ incrementPosition' f
   
-incrementPosition' :: ProofState -> ProofState
-incrementPosition' ps@(PState {position=n:ns}) = ps {position = (n+1):ns}
+incrementPosition' :: (Int -> Int) -> ProofState -> ProofState
+incrementPosition' f ps@(PState {position=n:ns}) = ps {position = (f n) : ns}
 
 addContext :: (Type,TType) -> StateExceptions ()
 addContext x = modify (addContext' x)

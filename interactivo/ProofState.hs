@@ -76,8 +76,8 @@ addTypeContext x = modify (addTypeContext' x)
 addTypeContext' :: String -> ProofState -> ProofState
 addTypeContext' x ps@(PState {typeContext=tc:tcs})= ps {typeContext = (x:tc):tcs}
 
-replaceType :: Maybe (Type, TType) -> StateExceptions ()
-replaceType x = modifyType (\tys -> x : tail tys)
+replaceType :: (Type, TType) -> StateExceptions ()
+replaceType x = modifyType (\tys -> Just x : tail tys)
 
 modifySubP :: (Int -> Int) -> StateExceptions ()
 modifySubP f = modify (\ps -> ps {subp = f $ subp ps})

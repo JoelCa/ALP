@@ -9,7 +9,8 @@ import Data.Maybe (fromJust)
 import ProofState hiding (throwError)
 
 habitar :: Tactic -> StateExceptions ()
-habitar Assumption = do (_,tw) <- fmap fromJust getType
+habitar Assumption = do x <- getType
+                        (_,tw) <- maybeToStateExceptions CommandInvalid x 
                         c <- getContext
                         i <- maybeToStateExceptions AssuE (findIndex (\x->snd x == tw) c)
                         modifyTerm $ simplify (Bound i)
@@ -20,44 +21,28 @@ habitar Intros = introsComm
 habitar (Apply h) = do n <- getPosition
                        i <- getHypothesisValue n h
                        c <- getContext
-                       applyComm (n-i-1) (c !! (n-i-1))                       
+                       x <- getType
+                       (t,t') <- maybeToStateExceptions CommandInvalid x
+                       applyComm (n-i-1) (t,t') (c !! (n-i-1))                       
 habitar (Elim h) = do n <- getPosition
                       i <- getHypothesisValue n h
                       c <- getContext
-                      elimComm i (c !! (n-i-1))
-                      
--- habitar (PState {name=name,
---                  subp=p,
---                  position=ns,
---                  typeContext=tcs,
---                  context=cs,
---                  tyFromCut = cut,
---                  ty=Just (Or t1 t2 , TOr t1' t2'):tys,
---                  term=ts}) CLeft = 
---   return $ PState {name=name,
---                    subp=p,
---                    position=ns,
---                    typeContext=tcs,
---                    context=cs,
---                    tyFromCut = cut,
---                    ty=Just (t1,t1'):tys,
---                    term=addHT (\x -> ((Free $ Global "intro_or1") :!: (t1,t1') :!: (t2,t2')) :@: x) ts}
--- habitar (PState {name=name,
---                  subp=p,
---                  position=ns,
---                  typeContext=tcs,
---                  context=cs,
---                  tyFromCut = cut,
---                  ty=Just (Or t1 t2 , TOr t1' t2'):tys,
---                  term=ts}) CRight = 
---   return $ PState {name=name,
---                    subp=p,
---                    position=ns,
---                    typeContext=tcs,
---                    context=cs,
---                    tyFromCut = cut,
---                    ty=Just (t2,t2'):tys,
---                    term=addHT (\x -> ((Free $ Global "intro_or2") :!: (t1,t1') :!: (t2,t2')) :@: x) ts}
+                      x <- getType
+                      (t,t') <- maybeToStateExceptions CommandInvalid x
+                      elimComm i (t,t') (c !! (n-i-1))
+habitar CLeft = do x <- getType
+                   case x of
+                     Just (Or t1 t2 , TOr t1' t2') ->
+                       do replaceType (t1,t1')
+                          modifyTerm $ addHT (\x -> ((Free $ Global "intro_or1") :!: (t1,t1') :!: (t2,t2')) :@: x)
+                     _ -> throw CommandInvalid
+habitar CRight = do x <- getType
+                    case x of
+                      Just (Or t1 t2 , TOr t1' t2') ->
+                        do replaceType (t2,t2')
+                           modifyTerm $ addHT (\x -> ((Free $ Global "intro_or2") :!: (t1,t1') :!: (t2,t2')) :@: x)
+                      _ -> throw CommandInvalid
+
 -- habitar (PState {name=name,
 --                  subp=p,
 --                  position=n:ns,
@@ -138,11 +123,11 @@ introComm :: Maybe (Type, TType) -> StateExceptions ()
 introComm (Just (Fun t1 t2, TFun t1' t2')) =
   do incrementPosition (+ 1)
      addContext (t1,t1')
-     replaceType $ Just (t2, t2')
+     replaceType (t2, t2')
      modifyTerm $ addHT (\x -> Lam t1' x)
 introComm (Just (ForAll q t, TForAll t')) =
   do addTypeContext q
-     replaceType $ Just (t, renameBounds q t')
+     replaceType (t, renameBounds q t')
      modifyTerm $ addHT (\x -> BLam x)
 introComm _ = throw IntroE1
 
@@ -206,16 +191,14 @@ renameBounds' n v t@(TFree x) = t
 
 --CHEQUEAR lambda términos
 -- Asumimos que las tuplas del 2º arg. , tienen la forma correcta.
-elimComm :: Int -> (Type, TType) -> StateExceptions ()
-elimComm i (And t1 t2, TAnd t1' t2') =
-  do (t,t') <- fmap fromJust getType
-     replaceType $ Just (Fun t1 (Fun t2 t), TFun t1' (TFun t2' t'))
+elimComm :: Int -> (Type, TType) -> (Type, TType) -> StateExceptions ()
+elimComm i (t,t') (And t1 t2, TAnd t1' t2') =
+  do replaceType (Fun t1 (Fun t2 t), TFun t1' (TFun t2' t'))
      modifyTerm $ addHT (\x -> ((Free $ Global "elim_and")
                                  :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
                                :@: (Bound i) :@: x)
-elimComm i (Or t1 t2, TOr t1' t2') =
-  do (t,t') <- fmap fromJust getType
-     modifySubP (+ 1)
+elimComm i (t,t') (Or t1 t2, TOr t1' t2') =
+  do modifySubP (+ 1)
      modifyPosition $ repeatOrSubstract 2
      modifyTypeCont $ repeatOrSubstract 2
      modifyContext $ repeatOrSubstract 2
@@ -224,12 +207,11 @@ elimComm i (Or t1 t2, TOr t1' t2') =
      modifyTerm $ addDHT (\x y -> ((Free $ Global "elim_or")
                                     :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
                                   :@: (Bound i) :@: x :@: y)
-elimComm i (Exists v t1, TExists t1') =
-  do (t,t') <- fmap fromJust getType
-     tc <- getTypeContext
-     replaceType $ Just (tyExists tc v t1 t, TForAll $ TFun t1' t')
+elimComm i (t,t') (Exists v t1, TExists t1') =
+  do tc <- getTypeContext
+     replaceType (tyExists tc v t1 t, TForAll $ TFun t1' t')
      modifyTerm $ addHT (\x -> (elim_exists t1' (t,t')) :@: (Bound i) :@: x)
-elimComm _ _ = throw ElimE1
+elimComm _ _ _ = throw ElimE1
 
 
 -- Funciones auxiliares para la función elimComm
@@ -289,19 +271,17 @@ getBoundsList (Fun t1 t2) = getBoundsList t1 ++ getBoundsList t2
 --                                  term=simplify (Bound i) ts}
 --   | otherwise = applyComm' i st ht
 
-applyComm :: Int -> (Type, TType) -> StateExceptions ()
-applyComm i ht@(Fun _ _, TFun _ _) =
-  do x <- fmap fromJust getType
-     n <- compareTypes ht x
+applyComm :: Int -> (Type, TType) -> (Type, TType) -> StateExceptions ()
+applyComm i x ht@(Fun _ _, TFun _ _) =
+  do n <- compareTypes ht x
      modifySubP (+ (n-1))
      modifyPosition $ repeatOrSubstract n
      modifyTypeCont $ repeatOrSubstract n
      modifyContext $ repeatOrSubstract n
      modifyType (\tys -> getTypesFun n ht ++ tail tys)
      modifyTerm $ getApplyTermFun n i
-applyComm i ht@(ForAll _ _, TForAll _) =
-  do x <- fmap fromJust getType
-     let equal = snd ht == snd x
+applyComm i x ht@(ForAll _ _, TForAll _) =
+  do let equal = snd ht == snd x
      let (ft, n) = getNestedTypeForAll equal (snd ht)
      r <- eitherToStateExceptions $ unification equal n ft x
      let m = n - M.size r
@@ -311,14 +291,10 @@ applyComm i ht@(ForAll _ _, TForAll _) =
      modifyContext $ repeatOrSubstract m
      modifyType (\tys -> getTypesForAll m (tail tys))
      modifyTerm $ getApplyTermForAll n r (Bound i)
-applyComm i ht@(t, t') =
-  do (t1, t1') <- fmap fromJust getType
-     if t' == t1'
-       then
-       do modifyTerm $ simplify (Bound i)
-          finishSubProof
-       else
-       throw $ ApplyE1 t t1
+applyComm i (t1, t1') (t, t')
+  | t' == t1' = do modifyTerm $ simplify (Bound i)
+                   finishSubProof
+  | otherwise = throw $ ApplyE1 t t1
                         
 -- applyComm' :: Int -> (Type, TType) -> StateExceptions ()
 -- applyComm' i (PState {name=name,

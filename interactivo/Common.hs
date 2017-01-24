@@ -1,10 +1,13 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Common where
 
 import Data.Typeable
-import System.Console.Haskeline.MonadException
+import System.Console.Haskeline.MonadException (Exception)
 import Data.Map (Map)
+import Control.Monad (ap, liftM)
 
   -- Tipos de los nombres
 data Name
@@ -77,11 +80,10 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String |
                        ApplyE1 Type Type | ApplyE2 | Unif1 |
                        Unif2 | Unif3 | Unif4 | ElimE1 |
                        CommandInvalid | PropRepeated1 String | PropRepeated2 String |
-                       PropNotExists String | ExactE | PSE
+                       PropNotExists String | ExactE | PSE | EmptyType
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
-
 
   -- Estado de la prueba
 data ProverState = PSt { proof :: Maybe ProofState
@@ -108,3 +110,46 @@ data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) |
                    Term Term | TypeH TypeHole
 
 data TypeHole = HTe ((Type, TType) -> Term) | HTy ((Type, TType) -> TypeHole)
+
+
+newtype StateExceptions e a = StateExceptions { runStateExceptions :: ProofState -> Either e (a, ProofState) }
+
+type Proof = StateExceptions ProofExceptions
+
+instance Monad (StateExceptions e) where
+  return x = StateExceptions (\s -> Right (x, s))
+  m >>= f = StateExceptions (\s -> case runStateExceptions m s of
+                                     Right (a,b) -> runStateExceptions (f a) b
+                                     Left e -> Left e)
+
+get :: StateExceptions e ProofState
+get = StateExceptions (\s -> Right (s, s))
+
+set :: ProofState -> StateExceptions e ()
+set s = StateExceptions (\_ -> Right ((), s))  
+
+modify :: (ProofState -> ProofState) -> StateExceptions e ()
+modify f = StateExceptions (\s -> Right ((), f s))
+
+instance Applicative (StateExceptions e) where
+  pure  = return
+  (<*>) = ap
+              
+instance Functor (StateExceptions e) where
+  fmap = liftM
+
+class Monad m => MonadException m e where
+  throw :: e -> m a
+  catch :: m a -> (e -> m a) -> m a
+
+instance MonadException (StateExceptions e) e where
+  throw e = StateExceptions (\_ -> Left e)
+  catch m f = StateExceptions (\s -> case runStateExceptions m s of
+                                       Left e -> runStateExceptions (f e) s
+                                       Right x -> Right x)
+
+instance MonadException (Either e) e where
+  throw e = Left e
+  catch m f = case m of
+                Left x -> f x
+                Right x -> Right x

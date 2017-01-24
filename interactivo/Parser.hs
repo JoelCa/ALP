@@ -4,11 +4,11 @@ import Parsing
 import Common
 import Control.Applicative
 
-type Proof = Either ProofExceptions Command
+type ProofCommand = Either ProofExceptions Command
 
 reservedWords = ["forall", "exists"]
 
-getCommand :: String -> Proof
+getCommand :: String -> ProofCommand
 getCommand s = case parse exprTy s of
   [(x,[])] -> return x
   _ -> Left SyntaxE

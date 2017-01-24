@@ -2,7 +2,7 @@ import System.Environment
 import System.Console.Haskeline
 import Asistente
 import Parser
-import Common hiding (State)
+import Common hiding (State, catch, get)
 import Text.PrettyPrint.HughesPJ (render)
 import PrettyPrinter (printTerm, printProof, printType)
 import System.Console.Haskeline.MonadException
@@ -12,7 +12,6 @@ import Control.Monad.IO.Class
 import Data.Maybe
 import qualified Data.Map as Map
 import Data.List (findIndex, elemIndex)
-import ProofState (runStateExceptions)
 
 
 type ProverInputState a = InputT (StateT ProverState IO) a
@@ -151,7 +150,9 @@ errorMessage (PNotExist s) = outputStrLn $ "error: " ++ s ++ " no existe."
 errorMessage AssuE = outputStrLn "error: comando assumption mal aplicado."
 errorMessage IntroE1 = outputStrLn "error: comando intro mal aplicado."
 errorMessage (ApplyE1 t1 t2) =
-  outputStrLn $ "error: comando apply mal aplicado, \"" ++ (render $ printType t1) ++  "\" no coincide con \"" ++ (render $ printType t2) ++ "\"."
+  outputStrLn $ "error: comando apply mal aplicado, \"" ++
+  (render $ printType t1) ++  "\" no coincide con \"" ++
+  (render $ printType t2) ++ "\"."
 errorMessage ApplyE2 = outputStrLn "error: comando apply, hipótesis no existe."
 errorMessage Unif1 = outputStrLn "error: unificación inválida 1."
 errorMessage Unif2 = outputStrLn "error: unificación inválida 2."
@@ -159,6 +160,7 @@ errorMessage Unif3 = outputStrLn "error: unificación inválida 3."
 errorMessage Unif4 = outputStrLn "error: unificación inválida 4."
 errorMessage ElimE1 = outputStrLn "error: comando elim mal aplicado."
 errorMessage CommandInvalid = outputStrLn "error: comando inválido."
+errorMessage EmptyType = outputStrLn "error: comando inválido (usar comando \"exact\")."
 errorMessage (PropRepeated1 s) = outputStrLn $ "error: proposición \""++ s ++"\" repetida."
 errorMessage (PropRepeated2 s) = outputStrLn $ "error: proposición \""++ s ++"\" ya existe."
 errorMessage (PropNotExists s) = outputStrLn $ "error: proposición \""++ s ++"\" no existe en el entorno."

@@ -1,0 +1,38 @@
+Dependencias
+
+cabal install mtl
+cabal install exceptions
+
+
+Observaciones
+
+- Para parsear la string "\", hice el truco: [head "\\"]
+
+- (PROBAR) Emplee unificación de solo un nivel, por ejemplo esto no se puede probar:
+  Theorem qqq: p->(forall p, forall p, p) -> forall p, p.
+
+- Problema dado por Mauro en agda: ~(A <-> ~A)
+Resuelto en Coq.
+
+Theorem paradox: ~(A <-> ~A).
+Proof.
+  unfold iff, not.
+  intros.
+  elim H.
+  intros;
+  apply H0;
+  apply H1;
+  intro;
+  apply H0;
+  assumption;
+  assumption.
+Qed.
+
+- Cuando se aplica la introducción del "para todo" sobre la variable de tipo "x", se reemplaza
+en el tipo sin nombre el término "TBound 0" por "TFree x". Es util cuando se comparan tipos
+en el comando "assumption".
+
+- El lambda término final tiene un tipo alpha equivalente al dado por el usuario.
+Por ejemplo, si el tipo es: (forall k, k -> k) -> (forall j, j) -> (forall y, y).
+Se tiene el lambda término \x:(forall k, k -> k).x (forall j, j), el cual tendría tipo
+(forall k, k -> k) -> (forall j, j) -> (forall j, j).

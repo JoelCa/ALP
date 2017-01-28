@@ -5,7 +5,7 @@ Props p.
 - Theorem t1 : (forall x, x -> x) -> (exists x, x -> x) -> (exists x, x -> x).
 Para chequear que el para todo unifica con el existe.
 - Theorem t2 : p -> (exists x, p -> x) -> (exists y, y).
-Para chequear eliminación de existe. ARREGLAR pretty printer del término.
+Para chequear eliminación de existe. ARREGLAR pretty printer del término. (VER)
 - Theorem t3: (exists y, forall x, x -> y) -> (forall x, exists y, x -> y).
 Para chequear eliminación de existe. NO chequee el lambda termino.
 - Theorem t4: (forall x, forall y, forall z, y -> y) -> (p -> p).
@@ -15,3 +15,8 @@ Arreglado. Cambiamos la forma con que se añadían las susbtituciones a la estru
 - Theorem t6: (forall a, forall b, a -> b) -> p -> q.
 Arreglado. Se Generaba un lambda término con las instancias al reves. La solución es es la misma
 del teorema t5.
+- Theorem t7: forall as, forall we, as -> (forall jk, jk) -> we.
+Para chequear que se imprima bien el lambda término.
+- Theorem t8 : (forall qw, qw /\ qw) -> forall nm, nm /\ nm.
+Para chequear que se imprima bien el lambda término.
+

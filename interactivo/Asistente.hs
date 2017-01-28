@@ -116,11 +116,11 @@ introComm (Just (Fun t1 t2, TFun t1' t2')) =
   do incrementPosition (+ 1)
      addContext (t1,t1')
      replaceType (t2, t2')
-     modifyTerm $ addHT (\x -> Lam t1' x)
+     modifyTerm $ addHT (\x -> Lam (t1,t1') x)
 introComm (Just (ForAll q t, TForAll t')) =
   do addTypeContext q
      replaceType (t, renameBounds q t')
-     modifyTerm $ addHT (\x -> BLam x)
+     modifyTerm $ addHT (\x -> BLam q x)
 introComm Nothing = throw EmptyType
 introComm _ = throw IntroE1
 
@@ -170,8 +170,10 @@ elimComm i (t,t') (Or t1 t2, TOr t1' t2') =
                                   :@: (Bound i) :@: x :@: y)
 elimComm i (t,t') (Exists v t1, TExists t1') =
   do tc <- getTypeContext
-     replaceType (tyExists tc v t1 t, TForAll $ TFun t1' t')
-     modifyTerm $ addHT (\x -> (elim_exists t1' (t,t')) :@: (Bound i) :@: x)
+     let tt = tyExists tc v t1 t
+     replaceType (tt, TForAll $ TFun t1' t')
+     modifyTerm $ addHT (\x -> (elim_exists (Exists v t1, TExists t1') (tt, TForAll $ TFun t1' t'))
+                               :@: (Bound i) :@: x)
 elimComm _ _ _ = throw ElimE1
 
 
@@ -418,32 +420,35 @@ replace' _ _ _ = error "error: replace' no debería pasar."
 
 ----------------------------------------------------------------------------------------------------------------------
 
+--ARREGLAR
+-- intro_exists :: TType -> TType -> (Type, TType) -> Term
+-- intro_exists s_a0 s a0 = Lam s_a0 $ BLam $ Lam (TForAll $ TFun s (TBound 1)) $ (Bound 0 :!: a0) :@: (Bound 1)      
 
-intro_exists :: TType -> TType -> (Type, TType) -> Term
-intro_exists s_a0 s a0 = Lam s_a0 $ BLam $ Lam (TForAll $ TFun s (TBound 1)) $ (Bound 0 :!: a0) :@: (Bound 1)      
-
-elim_exists :: TType -> (Type, TType) -> Term
-elim_exists s (b, b') = Lam (TExists s) $ Lam (TForAll $ TFun s b') $ (Bound 1 :!: (b, b')) :@: (Bound 0)
+--ESTA MAL
+elim_exists :: (Type, TType) -> (Type, TType) -> Term
+elim_exists (s,s') x@(ForAll _ (Fun _ t), TForAll (TFun _ t'))
+  = Lam (s, s') $ Lam x $ (Bound 1 :!: (t, t')) :@: (Bound 0)
 
 intro_and :: Term
-intro_and = BLam $ BLam $ Lam (TBound 1) $ Lam (TBound 0) $ BLam $ Lam (TFun (TBound 2) (TFun (TBound 1) (TBound 0)))
+intro_and = BLam "a" $ BLam "b" $ Lam (B "a",TBound 1) $ Lam (B "b",TBound 0) $
+            BLam "c" $ Lam (Fun (B "a") (Fun (B "b") (B "c")), TFun (TBound 2) (TFun (TBound 1) (TBound 0)))
             (((Bound 0) :@: (Bound 2)) :@: (Bound 1))
             
-elim_and :: Term
-elim_and = BLam $ BLam $ BLam $ Lam (TAnd (TBound 2) (TBound 1)) $ Lam (TFun (TBound 2) (TFun (TBound 1) (TBound 0)))
-           (Bound 1) :!: (B "c", TBound 0) :@: (Bound 0)
+-- elim_and :: Term
+-- elim_and = BLam $ BLam $ BLam $ Lam (TAnd (TBound 2) (TBound 1)) $ Lam (TFun (TBound 2) (TFun (TBound 1) (TBound 0)))
+--            (Bound 1) :!: (B "c", TBound 0) :@: (Bound 0)
 
-intro_or1 ::Term
-intro_or1 = BLam $ BLam $ Lam (TBound 1) $ BLam $ Lam (TFun (TBound 2) (TBound 0)) $ Lam (TFun (TBound 1) (TBound 0))
-            (Bound 1) :@: (Bound 2)
+-- intro_or1 ::Term
+-- intro_or1 = BLam $ BLam $ Lam (TBound 1) $ BLam $ Lam (TFun (TBound 2) (TBound 0)) $ Lam (TFun (TBound 1) (TBound 0))
+--             (Bound 1) :@: (Bound 2)
 
-intro_or2 ::Term
-intro_or2 = BLam $ BLam $ Lam (TBound 0) $ BLam $ Lam (TFun (TBound 2) (TBound 0)) $ Lam (TFun (TBound 1) (TBound 0))
-            (Bound 0) :@: (Bound 2)
+-- intro_or2 ::Term
+-- intro_or2 = BLam $ BLam $ Lam (TBound 0) $ BLam $ Lam (TFun (TBound 2) (TBound 0)) $ Lam (TFun (TBound 1) (TBound 0))
+--             (Bound 0) :@: (Bound 2)
 
-elim_or :: Term
-elim_or = BLam $ BLam $ BLam $ Lam (TOr (TBound 2) (TBound 1)) $ Lam (TFun (TBound 2) (TBound 0)) $
-          Lam (TFun (TBound 1) (TBound 0)) $ (Bound 2) :!: (B "c", TBound 0) :@: (Bound 1) :@: (Bound 0)
+-- elim_or :: Term
+-- elim_or = BLam $ BLam $ BLam $ Lam (TOr (TBound 2) (TBound 1)) $ Lam (TFun (TBound 2) (TBound 0)) $
+--           Lam (TFun (TBound 1) (TBound 0)) $ (Bound 2) :!: (B "c", TBound 0) :@: (Bound 1) :@: (Bound 0)
 
 
 

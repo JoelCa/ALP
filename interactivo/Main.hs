@@ -19,12 +19,8 @@ type ProverInputState a = InputT (StateT ProverState IO) a
 -- instance MonadState ProverState ProverInputState where
 --      get = lift . get
 --      put = lift . put
-
-initialT' = [("intro_and", intro_and),
-             ("elim_and", elim_and),
-             ("intro_or1", intro_or1),
-             ("intro_or2", intro_or2),
-             ("elim_or", elim_or)]
+--ARREGLAR, faltan reglas
+initialT' = [("intro_and", intro_and)]
 
 initialT = Map.fromList initialT'
 

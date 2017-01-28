@@ -51,8 +51,8 @@ data LamTerm  =  LVar String
 data Term  = Bound Int
            | Free Name 
            | Term :@: Term
-           | Lam TType Term
-           | BLam Term
+           | Lam (Type,TType) Term
+           | BLam Var Term
            | Term :!: (Type,TType)
            deriving (Show, Eq)
 

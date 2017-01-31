@@ -94,15 +94,16 @@ data ProverGlobal = PGlobal { props :: [String]
                             , terms :: Map String Term
                             }
 
-
 data ProofState = PState { position :: [Int]
                          , context :: [Context]
                          , typeContext :: [TypeContext]
                          , ty :: [Maybe (Type, TType)]
                          , term :: [SpecialTerm]
-                         , subp :: Int
+                         , subp :: Int           -- Cantidad de subpruebas activas en total.
                          , name :: String
                          , tyFromCut :: [Type]
+                         , subplevel :: [Int]    -- Indica la cantidad de subpruebas que están activas
+                                                 -- por nivel.
                          }
 
                                     

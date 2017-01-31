@@ -1,6 +1,6 @@
 Casos probados:
 
-Props p.
+Props p q.
 
 - Theorem t1 : (forall x, x -> x) -> (exists x, x -> x) -> (exists x, x -> x).
 Para chequear que el para todo unifica con el existe.
@@ -19,4 +19,10 @@ del teorema t5.
 Para chequear que se imprima bien el lambda término.
 - Theorem t8 : (forall qw, qw /\ qw) -> forall nm, nm /\ nm.
 Para chequear que se imprima bien el lambda término.
+- Theorem t9 : p -> q -> (p /\ (p /\ q)) /\ q.
+Para chequear que funcione bien el algoritmo que maneja la construcción de las subpruebaso
+- Props p q r t y.
+  Theorem t10: p -> q -> r -> t -> (p -> q -> r -> t -> y) -> y.
+Para chequear el pretty printer de las subpruebas, con el nuevo algoritmo.
+¿Qué hacer cuando variable de tipo es el igual a variable de término?
 

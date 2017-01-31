@@ -151,21 +151,24 @@ printType' False (Or t1 t2)   = printType' True t1 <+>
                                 printType' False t2
 
 
-printProof :: Int -> [Int] -> [TypeContext] -> [Context] -> [Maybe Type] -> Doc
-printProof = printSubProofs 1
-
-printSubProofs :: Int -> Int -> [Int] ->  [TypeContext] -> [Context] -> [Maybe Type] -> Doc
-printSubProofs _ _ [] [] [] [] =  empty
-printSubProofs i tp (n:ns) (tc:tcs) (c:cs) (ty:tys) = printSubProofs' i tp n tc c ty $$
-                                                      printSubProofs (i+1) tp ns tcs cs tys
+-- printSubProofs :: Int -> Int -> [Int] ->  [TypeContext] -> [Context] -> [Maybe Type] -> Doc
+-- printSubProofs _ _ [] [] [] [] =  empty
+-- printSubProofs i tp (n:ns) (tc:tcs) (c:cs) (ty:tys) = printSubProofsInit tp n tc c ty $$
+--                                                       printSubProofsLast (i+1) tp tys
                                     
-printSubProofs' :: Int -> Int -> Int -> TypeContext -> Context -> Maybe Type -> Doc
-printSubProofs' 1 tp n tc c ty = (text $ "Hay " ++ show tp ++ " sub pruebas.\n") $$
-                                 printContext n tc c $$
-                                 (text $ "___________________[1/"++ show tp ++"]") $$
-                                 printTypeFromMaybe ty
-printSubProofs' i tp n _ _ ty = (text $ "___________________["++(show i)++"/"++(show tp)++"]") $$
-                                printTypeFromMaybe ty
+printProof :: Int -> [Int] -> [TypeContext] -> [Context] -> [Maybe Type] -> Doc
+printProof tp (n:_) (tc:_) (c:_) tys =
+  (text $ "Hay " ++ show tp ++ " sub pruebas.\n") $$
+  printContext n tc c $$
+  printSubProofs 1 tp tys
+
+printSubProofs :: Int -> Int -> [Maybe Type] -> Doc
+printSubProofs _ _ [] = empty
+printSubProofs i tp (ty:tys)
+  | i <= tp = (text $ "___________________["++(show i)++"/"++(show tp)++"]") $$
+              printTypeFromMaybe ty $$
+              printSubProofs (i+1) tp tys
+  | otherwise = empty
 
 
 printContext :: Int -> TypeContext -> Context -> Doc

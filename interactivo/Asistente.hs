@@ -13,8 +13,8 @@ habitar Assumption = do x <- getType
                         (_,tw) <- maybeToProof EmptyType x 
                         c <- getContext
                         i <- maybeToProof AssuE (findIndex (\x->snd x == tw) c)
+                        modifySubProofs 0 id
                         modifyTerm $ simplify (Bound i)
-                        finishSubProof                        
 habitar Intro = do x <- getType
                    introComm x
 habitar Intros = introsComm
@@ -50,11 +50,7 @@ habitar CRight = do x <- getType
 habitar Split = do x <- getType
                    case x of
                      Just (And t1 t2, TAnd t1' t2') ->
-                       do modifySubP (+1)
-                          modifyPosition $ repeatOrSubstract 2
-                          modifyTypeCont $ repeatOrSubstract 2
-                          modifyContext $ repeatOrSubstract 2
-                          modifyType (\tys -> Just (t1,t1') : Just (t2,t2') : tail tys)
+                       do modifySubProofs 2 (\tys -> Just (t1,t1') : Just (t2,t2') : tys)
                           modifyTerm $ addDHT (\x y -> ((Free $ Global "intro_and")
                                                          :!: (t1,t1') :!: (t2,t2'))
                                                        :@: x :@: y)
@@ -159,12 +155,8 @@ elimComm i (t,t') (And t1 t2, TAnd t1' t2') =
                                  :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
                                :@: (Bound i) :@: x)
 elimComm i (t,t') (Or t1 t2, TOr t1' t2') =
-  do modifySubP (+ 1)
-     modifyPosition $ repeatOrSubstract 2
-     modifyTypeCont $ repeatOrSubstract 2
-     modifyContext $ repeatOrSubstract 2
-     modifyType (\tys -> Just (Fun t1 t, TFun t1' t') :
-                         Just (Fun t2 t, TFun t2' t') : tail tys)
+  do modifySubProofs 2 (\tys -> Just (Fun t1 t, TFun t1' t') :
+                         Just (Fun t2 t, TFun t2' t') : tys)
      modifyTerm $ addDHT (\x y -> ((Free $ Global "elim_or")
                                     :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
                                   :@: (Bound i) :@: x :@: y)
@@ -218,26 +210,18 @@ getBoundsList (Fun t1 t2) = getBoundsList t1 ++ getBoundsList t2
 applyComm :: Int -> (Type, TType) -> (Type, TType) -> Proof ()
 applyComm i x ht@(Fun _ _, TFun _ _) =
   do n <- compareTypes ht x
-     modifySubP (+ (n-1))
-     modifyPosition $ repeatOrSubstract n
-     modifyTypeCont $ repeatOrSubstract n
-     modifyContext $ repeatOrSubstract n
-     modifyType (\tys -> getTypesFun n ht ++ tail tys)
+     modifySubProofs n (\tys -> getTypesFun n ht ++ tys)
      modifyTerm $ getApplyTermFun n i
 applyComm i x ht@(ForAll _ _, TForAll _) =
   do let equal = snd ht == snd x
      let (ft, n) = getNestedTypeForAll equal (snd ht)
      r <- eitherToProof $ unification equal n ft x
      let m = n - M.size r
-     modifySubP (+ (m-1))
-     modifyPosition $ repeatOrSubstract m
-     modifyTypeCont $ repeatOrSubstract m
-     modifyContext $ repeatOrSubstract m
-     modifyType (\tys -> getTypesForAll m (tail tys))
+     modifySubProofs m (\tys -> getTypesForAll m tys)
      modifyTerm $ getApplyTermForAll n r (Bound i)
 applyComm i (t1, t1') (t, t')
-  | t' == t1' = do modifyTerm $ simplify (Bound i)
-                   finishSubProof
+  | t' == t1' = do modifySubProofs 0 id
+                   modifyTerm $ simplify (Bound i)
   | otherwise = throw $ ApplyE1 t t1
   
 
@@ -255,12 +239,6 @@ compareTypes' (Fun _ y1, TFun _ y1') t
                    return $ n + 1
 compareTypes' (x, _) (y, _) = throw $ ApplyE1 x y
 
-repeatHead :: Int -> [a] -> [a]
-repeatHead _ [] = error "error: repeatHead."
-repeatHead n xs
-  | n == 0 = xs
-  | n > 0 = head xs : (repeatHead (n-1) xs )
-  | n < 0 = error "error: repeatHead."
 
 getTypesFun :: Int -> (Type, TType) -> [Maybe (Type, TType)]
 getTypesFun n (Fun t1 t2, TFun t1' t2')
@@ -291,10 +269,6 @@ getApplyTermFun 1 i ts = addHT (\x -> (Bound i) :@: x) ts
 getApplyTermFun 2 i ts = addDHT (\x y -> ((Bound i) :@: x) :@: y) ts
 getApplyTermFun n i ts = getApplyTermFun (n-1) i $ addDHT (\x y -> x :@: y) ts
 
-repeatOrSubstract :: Int -> [a] -> [a]
-repeatOrSubstract m xs
-  | m == 0 = tail xs
-  | otherwise = repeatHead (m-1) xs
 
 repeatElem :: Int -> a -> [a] -> [a]
 repeatElem n x xs
@@ -650,7 +624,6 @@ rename' fv rv bv (Or t t') = do (x,y) <- rename' fv rv bv t
 
 
 --------------------------------------------------------------------
-
 
 maybeToEither :: e -> Maybe a -> Either e a
 maybeToEither errorval Nothing = throw errorval

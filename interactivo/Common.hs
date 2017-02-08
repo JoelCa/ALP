@@ -43,11 +43,11 @@ data TType = TBound Int
 data LamTerm  =  LVar String
               |  Abs String Type LamTerm
               |  App LamTerm LamTerm
-              |  BAbs Type LamTerm
+              |  BAbs String LamTerm
               |  BApp LamTerm Type
               deriving (Show, Eq)
 
-  -- Términos pseudo localmente sin nombres
+  -- Términos sin nombres
 data Term  = Bound Int
            | Free Name 
            | Term :@: Term
@@ -70,7 +70,7 @@ data Command = Ty String Type | Ta Tactic | Props [String] deriving (Show)
 -- Arreglar el Exact para que tome lambda términos
 data Tactic = Assumption | Apply String | Intro | Intros | Split
             | Elim String | CLeft | CRight | Print String 
-            | CExists Type | Cut Type | Exact Type
+            | CExists Type | Cut Type | Exact Type | Infer LamTerm
             deriving (Show)
 
 
@@ -80,7 +80,7 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String |
                        ApplyE1 Type Type | ApplyE2 | Unif1 |
                        Unif2 | Unif3 | Unif4 | ElimE1 |
                        CommandInvalid | PropRepeated1 String | PropRepeated2 String |
-                       PropNotExists String | ExactE | PSE | EmptyType
+                       PropNotExists String | ExactE | PSE | EmptyType | NotType
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
@@ -90,8 +90,8 @@ data ProverState = PSt { proof :: Maybe ProofState
                        , global :: ProverGlobal
                        }
                    
-data ProverGlobal = PGlobal { props :: [String]
-                            , terms :: Map String Term
+data ProverGlobal = PGlobal { props :: [String]          -- Proposiciones de tipos.
+                            , terms :: Map String Term   -- Teoremas.
                             }
 
 data ProofState = PState { position :: [Int]

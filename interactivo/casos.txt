@@ -24,5 +24,8 @@ Para chequear que funcione bien el algoritmo que maneja la construcción de las 
 - Props p q r t y.
   Theorem t10: p -> q -> r -> t -> (p -> q -> r -> t -> y) -> y.
 Para chequear el pretty printer de las subpruebas, con el nuevo algoritmo.
-¿Qué hacer cuando variable de tipo es el igual a variable de término?
+¿Qué hacer cuando variable de tipo es el igual a variable de término? NO hay problema.
+- Theorem t11: (forall b, (forall a, a) -> (forall w, forall r, b) -> b) -> 
+    (forall o, forall w, (forall x, x) -> (forall dd, forall ee, (forall zz, o)) -> (forall kk, o)).
+Para probar la unificación y el pretty printer.
 

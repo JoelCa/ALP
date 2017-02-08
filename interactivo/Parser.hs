@@ -28,7 +28,7 @@ exprTy = do symbol "Theorem"
          <|> do tac <- termTac
                 return $ Ta tac
          
-             
+-- Parser de los tipos (o fórmulas lógicas).
 exprTy' :: Parser Type
 exprTy' = do t <- termTy
              (do symbol "->"
@@ -65,6 +65,43 @@ termTy' = do char '('
           <|> do v <- validIdent reservedWords
                  return (B v)
 
+-- Parser del lambda término con nombre.
+expLam :: Parser LamTerm
+expLam = do e <- expLam'
+            f <- emptyLam
+            return $ f e
+
+emptyLam :: Parser (LamTerm -> LamTerm)
+emptyLam = do symbol "["
+              t <- exprTy'
+              symbol "]"
+              f <- emptyLam
+              return $ \x -> f $ BApp x t
+           <|> do e <- expLam
+                  return $ \x -> App x e
+           <|> return id
+
+expLam' :: Parser LamTerm
+expLam' = do symbol [head "\\"]
+             v <- validIdent reservedWords
+             symbol ":"
+             t <- exprTy'
+             symbol "."
+             e <- expLam
+             return $ Abs v t e
+          <|> do symbol [head "\\"]
+                 v <- validIdent reservedWords
+                 symbol "."
+                 e <- expLam
+                 return $ BAbs v e
+          <|> do v <- validIdent reservedWords
+                 return $ LVar v
+          <|> do symbol "("
+                 e <- expLam
+                 symbol ")"
+                 return e
+
+-- Parser de las tácticas.
 termTac :: Parser Tactic
 termTac = assumptionParser
           <|> applyParser
@@ -78,6 +115,7 @@ termTac = assumptionParser
           <|> printParser
           <|> cutParser
           <|> exactParser
+          <|> inferParser
 
 
 assumptionParser :: Parser Tactic
@@ -133,3 +171,9 @@ tacticTypeArg s tac = do symbol s
                          t <- exprTy'
                          char '.'
                          return $ tac t          
+
+inferParser :: Parser Tactic
+inferParser = do symbol "infer"
+                 l <- expLam
+                 char '.'
+                 return $ Infer l

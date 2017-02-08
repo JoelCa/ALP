@@ -403,28 +403,60 @@ elim_exists :: (Type, TType) -> (Type, TType) -> Term
 elim_exists (s,s') x@(ForAll _ (Fun _ t), TForAll (TFun _ t'))
   = Lam (s, s') $ Lam x $ (Bound 1 :!: (t, t')) :@: (Bound 0)
 
+-- elim_exists :: TType -> (Type, TType) -> Term
+-- elim_exists s (b, b') = Lam (TExists s) $ Lam (TForAll $ TFun s b') $ (Bound 1 :!: (b, b')) :@: (Bound 0)
+
+
+-- En el término utilizo TFree "a" en lugar de TBound 0, para que la impresión en
+-- patalla quede bien.
+-- intro_and :: (Type, TType) -> (Type, TType) -> Term
+-- intro_and x@(x1, x2) y@(y1, y2) =
+--   Lam x $ Lam y $
+--   BLam "a" $ Lam (Fun x1 $ Fun y1 (B "a"), TFun x2 $ TFun y2 (TFree "a")) (((Bound 0) :@: (Bound 2)) :@: (Bound 1))
+
 intro_and :: Term
-intro_and = BLam "a" $ BLam "b" $ Lam (B "a",TBound 1) $ Lam (B "b",TBound 0) $
-            BLam "c" $ Lam (Fun (B "a") (Fun (B "b") (B "c")), TFun (TBound 2) (TFun (TBound 1) (TBound 0)))
-            (((Bound 0) :@: (Bound 2)) :@: (Bound 1))
-            
--- elim_and :: Term
--- elim_and = BLam $ BLam $ BLam $ Lam (TAnd (TBound 2) (TBound 1)) $ Lam (TFun (TBound 2) (TFun (TBound 1) (TBound 0)))
---            (Bound 1) :!: (B "c", TBound 0) :@: (Bound 0)
+intro_and =
+  BLam "a" $ BLam "b" $ Lam (B "a", TBound 1) $ Lam (B "b", TBound 0) $ BLam "c" $
+  Lam (Fun (B "a") $ Fun (B "b") (B "c"), TFun (TBound 2) $ TFun (TBound 1) (TBound 0)) $
+  (Bound 0 :@: Bound 2) :@: Bound 1
 
--- intro_or1 ::Term
--- intro_or1 = BLam $ BLam $ Lam (TBound 1) $ BLam $ Lam (TFun (TBound 2) (TBound 0)) $ Lam (TFun (TBound 1) (TBound 0))
---             (Bound 1) :@: (Bound 2)
+-- Teorema de eliminación del and "general": forall a b c, a /\ b -> (a -> b -> c) -> c
+elim_and :: Term
+elim_and =
+  BLam "a" $ BLam "b" $ BLam "c" $ Lam (And (B "a") (B "b"), TAnd (TBound 2) (TBound 1)) $
+  Lam (Fun (B "a") (Fun (B "b") (B "c")), TFun (TBound 2) (TFun (TBound 1) (TBound 0))) $
+  (Bound 1) :!: (B "c", TBound 0) :@: (Bound 0)
 
--- intro_or2 ::Term
--- intro_or2 = BLam $ BLam $ Lam (TBound 0) $ BLam $ Lam (TFun (TBound 2) (TBound 0)) $ Lam (TFun (TBound 1) (TBound 0))
---             (Bound 0) :@: (Bound 2)
+-- elim_and1 :: Term
+-- elim_and1 =
+--   BLam "a" $ BLam "b" $ Lam (And (B "a") (B "b"), TAnd (TBound 1) (TBound 0)) $
+--   (Bound 0 :!: (B "a", TBound 1)) :@: (Lam (B "a", TBound 1) $ Lam (B "b", TBound 0) $ Bound 1)  
 
--- elim_or :: Term
--- elim_or = BLam $ BLam $ BLam $ Lam (TOr (TBound 2) (TBound 1)) $ Lam (TFun (TBound 2) (TBound 0)) $
---           Lam (TFun (TBound 1) (TBound 0)) $ (Bound 2) :!: (B "c", TBound 0) :@: (Bound 1) :@: (Bound 0)
+-- elim_and2 :: Term
+-- elim_and2 =
+--   BLam "a" $ BLam "b" $ Lam (And (B "a") (B "b"), TAnd (TBound 1) (TBound 0)) $
+--   (Bound 0 :!: (B "b", TBound 0)) :@: (Lam (B "a", TBound 1) $ Lam (B "b", TBound 0) $ Bound 0)  
 
+intro_or1 ::Term
+intro_or1 =
+  BLam "a" $ BLam "b" $ Lam (B "a", TBound 1) $ BLam "c" $
+  Lam (Fun (B "a") (B "c"), TFun (TBound 2) (TBound 0)) $
+  Lam (Fun (B "b") (B "c"), TFun (TBound 1) (TBound 0)) $ Bound 1 :@: Bound 2
 
+intro_or2 ::Term
+intro_or2 =
+  BLam "a" $ BLam "b" $ Lam (B "b", TBound 0) $ BLam "c" $
+  Lam (Fun (B "a") (B "c"), TFun (TBound 2) (TBound 0)) $
+  Lam (Fun (B "b") (B "c"), TFun (TBound 1) (TBound 0)) $ Bound 0 :@: Bound 2
+
+elim_or :: Term
+elim_or =
+  BLam "a" $ BLam "b" $ BLam "c" $ Lam (Or (B "a") (B "b"), TOr (TBound 2) (TBound 1)) $
+  Lam (Fun (B "a") (B "c"), TFun (TBound 2) (TBound 0)) $
+  Lam (Fun (B "b") (B "c"), TFun (TBound 1) (TBound 0)) $
+  ((Bound 2 :!: (B "c", TBound 0)) :@: Bound 1) :@: Bound 0
+
+----------------------------------------------------------------------------------------------------------------------
 
 simplifyTypeInTerm :: (Type, TType) -> [SpecialTerm] -> [SpecialTerm]
 simplifyTypeInTerm ty (TypeH (HTe h) : ts) = simplify (h ty) ts
@@ -610,18 +642,93 @@ rename' fv rv bv (Or t t') = do (x,y) <- rename' fv rv bv t
                                 return  (Or x x', TOr y y')
 
 --------------------------------------------------------------------
---TERMINAR
--- termWithName :: Term -> Type -> LamTerm
--- termWithName' t = termWithName [] (vars \\ fv t) t
 
--- termWithName' :: [String] -> [String] -> Term -> Type -> LamTer
--- termWithName' (b:bs) fs (Bound i) (B t) = LVar $ bs !! j
--- termWithName' bs fs (Free (Global n)) (B t)
---   | n == t = LVar n
---   | otherwise = error "error: termWithName', no debería pasar"
--- termWithName' bs (f:fs) (Lam tt te) (Fun t1 t2) = Abs f t1 $ termWithName' bs fs te t2
--- termWithName' bs fs (te1 :@: te2) t = 
+-- Genera el lambda término, sin nombre de término ni de tipo.
+withoutName :: LamTerm -> Term
+withoutName = withoutName' [] []
 
+withoutName' :: [String] -> [String] -> LamTerm -> Term
+withoutName' _ teb (LVar x) = case elemIndex x teb of
+                                Just n -> Bound n
+                                Nothing -> Free $ Global x
+withoutName' tyb teb (Abs x t e) = Lam (t, typeWhitoutName tyb t)
+                                       (withoutName' tyb (x:teb) e)
+withoutName' tyb teb (App e1 e2) = withoutName' tyb teb e1 :@:
+                                   withoutName' tyb teb e2
+withoutName' tyb teb (BAbs x e) = BLam x $ withoutName' (x:tyb) teb e
+withoutName' tyb teb (BApp e t) = withoutName' tyb teb e :!:
+                                  (t, typeWhitoutName tyb t)
+
+
+typeWhitoutName :: [String] -> Type -> TType
+typeWhitoutName xs (B x) = case elemIndex x xs of
+                             Just n -> TBound n
+                             Nothing -> TFree x
+typeWhitoutName xs (ForAll x t) = TForAll $ typeWhitoutName (x:xs) t
+typeWhitoutName xs (Exists x t) = TExists $ typeWhitoutName (x:xs) t
+typeWhitoutName xs (Fun t1 t2 ) = TFun (typeWhitoutName xs t1) (typeWhitoutName xs t2)
+typeWhitoutName xs (And t1 t2) = TAnd (typeWhitoutName xs t1) (typeWhitoutName xs t2)
+typeWhitoutName xs (Or t1 t2) = TOr (typeWhitoutName xs t1) (typeWhitoutName xs t2)
+
+
+-- Infiere el tipo sin nombre de un lambda término.
+inferTType :: Term -> Maybe TType
+inferTType = inferTType' 0 []
+
+inferTType' :: Int -> [(Int,TType)] -> Term -> Maybe TType
+inferTType' n _ (Free x) = Nothing                       -- NO puede haber variables de términos libres
+inferTType' n c (Bound x) = let (m,t) = c !! x
+                            in return $ renameTType (n-m) t
+inferTType' n c (Lam (_,t) x) = do tt <- inferTType' n ((n,t):c) x
+                                   return $ TFun t tt
+inferTType' n c (x :@: y) = do tt1 <- inferTType' n c x
+                               case tt1 of
+                                 TFun t1 t2 -> do tt2 <- inferTType' n c y
+                                                  if  tt2 == t1
+                                                    then return t2
+                                                    else Nothing
+                                 _ -> Nothing
+inferTType' n c (BLam _ x) = do t <- inferTType' (n+1) c x
+                                return $ TForAll t
+inferTType' n c (x :!: (_,t)) = do tt <- inferTType' n c x
+                                   case tt of
+                                     TForAll t1 -> return $ replaceTType t1 t
+                                     _ -> Nothing
+
+-- Renombra todas las variables de tipo ligadas "escapadas", nos referimos a aquellas
+-- variables cuyo cuantificador no figura en el lambda término (el 2º arg.)
+renameTType :: Int -> TType -> TType
+renameTType 0 = id
+renameTType n = renameTType' 0 n
+
+renameTType' :: Int -> Int -> TType -> TType
+renameTType' n r t@(TBound x)
+  | x < n = t
+  | otherwise = TBound (x+r)
+renameTType' _ _ t@(TFree x) = t
+renameTType' n r (TForAll t) = TForAll $ renameTType' (n+1) r t
+renameTType' n r (TExists t) = TExists $ renameTType' (n+1) r t
+renameTType' n r (TFun t1 t2) = TFun (renameTType' n r t1) (renameTType' n r t2)
+renameTType' n r (TAnd t1 t2) = TAnd (renameTType' n r t1) (renameTType' n r t2)
+renameTType' n r (TOr t1 t2) = TOr (renameTType' n r t1) (renameTType' n r t2)
+
+-- Consideramos que el 1º argumento corresponde al cuerpo de un "para todo".
+-- Se reemplaza la variable ligada más "externa" por el 2º argumento.
+-- Además, se corrigen las varibles ligadas escapadas.
+replaceTType :: TType -> TType -> TType
+replaceTType = replaceTType' 0
+
+replaceTType' :: Int -> TType -> TType -> TType
+replaceTType' n x@(TBound m) t
+  | n == m = renameTType n t
+  | m > n = TBound (m-1)
+  | otherwise = x
+replaceTType' n x@(TFree f) _ = x
+replaceTType' n (TForAll t1) t = TForAll $ replaceTType' (n+1) t1 t
+replaceTType' n (TExists t1) t = TExists $ replaceTType' (n+1) t1 t
+replaceTType' n (TFun t1 t2) t = TFun (replaceTType' n t1 t) (replaceTType' n t2 t)
+replaceTType' n (TAnd t1 t2) t = TAnd (replaceTType' n t1 t) (replaceTType' n t2 t)
+replaceTType' n (TOr t1 t2) t = TOr (replaceTType' n t1 t) (replaceTType' n t2 t)
 
 --------------------------------------------------------------------
 

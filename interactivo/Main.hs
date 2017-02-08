@@ -4,7 +4,7 @@ import Asistente
 import Parser
 import Common hiding (State, catch, get)
 import Text.PrettyPrint.HughesPJ (render)
-import PrettyPrinter (printTerm, printProof, printType)
+import PrettyPrinter (printTerm, printProof, printType, printTType)
 import System.Console.Haskeline.MonadException
 import Control.Monad.Trans.Class
 import Control.Monad.State.Strict
@@ -13,14 +13,19 @@ import Data.Maybe
 import qualified Data.Map as Map
 import Data.List (findIndex, elemIndex)
 
-
 type ProverInputState a = InputT (StateT ProverState IO) a
 
 -- instance MonadState ProverState ProverInputState where
 --      get = lift . get
 --      put = lift . put
---ARREGLAR, faltan reglas
-initialT' = [("intro_and", intro_and)]
+
+-- TERMINAR
+initialT' = [ ("intro_and", intro_and),
+              ("elim_and", elim_and),
+              ("intro_or1", intro_or1),
+              ("intro_or2", intro_or2),
+              ("elim_or", elim_or)
+            ]
 
 initialT = Map.fromList initialT'
 
@@ -44,12 +49,21 @@ prover = do minput <- getInputLine "> "
               Just "-quit" -> do outputStrLn "Saliendo."
                                  return ()
               Just "-r" -> resetProof
+              Just "" -> prover
               Just x -> catch (do command <- returnInput $ getCommand x
                                   checkCommand command) (\e -> errorMessage (e :: ProofExceptions) >> prover)
 
 
 newProof :: String -> Type -> TType -> TypeContext -> ProofState
-newProof name ty tty ps = PState {name=name, subp=1, position=[0], typeContext = [ps], context=[[]], ty=[Just (ty, tty)], term=[HoleT id], tyFromCut=[]}
+newProof name ty tty ps = PState { name=name,
+                                   subp=1,
+                                   position=[0],
+                                   typeContext = [ps],
+                                   context=[[]],
+                                   ty=[Just (ty, tty)],
+                                   term=[HoleT id],
+                                   tyFromCut=[],
+                                   subplevel=[1] }
 
 renderNewProof :: Type -> String
 renderNewProof ty = render $ printProof 1 [0] [[]] [[]] [Just ty]
@@ -85,28 +99,34 @@ checkCommand (Ty name ty) = do s <- lift get
                                outputStrLn $ renderProof p               
                                prover
                                
-checkCommand(Props ps) = do s <- lift get
-                            when (isJust $ proof s) (throwIO PNotFinished)
-                            let gps = props $ global s
-                            let pr1 = propRepeated1 ps
-                            let pr2 = propRepeated2 ps gps
-                            when (isJust pr1) (throwIO $ PropRepeated1 $ fromJust pr1)
-                            when (isJust pr2) (throwIO $ PropRepeated2 $ fromJust pr2)
-                            lift $ put $ PSt {global=PGlobal {terms=terms $ global s, props=ps++gps}, proof=proof s}
-                            prover
+checkCommand (Props ps) = do s <- lift get
+                             when (isJust $ proof s) (throwIO PNotFinished)
+                             let gps = props $ global s
+                             let pr1 = propRepeated1 ps
+                             let pr2 = propRepeated2 ps gps
+                             when (isJust pr1) (throwIO $ PropRepeated1 $ fromJust pr1)
+                             when (isJust pr2) (throwIO $ PropRepeated2 $ fromJust pr2)
+                             lift $ put $ PSt {global=PGlobal {terms=terms $ global s, props=ps++gps}, proof=proof s}
+                             prover
 
 checkCommand (Ta (Print x)) = do s <- lift get
                                  let ter = terms $ global s
                                  when (Map.notMember x ter) (throwIO $ PNotExist x)
                                  outputStrLn $ render $ printTerm $ ter Map.! x
                                  prover
+
+checkCommand (Ta (Infer x)) = case inferTType $ withoutName x of
+                                Just t -> do outputStrLn $ render $ printTType t
+                                             outputStrLn $ show t ++ "\n"         -- Borrar SHOW
+                                             prover
+                                Nothing -> throwIO NotType
                                  
 checkCommand (Ta ta) = do  s <- lift get
                            when (isNothing $ proof s) (throwIO PNotStarted)
                            (_ , p) <- returnInput $ runStateExceptions (habitar ta) (fromJust $ proof s)
                            lift $ put $ PSt {global=global s, proof=Just p}
                            if (isFinalTerm p)
-                             then ((outputStrLn $ "Prueba completa.\n" ++ renderFinalTerm p ++ "\n" ++ show (getTermFromProof p) ++ "\n") --Borrar SHOW
+                             then ((outputStrLn $ "Prueba completa.\n" ++ renderFinalTerm p ++ "\n" ++ show (getTermFromProof p) ++ "\n") -- Borrar SHOW
                                    >> reloadProver)
                              else (outputStrLn (renderProof p) >> (outputStrLn $ show $ length $ term p))
                            prover
@@ -162,3 +182,4 @@ errorMessage (PropRepeated2 s) = outputStrLn $ "error: proposición \""++ s ++"\
 errorMessage (PropNotExists s) = outputStrLn $ "error: proposición \""++ s ++"\" no existe en el entorno."
 errorMessage ExactE = outputStrLn "error: no es posible aplicar el comando exact."
 errorMessage PSE = outputStrLn "error: operación sobre el estado interno inválida"
+errorMessage NotType = outputStrLn "error: lambda término sin tipo."

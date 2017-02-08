@@ -6,7 +6,9 @@ cabal install exceptions
 
 Observaciones
 
-- Para parsear la string "\", hice el truco: [head "\\"]
+- Para parsear la string "\", hice el truco: [head "\\"].
+CUIDADO!. Si se quiere probar el parser por el interprete usar [head "\\"] en lugar de "\".
+Ej: getCommand ("Theorem a : a /" ++ [head "\\"]++ "a.")
 
 - (PROBAR) Emplee unificación de solo un nivel, por ejemplo esto no se puede probar:
   Theorem qqq: p->(forall p, forall p, p) -> forall p, p.
@@ -35,4 +37,20 @@ en el comando "assumption".
 - El lambda término final tiene un tipo alpha equivalente al dado por el usuario.
 Por ejemplo, si el tipo es: (forall k, k -> k) -> (forall j, j) -> (forall y, y).
 Se tiene el lambda término \x:(forall k, k -> k).x (forall j, j), el cual tendría tipo
-(forall k, k -> k) -> (forall j, j) -> (forall j, j).
+(forall k, k -> k) -> (forall j, j) -> (forall j, j)
+
+- Definimos cada una de la reglas de la semántica de tipos del sistema F, mediante términos con aujeros.
+De modo tal que sucesivas aplicaciones de los axiomas terminen de armar el lambda término que cumpla
+con el tipo deseado. 
+Sabemos que el sistema F, permite la abstracción tanto términos como tipos. Así podemos definir nuevos 
+constructores de tipos, a partir del lenguaje, sin necesidad de incoorporarlo ad hoc.
+Hacemos uso del poder expresivo del sistema F, definiendo los tipos (u operadores lógicos) "and" y "or",
+en término de los tipos del sistema F.
+
+- ¿Por qué es necesario declarar las proposiciones (o variables de tipo)?. Lo hacemos para tener un
+un mejor algoritmo de reescritura de variables de tipos ligadas sobre el tipo que da el usuario.
+
+- Casos de pruebas para el inferidor de tipos sin nombres:
+infer \d.\a.\x: a -> d.\b.\y:b.x.
+infer \a.\b.\x:a->b.\c.\y:a->c.\d.\z:a->b.y.
+infer \a.\b.\w:a->b.(\c.\x:a->c.\d.\y:forall o, d->c. y [d]) [a].

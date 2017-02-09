@@ -59,8 +59,15 @@ data Term  = Bound Int
   -- Valores
 data Value = VLam Type Term
 
-  -- Contextos del tipado
-type Context = [(Type,TType)]
+  -- Contextos del tipado.
+
+type TypeVar = (Int,Type,TType)
+  -- Contexto de variables de términos. Para cada variable, tenemos
+  -- su tipo con y sin nombre, junto con la profundidad con la que se
+  -- añadio al contexto (la profundidad se refiere a la cantidad de
+  -- cuantificadores construidos).
+type Context = [TypeVar]
+  -- Contexto de variables de tipos.
 type TypeContext = [String]
   
   --Comandos
@@ -104,6 +111,7 @@ data ProofState = PState { position :: [Int]
                          , tyFromCut :: [Type]
                          , subplevel :: [Int]    -- Indica la cantidad de subpruebas que están activas
                                                  -- por nivel.
+                         , quantifier :: [Int]  -- Indica la cantidad de variables de tipo en el contexto.
                          }
 
                                     

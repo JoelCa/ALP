@@ -18,6 +18,9 @@ getContext = getAttribute context
 getPosition :: Proof Int
 getPosition = getAttribute position
 
+getQuantifier :: Proof Int
+getQuantifier = getAttribute quantifier
+
 getTypeContext :: Proof TypeContext
 getTypeContext = getAttribute typeContext
 
@@ -34,10 +37,16 @@ incrementPosition f = modify $ incrementPosition' f
 incrementPosition' :: (Int -> Int) -> ProofState -> ProofState
 incrementPosition' f ps@(PState {position=n:ns}) = ps {position = (f n) : ns}
 
-addContext :: (Type,TType) -> Proof ()
+incrementQuantifier :: (Int -> Int) -> Proof ()
+incrementQuantifier f = modify $ incrementQuantifier' f
+  
+incrementQuantifier' :: (Int -> Int) -> ProofState -> ProofState
+incrementQuantifier' f ps@(PState {quantifier=n:ns}) = ps {quantifier = (f n) : ns}
+
+addContext :: TypeVar -> Proof ()
 addContext x = modify (addContext' x)
 
-addContext' :: (Type,TType) -> ProofState -> ProofState
+addContext' :: TypeVar -> ProofState -> ProofState
 addContext' x ps@(PState {context=c:cs})= ps {context = (x:c):cs}
 
 addTypeContext :: String -> Proof ()
@@ -54,6 +63,9 @@ modifySubP f = modify (\ps -> ps {subp = f $ subp ps})
 
 modifyPosition :: ([Int] -> [Int]) -> Proof ()
 modifyPosition f = modify (\ps -> ps {position = f $ position ps})
+
+modifyQuantifier :: ([Int] -> [Int]) -> Proof ()
+modifyQuantifier f = modify (\ps -> ps {quantifier = f $ quantifier ps})
 
 modifyTypeCont :: ([TypeContext] -> [TypeContext]) -> Proof ()
 modifyTypeCont f = modify (\ps -> ps {typeContext = f $ typeContext ps})
@@ -83,21 +95,6 @@ modifySubPLevel' x ps@(PState {subplevel=s:spl})
   | s > 1 = ps {subplevel = x : s : spl}
   | s == 1 = ps {subplevel = x :  spl}
 
--- finishSubProof :: Proof ()
--- finishSubProof = modify finishSubProof'
-
--- finishSubProof' :: ProofState ->  ProofState
--- finishSubProof' ps@(PState {subp=p,
---                             position=n:ns,
---                             typeContext=tc:tcs,
---                             context=c:cs,
---                             ty=ty:tys}) =
---   ps {subp=p-1,
---       position=ns,
---       typeContext=tcs,
---       context=cs,
---       ty=tys}
-
 ------------------------------------------------------------------------------
 
 repeatHead :: Int -> [a] -> [a]
@@ -112,6 +109,7 @@ modifySubProofs n f
   | n > 1 =
       do modifySubP (+ (n-1))
          modifySubPLevel n
+         modifyQuantifier $ repeatHead 1
          modifyPosition $ repeatHead 1
          modifyTypeCont $ repeatHead 1
          modifyContext $ repeatHead 1
@@ -123,43 +121,13 @@ modifySubProofs n f
          w <- getSubPLevel (\x -> if x == 1 then Nothing else Just x)
          case w of
            Nothing ->
-             do modifyPosition $ tail
-                modifyTypeCont $ tail
-                modifyContext $ tail
+             do modifyQuantifier tail
+                modifyPosition tail
+                modifyTypeCont tail
+                modifyContext tail
            Just _ -> 
-             do modifyPosition $ repeatHead 1 . tail
+             do modifyQuantifier $ repeatHead 1 . tail
+                modifyPosition $ repeatHead 1 . tail
                 modifyTypeCont $ repeatHead 1 . tail
                 modifyContext $ repeatHead 1 . tail
   | n == 1 = modifyType (\tys -> f $ tail tys)
-
-    
-  -- | n > 1 = 
-  --     do modifySubP (+ (n-1))
-  --        modifyPosition $ repeatHead 1
-  --        modifyTypeCont $ repeatHead 1
-  --        modifyContext $ repeatHead 1
-  --        modifyType (\tys -> f $ tail tys)
-  -- | n == 0 =
-  --     do sp <- getSubProof
-  --        if sp > 2
-  --          then do modifySubP (+ (n-1))
-  --                  modifyPosition $ repeatHead 1 . tail
-  --                  modifyTypeCont $ repeatHead 1 . tail
-  --                  modifyContext $ repeatHead 1 . tail
-  --                  modifyType (\tys -> f $ tail tys)
-  --          else do modifySubP (+ (n-1))
-  --                  modifyPosition $ tail
-  --                  modifyTypeCont $ tail
-  --                  modifyContext $ tail
-  --                  modifyType (\tys -> f $ tail tys)
-  --  | n == 1 = modifyType (\tys -> f $ tail tys)
-
-------------------------------------------------------------------------------
--- PRUEBA!
-
--- type PProof = StateT ProofState (Either ProofExceptions)
-
--- hola :: State (Int, Int) (Either ProofExceptions (Int, Int))
--- hola = do put (1, 4)
---           s <- get
---           return (return s)

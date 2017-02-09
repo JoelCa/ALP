@@ -4,7 +4,7 @@ import Asistente
 import Parser
 import Common hiding (State, catch, get)
 import Text.PrettyPrint.HughesPJ (render)
-import PrettyPrinter (printTerm, printProof, printType, printTType)
+import PrettyPrinter (printTerm, printProof, printType, printTType, printTermTType)
 import System.Console.Haskeline.MonadException
 import Control.Monad.Trans.Class
 import Control.Monad.State.Strict
@@ -53,7 +53,6 @@ prover = do minput <- getInputLine "> "
               Just x -> catch (do command <- returnInput $ getCommand x
                                   checkCommand command) (\e -> errorMessage (e :: ProofExceptions) >> prover)
 
-
 newProof :: String -> Type -> TType -> TypeContext -> ProofState
 newProof name ty tty ps = PState { name=name,
                                    subp=1,
@@ -63,13 +62,18 @@ newProof name ty tty ps = PState { name=name,
                                    ty=[Just (ty, tty)],
                                    term=[HoleT id],
                                    tyFromCut=[],
-                                   subplevel=[1] }
+                                   subplevel=[1],
+                                   quantifier=[0] }
 
 renderNewProof :: Type -> String
 renderNewProof ty = render $ printProof 1 [0] [[]] [[]] [Just ty]
 
 renderFinalTerm :: ProofState -> String
 renderFinalTerm p = render $ printTerm $ getTermFromProof p
+
+--PRUEBA
+renderFinalTermWithoutName :: ProofState -> String
+renderFinalTermWithoutName p = render $ printTermTType $ getTermFromProof p
 
 renderProof :: ProofState -> String
 renderProof p = render $ printProof (subp p) (position p) (typeContext p) (context p) (map (maybe Nothing (Just . fst)) (ty p))
@@ -126,7 +130,10 @@ checkCommand (Ta ta) = do  s <- lift get
                            (_ , p) <- returnInput $ runStateExceptions (habitar ta) (fromJust $ proof s)
                            lift $ put $ PSt {global=global s, proof=Just p}
                            if (isFinalTerm p)
-                             then ((outputStrLn $ "Prueba completa.\n" ++ renderFinalTerm p ++ "\n" ++ show (getTermFromProof p) ++ "\n") -- Borrar SHOW
+                             then ((outputStrLn $ "Prueba completa.\n"
+                                     ++ renderFinalTerm p ++ "\n"
+                                     ++ renderFinalTermWithoutName p ++ "\n"
+                                     ++ show (getTermFromProof p) ++ "\n") -- Borrar SHOWs
                                    >> reloadProver)
                              else (outputStrLn (renderProof p) >> (outputStrLn $ show $ length $ term p))
                            prover

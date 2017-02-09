@@ -12,7 +12,10 @@ habitar :: Tactic -> Proof ()
 habitar Assumption = do x <- getType
                         (_,tw) <- maybeToProof EmptyType x 
                         c <- getContext
-                        i <- maybeToProof AssuE (findIndex (\x->snd x == tw) c)
+                        q <- getQuantifier
+                        i <- maybeToProof AssuE (findIndex
+                                                  (\(p,_,t) -> renameTType (q - p) t == tw)
+                                                  c)
                         modifySubProofs 0 id
                         modifyTerm $ simplify (Bound i)
 habitar Intro = do x <- getType
@@ -23,13 +26,15 @@ habitar (Apply h) = do x <- getType
                        n <- getPosition
                        i <- getHypothesisValue n h
                        c <- getContext
-                       applyComm (n-i-1) (t,t') (c !! (n-i-1))                       
+                       q <- getQuantifier
+                       applyComm (n-i-1) (t,t') (getTypeVar q $ c !! (n-i-1))
 habitar (Elim h) = do x <- getType
                       (t,t') <- maybeToProof EmptyType x
                       n <- getPosition
                       i <- getHypothesisValue n h
                       c <- getContext
-                      elimComm i (t,t') (c !! (n-i-1))
+                      q <- getQuantifier
+                      elimComm i (t,t') (getTypeVar q $ c !! (n-i-1))
 --CHEQUEAR lambda términos
 habitar CLeft = do x <- getType
                    case x of
@@ -109,14 +114,16 @@ habitar (CExists x) = do y <- getType
 
 introComm :: Maybe (Type, TType) -> Proof ()
 introComm (Just (Fun t1 t2, TFun t1' t2')) =
-  do incrementPosition (+ 1)
-     addContext (t1,t1')
+  do incrementPosition (+1)
+     q <- getQuantifier
+     addContext (q,t1,t1')
      replaceType (t2, t2')
      modifyTerm $ addHT (\x -> Lam (t1,t1') x)
-introComm (Just (ForAll q t, TForAll t')) =
-  do addTypeContext q
-     replaceType (t, renameBounds q t')
-     modifyTerm $ addHT (\x -> BLam q x)
+introComm (Just (ForAll v t, TForAll t')) =
+  do addTypeContext v
+     incrementQuantifier (+1)
+     replaceType (t, t')
+     modifyTerm $ addHT (\x -> BLam v x)
 introComm Nothing = throw EmptyType
 introComm _ = throw IntroE1
 
@@ -208,7 +215,7 @@ getBoundsList (Fun t1 t2) = getBoundsList t1 ++ getBoundsList t2
 -- Comando APPLY
 
 applyComm :: Int -> (Type, TType) -> (Type, TType) -> Proof ()
-applyComm i x ht@(Fun _ _, TFun _ _) =
+applyComm i x ht@(Fun _ _, TFun _ _) = 
   do n <- compareTypes ht x
      modifySubProofs n (\tys -> getTypesFun n ht ++ tys)
      modifyTerm $ getApplyTermFun n i
@@ -475,19 +482,6 @@ addDHT :: (Term->Term->Term) -> [SpecialTerm] -> [SpecialTerm]
 addDHT et ((HoleT et'):ts) = (DoubleHoleT $ (\f -> et' . f) . et):ts
 addDHT et ((DoubleHoleT et'):ts) = (DoubleHoleT et):(DoubleHoleT et'):ts
 
-isFreeType' :: Var -> TType -> Bool
-isFreeType' q (TFree p) = q == p
-isFreeType' q (TBound p) = False
-isFreeType' q (TFun a b) = isFreeType' q a || isFreeType' q b
-isFreeType' q (TForAll a) = isFreeType' q a
-isFreeType' q (TExists a) = isFreeType' q a
-isFreeType' q (TAnd a b) = isFreeType' q a || isFreeType' q b
-
---Creo que no es necesaria
-isFreeType :: Var -> Context -> Bool
-isFreeType q = foldl (\r x -> isFreeType' q (snd x) || r) False
-
-
 getHypothesisValue :: Int -> String -> Proof Int
 getHypothesisValue n h
   | isDefault h = let x = getValue h
@@ -543,11 +537,14 @@ unif pos n sust t@(TBound i) tt@(tt1,tt2)
     let k = n - 1 - i
     in case M.lookup k sust of
          Nothing -> maybe (throw Unif1)
-                    (\s -> return $ M.insert k s sust) (substitution tt)
-         Just (s,s') -> if s' == tt2
-                        then return sust
-                        else throw Unif1
-  | otherwise = if t == tt2
+                    (\s -> return $ M.insert k s sust) (substitution pos tt)
+         Just (_,s) -> if renameTType pos s == tt2
+                       then return sust
+                       else throw Unif1
+  | i < pos = if t == tt2
+              then return $ sust
+              else throw Unif2
+  | otherwise = if TBound (i-1) == tt2
                 then return $ sust
                 else throw Unif2
 unif _ _ sust (TFree x) (B _, TFree y)
@@ -566,23 +563,23 @@ unif pos n sust (TForAll t') (ForAll _ tt, TForAll tt') = unif (pos+1) (n+1) sus
 unif pos n sust (TExists t') (Exists _ tt, TExists tt') = unif (pos+1) (n+1) sust t' (tt,tt')
 unif _ _ _ _ _ = throw Unif4
 
-
-substitution :: (Type, TType) -> Maybe (Type, TType)
+-- Obtiene la substitución, a partir de la profundidad dada por el 1º argumento.
+substitution :: Int -> (Type, TType) -> Maybe (Type, TType)
 substitution = substitution' 0
 
-substitution' :: Int -> (Type, TType) -> Maybe (Type, TType)
-substitution' m (t,t'@(TBound x))
+substitution' :: Int -> Int -> (Type, TType) -> Maybe (Type, TType)
+substitution' m n (t,t'@(TBound x))
   | x < m = return (t,t')
-  | otherwise = Nothing
-substitution' _ (t, t'@(TFree f)) = return (t,t')
-substitution' m (Fun t1 t2,TFun t1' t2') = do (x,x') <- substitution' m (t1,t1')
-                                              (y,y') <- substitution' m (t2,t2')
-                                              return (Fun x y, TFun x' y')
-substitution' m (ForAll v t, TForAll t') = do (x,x') <- substitution' (m+1) (t,t')
-                                              return (ForAll v x, TForAll x')
-substitution' m (Exists v t, TExists t') = do (x,x') <- substitution' (m+1) (t,t')
-                                              return (Exists v x, TExists x')
-
+  | (m <= x) && (x < n) = Nothing
+  | otherwise = return (t, TBound $ x - n + m)
+substitution' _ _ (t, t'@(TFree f)) = return (t,t')
+substitution' m n (Fun t1 t2,TFun t1' t2') = do (x,x') <- substitution' m n (t1,t1')
+                                                (y,y') <- substitution' m n (t2,t2')
+                                                return (Fun x y, TFun x' y')
+substitution' m n (ForAll v t, TForAll t') = do (x,x') <- substitution' (m+1) (n+1) (t,t')
+                                                return (ForAll v x, TForAll x')
+substitution' m n (Exists v t, TExists t') = do (x,x') <- substitution' (m+1) (n+1) (t,t')
+                                                return (Exists v x, TExists x')
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Renombramiento
@@ -729,6 +726,11 @@ replaceTType' n (TExists t1) t = TExists $ replaceTType' (n+1) t1 t
 replaceTType' n (TFun t1 t2) t = TFun (replaceTType' n t1 t) (replaceTType' n t2 t)
 replaceTType' n (TAnd t1 t2) t = TAnd (replaceTType' n t1 t) (replaceTType' n t2 t)
 replaceTType' n (TOr t1 t2) t = TOr (replaceTType' n t1 t) (replaceTType' n t2 t)
+
+-- Obtiene la variable de tipo renombrada de acuerdo a la profundidad que se quiere
+-- con el 1º argumento.
+getTypeVar :: Int -> TypeVar -> (Type, TType)
+getTypeVar n (m, t, t') = (t, renameTType (n-m) t')
 
 --------------------------------------------------------------------
 

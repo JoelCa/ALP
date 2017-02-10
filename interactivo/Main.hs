@@ -119,11 +119,14 @@ checkCommand (Ta (Print x)) = do s <- lift get
                                  outputStrLn $ render $ printTerm $ ter Map.! x
                                  prover
 
-checkCommand (Ta (Infer x)) = case inferTType $ withoutName x of
-                                Just t -> do outputStrLn $ render $ printTType t
-                                             outputStrLn $ show t ++ "\n"         -- Borrar SHOW
-                                             prover
-                                Nothing -> throwIO NotType
+checkCommand (Ta (Infer x)) = do s <- lift get
+                                 outputStrLn $ show x ++ "\n"         -- Borrar SHOW
+                                 te <- returnInput $ withoutName (props $ global s) x
+                                 outputStrLn $ show te ++ "\n"
+                                 (ty,ty') <- returnInput $ inferType (terms $ global s) te
+                                 outputStrLn $ render $ printType ty
+                                 outputStrLn $ render $ printTType ty'
+                                 prover
                                  
 checkCommand (Ta ta) = do  s <- lift get
                            when (isNothing $ proof s) (throwIO PNotStarted)
@@ -189,4 +192,12 @@ errorMessage (PropRepeated2 s) = outputStrLn $ "error: proposición \""++ s ++"\
 errorMessage (PropNotExists s) = outputStrLn $ "error: proposición \""++ s ++"\" no existe en el entorno."
 errorMessage ExactE = outputStrLn "error: no es posible aplicar el comando exact."
 errorMessage PSE = outputStrLn "error: operación sobre el estado interno inválida"
-errorMessage NotType = outputStrLn "error: lambda término sin tipo."
+errorMessage (TermE x) = outputStrLn $ "error: el tipo \"" ++ x ++ "\" no fue declarado."
+errorMessage (InferE1 x) = outputStrLn $ "error: la variable de término \"" ++ x ++ "\" no fue declarada."
+errorMessage (InferE2 ty) = outputStrLn $ errorInferPrintTerm ty ++ "El tipo no unifica con la función."
+errorMessage (InferE3 ty) = outputStrLn $ errorInferPrintTerm ty ++ "El tipo no es una función."
+errorMessage (InferE4 ty) = outputStrLn $ errorInferPrintTerm ty ++ "El tipo no es un para todo."
+
+errorInferPrintTerm :: Type -> String
+errorInferPrintTerm ty =
+  "error: no se esperaba el tipo \"" ++ render (printType ty) ++ "\". "

@@ -506,7 +506,6 @@ getValue _ = undefined
 isValidValue :: Int -> Int -> Bool
 isValidValue n value = (value >= 0) && (value < n)
 
-
 --------------------------------------------------------------------
 
 bottom :: (Type, TType)
@@ -641,56 +640,80 @@ rename' fv rv bv (Or t t') = do (x,y) <- rename' fv rv bv t
 --------------------------------------------------------------------
 
 -- Genera el lambda término, sin nombre de término ni de tipo.
-withoutName :: LamTerm -> Term
+-- Además, chequea que las variables de tipo sean válidas de acuerdo al contexto
+-- dado por el 1º arg.
+withoutName :: TypeContext -> LamTerm -> Either ProofExceptions Term
 withoutName = withoutName' [] []
 
-withoutName' :: [String] -> [String] -> LamTerm -> Term
-withoutName' _ teb (LVar x) = case elemIndex x teb of
-                                Just n -> Bound n
-                                Nothing -> Free $ Global x
-withoutName' tyb teb (Abs x t e) = Lam (t, typeWhitoutName tyb t)
-                                       (withoutName' tyb (x:teb) e)
-withoutName' tyb teb (App e1 e2) = withoutName' tyb teb e1 :@:
-                                   withoutName' tyb teb e2
-withoutName' tyb teb (BAbs x e) = BLam x $ withoutName' (x:tyb) teb e
-withoutName' tyb teb (BApp e t) = withoutName' tyb teb e :!:
-                                  (t, typeWhitoutName tyb t)
+withoutName' :: [String] -> [String] -> TypeContext -> LamTerm -> Either ProofExceptions Term
+withoutName' _ teb tyc (LVar x) = case elemIndex x teb of
+                                    Just n -> return $ Bound n
+                                    Nothing -> return $ Free $ Global x
+withoutName' tyb teb tyc (Abs x t e) = do t' <- typeWhitoutName tyc tyb t
+                                          e' <- withoutName' tyb (x:teb) tyc e
+                                          return $ Lam (t, t') e'
+withoutName' tyb teb tyc (App e1 e2) = do e1' <- withoutName' tyb teb tyc e1
+                                          e2' <- withoutName' tyb teb tyc e2
+                                          return $ e1' :@: e2'
+withoutName' tyb teb tyc (BAbs x e) = do e' <- withoutName' (x:tyb) teb tyc e
+                                         return $ BLam x e'
+withoutName' tyb teb tyc (BApp e t) = do e' <- withoutName' tyb teb tyc e
+                                         t' <- typeWhitoutName tyc tyb t
+                                         return $ e' :!: (t,t')
 
 
-typeWhitoutName :: [String] -> Type -> TType
-typeWhitoutName xs (B x) = case elemIndex x xs of
-                             Just n -> TBound n
-                             Nothing -> TFree x
-typeWhitoutName xs (ForAll x t) = TForAll $ typeWhitoutName (x:xs) t
-typeWhitoutName xs (Exists x t) = TExists $ typeWhitoutName (x:xs) t
-typeWhitoutName xs (Fun t1 t2 ) = TFun (typeWhitoutName xs t1) (typeWhitoutName xs t2)
-typeWhitoutName xs (And t1 t2) = TAnd (typeWhitoutName xs t1) (typeWhitoutName xs t2)
-typeWhitoutName xs (Or t1 t2) = TOr (typeWhitoutName xs t1) (typeWhitoutName xs t2)
+typeWhitoutName :: TypeContext -> [String] -> Type -> Either ProofExceptions TType
+typeWhitoutName tyc xs (B x) = case elemIndex x xs of
+                                 Just n -> return $ TBound n
+                                 Nothing -> case elemIndex x tyc of
+                                              Just m -> return $ TFree x
+                                              Nothing -> throw $ TermE x
+typeWhitoutName tyc xs (ForAll x t) = do r <- typeWhitoutName tyc (x:xs) t
+                                         return $ TForAll r
+typeWhitoutName tyc xs (Exists x t) = do r <- typeWhitoutName tyc (x:xs) t
+                                         return $ TExists r
+typeWhitoutName tyc xs (Fun t1 t2 ) = do r1 <- typeWhitoutName tyc xs t1
+                                         r2 <- typeWhitoutName tyc xs t2
+                                         return $ TFun r1 r2
+typeWhitoutName tyc xs (And t1 t2) = do r1 <- typeWhitoutName tyc xs t1
+                                        r2 <- typeWhitoutName tyc xs t2
+                                        return $ TAnd r1 r2
+typeWhitoutName tyc xs (Or t1 t2) = do r1 <- typeWhitoutName tyc xs t1
+                                       r2 <- typeWhitoutName tyc xs t2
+                                       return $ TOr r1 r2
 
 
--- Infiere el tipo sin nombre de un lambda término.
-inferTType :: Term -> Maybe TType
-inferTType = inferTType' 0 []
+-- Infiere el tipo sin nombre de un lambda término, de acuerdo a la
+-- lista de teoremas dada por el 1º arg.
+-- Suponemos que ninguna de las pruebas de los teoremas son recursivas.
+-- Es decir, que su lambda término es recursivo.
+inferType :: M.Map String Term -> Term -> Either ProofExceptions (Type, TType)
+inferType = inferType' 0 []
 
-inferTType' :: Int -> [(Int,TType)] -> Term -> Maybe TType
-inferTType' n _ (Free x) = Nothing                       -- NO puede haber variables de términos libres
-inferTType' n c (Bound x) = let (m,t) = c !! x
-                            in return $ renameTType (n-m) t
-inferTType' n c (Lam (_,t) x) = do tt <- inferTType' n ((n,t):c) x
-                                   return $ TFun t tt
-inferTType' n c (x :@: y) = do tt1 <- inferTType' n c x
-                               case tt1 of
-                                 TFun t1 t2 -> do tt2 <- inferTType' n c y
-                                                  if  tt2 == t1
-                                                    then return t2
-                                                    else Nothing
-                                 _ -> Nothing
-inferTType' n c (BLam _ x) = do t <- inferTType' (n+1) c x
-                                return $ TForAll t
-inferTType' n c (x :!: (_,t)) = do tt <- inferTType' n c x
-                                   case tt of
-                                     TForAll t1 -> return $ replaceTType t1 t
-                                     _ -> Nothing
+inferType' :: Int -> [(Int,Type,TType)] -> M.Map String Term -> Term -> Either ProofExceptions (Type, TType)
+inferType' n _ te (Free (Global x)) =
+  case M.lookup x te of
+    Just t -> inferType te t
+    Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean teoremas.
+inferType' n c te (Bound x) = let (m,t,t') = c !! x
+                              in return (t,renameTType (n-m) t')
+inferType' n c te (Lam (t,t') x) = do (tt,tt') <- inferType' n ((n,t,t'):c) te x
+                                      return (Fun t tt, TFun t' tt')
+inferType' n c te (x :@: y) = do (tt1, tt1') <- inferType' n c te x
+                                 case (tt1, tt1') of
+                                   (Fun _ t2, TFun t1' t2') ->
+                                     do (tt2, tt2') <- inferType' n c te y
+                                        if tt2' == t1'
+                                          then return (t2, t2')
+                                          else throw $ InferE2 tt2
+                                   _ -> throw $ InferE3 tt1
+inferType' n c te (BLam v x) = do (t,t') <- inferType' (n+1) c te x
+                                  return (ForAll v t, TForAll t')
+inferType' n c te (x :!: (t,t')) = do (tt,tt') <- inferType' n c te x
+                                      case (tt, tt') of
+                                        (ForAll _ t1, TForAll t1') ->
+                                          return $ inferReplaceType (t1,t1') (t,t')
+                                        _ -> throw $ InferE4 tt
 
 -- Renombra todas las variables de tipo ligadas "escapadas", nos referimos a aquellas
 -- variables cuyo cuantificador no figura en el lambda término (el 2º arg.)
@@ -712,20 +735,28 @@ renameTType' n r (TOr t1 t2) = TOr (renameTType' n r t1) (renameTType' n r t2)
 -- Consideramos que el 1º argumento corresponde al cuerpo de un "para todo".
 -- Se reemplaza la variable ligada más "externa" por el 2º argumento.
 -- Además, se corrigen las varibles ligadas escapadas.
-replaceTType :: TType -> TType -> TType
-replaceTType = replaceTType' 0
+inferReplaceType :: (Type, TType) -> (Type, TType) -> (Type, TType)
+inferReplaceType = inferReplaceType' 0
 
-replaceTType' :: Int -> TType -> TType -> TType
-replaceTType' n x@(TBound m) t
-  | n == m = renameTType n t
-  | m > n = TBound (m-1)
+inferReplaceType' :: Int -> (Type, TType) -> (Type, TType) -> (Type, TType)
+inferReplaceType' n x@(tt, TBound m) (t, t')
+  | n == m = (t, renameTType n t')
+  | m > n = (tt, TBound (m-1))
   | otherwise = x
-replaceTType' n x@(TFree f) _ = x
-replaceTType' n (TForAll t1) t = TForAll $ replaceTType' (n+1) t1 t
-replaceTType' n (TExists t1) t = TExists $ replaceTType' (n+1) t1 t
-replaceTType' n (TFun t1 t2) t = TFun (replaceTType' n t1 t) (replaceTType' n t2 t)
-replaceTType' n (TAnd t1 t2) t = TAnd (replaceTType' n t1 t) (replaceTType' n t2 t)
-replaceTType' n (TOr t1 t2) t = TOr (replaceTType' n t1 t) (replaceTType' n t2 t)
+inferReplaceType' n x@(tt, TFree f) _ = x
+inferReplaceType' n (ForAll v t1, TForAll t1') t = let (tt, tt') = inferReplaceType' (n+1) (t1,t1') t
+                                                   in (ForAll v tt, TForAll tt')
+inferReplaceType' n (Exists v t1, TExists t1') t = let (tt, tt') = inferReplaceType' (n+1) (t1,t1') t
+                                                   in (Exists v tt, TExists tt')
+inferReplaceType' n (Fun t1 t2, TFun t1' t2') t = let (tt1, tt1') = inferReplaceType' n (t1,t1') t
+                                                      (tt2, tt2') = inferReplaceType' n (t2,t2') t
+                                                  in (Fun tt1 tt2, TFun tt1' tt2')
+inferReplaceType' n (And t1 t2, TAnd t1' t2') t = let (tt1, tt1') = inferReplaceType' n (t1,t1') t
+                                                      (tt2, tt2') = inferReplaceType' n (t2,t2') t
+                                                  in (And tt1 tt2, TAnd tt1' tt2')
+inferReplaceType' n (Or t1 t2, TOr t1' t2') t = let (tt1, tt1') = inferReplaceType' n (t1,t1') t
+                                                    (tt2, tt2') = inferReplaceType' n (t2,t2') t
+                                                in (Or tt1 tt2, TOr tt1' tt2')
 
 -- Obtiene la variable de tipo renombrada de acuerdo a la profundidad que se quiere
 -- con el 1º argumento.

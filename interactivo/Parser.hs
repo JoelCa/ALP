@@ -82,20 +82,20 @@ emptyLam = do symbol "["
            <|> return id
 
 expLam' :: Parser LamTerm
-expLam' = do symbol [head "\\"]
-             v <- validIdent reservedWords
-             symbol ":"
-             t <- exprTy'
-             symbol "."
-             e <- expLam
-             return $ Abs v t e
+expLam' = do v <- validIdent reservedWords
+             return $ LVar v
+          <|> do symbol [head "\\"]
+                 v <- validIdent reservedWords
+                 symbol ":"
+                 t <- exprTy'
+                 symbol "."
+                 e <- expLam
+                 return $ Abs v t e
           <|> do symbol [head "\\"]
                  v <- validIdent reservedWords
                  symbol "."
                  e <- expLam
                  return $ BAbs v e
-          <|> do v <- validIdent reservedWords
-                 return $ LVar v
           <|> do symbol "("
                  e <- expLam
                  symbol ")"

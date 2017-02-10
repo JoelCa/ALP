@@ -132,7 +132,7 @@ printTType t = printTType' 1 [] (typeVars \\ fType t) t
 printTType' :: Int -> [String] -> [String] -> TType -> Doc
 printTType' _ bs _ (TBound n) = text $ bs !! n
 printTType' _ bs _ (TFree n) = text n
-printTType' i bs fs (TFun t u) = parenIf (i < 1) $ 
+printTType' i bs fs (TFun t u) = parenIf (i > 1) $ 
                                  printTType' 2 bs fs t <+>
                                  text "->" <+>
                                  printTType' 0 bs fs u

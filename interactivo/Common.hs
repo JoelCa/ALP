@@ -87,7 +87,9 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String |
                        ApplyE1 Type Type | ApplyE2 | Unif1 |
                        Unif2 | Unif3 | Unif4 | ElimE1 |
                        CommandInvalid | PropRepeated1 String | PropRepeated2 String |
-                       PropNotExists String | ExactE | PSE | EmptyType | NotType
+                       PropNotExists String | ExactE | PSE | EmptyType |
+                       TermE String | InferE1 String | InferE2 Type |
+                       InferE3 Type | InferE4 Type
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
@@ -97,7 +99,7 @@ data ProverState = PSt { proof :: Maybe ProofState
                        , global :: ProverGlobal
                        }
                    
-data ProverGlobal = PGlobal { props :: [String]          -- Proposiciones de tipos.
+data ProverGlobal = PGlobal { props :: TypeContext       -- Proposiciones de tipos.
                             , terms :: Map String Term   -- Teoremas.
                             }
 

@@ -6,12 +6,16 @@ import Control.Applicative
 
 type ProofCommand = Either ProofExceptions Command
 
+type Parser a = ParserState [(String, Bool)] a
+
+lambda = [head "\\"]
 reservedWords = ["forall", "exists"]
+initState = [(and_op, True), (or_op, False)]
 
 getCommand :: String -> ProofCommand
-getCommand s = case parse exprTy s of
-  [(x,[])] -> return x
-  _ -> Left SyntaxE
+getCommand s = case parse exprTy s initState of
+  [(x,[],s)] -> return x
+  _ -> throw SyntaxE
 
 
 exprTy :: Parser Command
@@ -27,6 +31,8 @@ exprTy = do symbol "Theorem"
                 return $ Props ps
          <|> do tac <- termTac
                 return $ Ta tac
+         <|> do def <- typeDef
+                return $ TypeDef def
          
 -- Parser de los tipos (o fórmulas lógicas).
 exprTy' :: Parser Type
@@ -40,21 +46,21 @@ exprTy' = do t <- termTy
                  symbol ","
                  e <- exprTy'
                  return (ForAll t e)
-          <|> do symbol "exists"
-                 t <- validIdent reservedWords
-                 symbol ","
-                 e <- exprTy'
-                 return (Exists t e)
+          -- <|> do symbol "exists"
+          --        t <- validIdent reservedWords
+          --        symbol ","
+          --        e <- exprTy'
+          --        return (Exists t e)
 
 
 termTy :: Parser Type
 termTy = do t <- termTy'
-            (do symbol $ "/" ++ [head "\\"]
+            (do symbol and_op
                 t' <- termTy
-                return (And t t')
-             <|> do symbol $ [head "\\"] ++ "/"
+                return $ RenameTy and_op [t, t']
+             <|> do symbol or_op
                     t' <- termTy
-                    return (Or t t')
+                    return $ RenameTy or_op [t, t']
              <|> return t)
             
 termTy' :: Parser Type
@@ -84,14 +90,14 @@ emptyLam = do symbol "["
 expLam' :: Parser LamTerm
 expLam' = do v <- validIdent reservedWords
              return $ LVar v
-          <|> do symbol [head "\\"]
+          <|> do symbol lambda
                  v <- validIdent reservedWords
                  symbol ":"
                  t <- exprTy'
                  symbol "."
                  e <- expLam
                  return $ Abs v t e
-          <|> do symbol [head "\\"]
+          <|> do symbol lambda
                  v <- validIdent reservedWords
                  symbol "."
                  e <- expLam
@@ -101,58 +107,73 @@ expLam' = do v <- validIdent reservedWords
                  symbol ")"
                  return e
 
+-- Parser de definición de tipos.
+typeDef :: Parser (String, Bool, Type)
+typeDef = do symbol "Notation"
+             op <- itemWithoutSpace
+             a <- validIdent reservedWords
+             b <- validIdent reservedWords
+             symbol ":="
+             t <- exprTy'
+             (do symbol "("
+                 symbol "infix"
+                 symbol ")"
+                 return (op, True, t)
+              <|> return (op, False, t))
+
+
 -- Parser de las tácticas.
 termTac :: Parser Tactic
-termTac = assumptionParser
-          <|> applyParser
-          <|> elimParser
-          <|> introParser
-          <|> introsParser
-          <|> splitParser
-          <|> leftParser
-          <|> rightParser
-          <|> existsParser
-          <|> printParser
-          <|> cutParser
-          <|> exactParser
-          <|> inferParser
+termTac = assumptionP
+          <|> applyP
+          <|> elimP
+          <|> introP
+          <|> introsP
+          <|> splitP
+          <|> leftP
+          <|> rightP
+          <|> existsP
+          <|> printP
+          <|> cutP
+          <|> exactP
+          <|> inferP
 
 
-assumptionParser :: Parser Tactic
-assumptionParser = tacticZeroArg "assumption" Assumption
+assumptionP :: Parser Tactic
+assumptionP = tacticZeroArg "assumption" Assumption
 
-introParser :: Parser Tactic
-introParser = tacticZeroArg "intro" Intro
+introP :: Parser Tactic
+introP = tacticZeroArg "intro" Intro
 
-introsParser :: Parser Tactic
-introsParser = tacticZeroArg "intros" Intros
+introsP :: Parser Tactic
+introsP = tacticZeroArg "intros" Intros
 
-splitParser :: Parser Tactic
-splitParser = tacticZeroArg "split" Split
+splitP :: Parser Tactic
+splitP = tacticZeroArg "split" Split
 
-leftParser :: Parser Tactic
-leftParser = tacticZeroArg "left" CLeft
+leftP :: Parser Tactic
+leftP = tacticZeroArg "left" CLeft
 
-rightParser :: Parser Tactic
-rightParser = tacticZeroArg "right" CRight
+rightP :: Parser Tactic
+rightP = tacticZeroArg "right" CRight
 
-applyParser :: Parser Tactic
-applyParser = tacticIdentArg "apply" Apply
+applyP :: Parser Tactic
+applyP = tacticIdentArg "apply" Apply
 
-elimParser :: Parser Tactic
-elimParser = tacticIdentArg "elim" Elim
+elimP :: Parser Tactic
+elimP = tacticIdentArg "elim" Elim
 
-printParser :: Parser Tactic
-printParser = tacticIdentArg "print" Print
+printP :: Parser Tactic
+printP = tacticIdentArg "print" Print
 
-existsParser :: Parser Tactic
-existsParser = tacticTypeArg "exists" CExists
+existsP :: Parser Tactic
+existsP = tacticTypeArg "exists" CExists
 
-cutParser :: Parser Tactic
-cutParser = tacticTypeArg "cut" Cut
+cutP :: Parser Tactic
+cutP = tacticTypeArg "cut" Cut
 
-exactParser :: Parser Tactic
-exactParser = tacticTypeArg "exact" Exact
+exactP :: Parser Tactic
+exactP = tacticTypeArg "exact" Exact
 
 
 tacticZeroArg :: String -> Tactic -> Parser Tactic
@@ -172,8 +193,8 @@ tacticTypeArg s tac = do symbol s
                          char '.'
                          return $ tac t          
 
-inferParser :: Parser Tactic
-inferParser = do symbol "infer"
-                 l <- expLam
-                 char '.'
-                 return $ Infer l
+inferP :: Parser Tactic
+inferP = do symbol "infer"
+            l <- expLam
+            char '.'
+            return $ Infer l

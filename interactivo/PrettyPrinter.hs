@@ -46,9 +46,8 @@ fType (TBound  _) = []
 fType (TFree n) = [n]
 fType (TFun t u) = fType t ++ fType u
 fType (TForAll t) = fType t
-fType (TExists t) = fType t
-fType (TAnd t u) = fType t ++ fType u
-fType (TOr t u) = fType t ++ fType u
+fType (RenameTTy _ ts) = foldr (\x r -> fType x ++ r) [] ts
+-- fType (TExists t) = fType t
 
 parenIf :: Bool -> Doc -> Doc
 parenIf False d   = d
@@ -56,38 +55,38 @@ parenIf True d    = PP.parens d
 
 
 -- pretty-printer de términos, con tipos sin nombres.
-printTermTType :: Term -> Doc 
-printTermTType t = printTermTType' 1 [] [] (vars \\ fv t) (typeVars \\ ftv t) t
+printTermTType :: [String] -> Term -> Doc 
+printTermTType op t = printTermTType' op 1 [] [] (vars \\ fv t) (typeVars \\ ftv t) t
 
-printTermTType' :: Int -> [String] -> [String] -> [String] -> [String] -> Term -> Doc
-printTermTType' _ bs _  _ _ (Bound j)             = text $ bs !! j
-printTermTType' _ _  _  _ _ (Free (Global n))     = text n
-printTermTType' _ _  _  _ _ (Free (Quote n))      = text "quoted" <> text (show n)
-printTermTType' i bs bts fs fts (t :@: u)         = parenIf (i < 1) $ 
-                                                    printTermTType' 2 bs bts fs fts t <+> 
-                                                    printTermTType' 0 bs bts fs fts u
-printTermTType' i bs bts (f:fs) fts (Lam (_,t) u) = parenIf (i > 1) $ 
-                                                    text "\\" <> 
-                                                    text f <> 
-                                                    text ":" <> 
-                                                    printTypeTerm bts t <>
-                                                    text "." <> 
-                                                    printTermTType' 1 (f:bs) bts fs fts u
-printTermTType' i bs bts fs (f':fts) (BLam _ u)   = parenIf (i > 1) $  -- Chequear "parenIf"
-                                                    text "\\" <> 
-                                                    text f' <> 
-                                                    text "." <> 
-                                                    printTermTType' 1 bs (f':bts) fs fts u
-printTermTType' i bs bts fs fts (u :!: (_,t))     = printTermTType' 2 bs bts fs fts u <+> -- Chequear valores de "i"
-                                                    text "[" <>
-                                                    printTypeTerm bts t <>
-                                                    text "]"
-printTermTType' _ _ _ [] _ (Lam _ _)              = error "prinTerm': no hay nombres para elegir"
-printTermTType' _ _ _ _ [] (BLam _ _)             = error "prinTerm': no hay nombres para elegir"
+printTermTType' :: [String] -> Int -> [String] -> [String] -> [String] -> [String] -> Term -> Doc
+printTermTType' _ _ bs _  _ _ (Bound j)             = text $ bs !! j
+printTermTType' _ _ _  _  _ _ (Free (Global n))     = text n
+printTermTType' _ _ _  _  _ _ (Free (Quote n))      = text "quoted" <> text (show n)
+printTermTType' op i bs bts fs fts (t :@: u)         = parenIf (i < 1) $ 
+                                                       printTermTType' op 2 bs bts fs fts t <+> 
+                                                       printTermTType' op 0 bs bts fs fts u
+printTermTType' op i bs bts (f:fs) fts (Lam (_,t) u) = parenIf (i > 1) $ 
+                                                       text "\\" <> 
+                                                       text f <> 
+                                                       text ":" <> 
+                                                       printTypeTermTType op bts t <>
+                                                       text "." <> 
+                                                       printTermTType' op 1 (f:bs) bts fs fts u
+printTermTType' op i bs bts fs (f':fts) (BLam _ u)   = parenIf (i > 1) $  -- Chequear "parenIf"
+                                                       text "\\" <> 
+                                                       text f' <> 
+                                                       text "." <> 
+                                                       printTermTType' op 1 bs (f':bts) fs fts u
+printTermTType' op i bs bts fs fts (u :!: (_,t))     = printTermTType' op 2 bs bts fs fts u <+> -- Chequear valores de "i"
+                                                       text "[" <>
+                                                       printTypeTermTType op bts t <>
+                                                       text "]"
+printTermTType' _ _ _ _ [] _ (Lam _ _)              = error "prinTerm': no hay nombres para elegir"
+printTermTType' _ _ _ _ _ [] (BLam _ _)             = error "prinTerm': no hay nombres para elegir"
 
 
-printTypeTerm :: [String] -> TType -> Doc
-printTypeTerm bs t = printTType' 2 bs ((typeVars \\ fType t) \\ bs) t
+printTypeTermTType :: [String] -> [String] -> TType -> Doc
+printTypeTermTType op bs t = printTType' op 2 bs ((typeVars \\ fType t) \\ bs) t
 
 
 -- pretty-printer de términos, con los tipos dados por el usuario.
@@ -125,35 +124,30 @@ printTerm' _ _ [] (Lam _ _)          = error "prinTerm': no hay nombres para ele
 
 
 -- pretty-printer de tipos sin nombres
-printTType :: TType -> Doc
-printTType t = printTType' 1 [] (typeVars \\ fType t) t
+printTType :: [String] -> TType -> Doc
+printTType op t = printTType' op 1 [] (typeVars \\ fType t) t
 
 -- Chequear si es necesario usar parenIf
-printTType' :: Int -> [String] -> [String] -> TType -> Doc
-printTType' _ bs _ (TBound n) = text $ bs !! n
-printTType' _ bs _ (TFree n) = text n
-printTType' i bs fs (TFun t u) = parenIf (i > 1) $ 
-                                 printTType' 2 bs fs t <+>
-                                 text "->" <+>
-                                 printTType' 0 bs fs u
-printTType' i bs (f:fs) (TForAll t) =  parenIf (i > 1) $ 
-                                       text "forall" <+> 
-                                       text f <> 
-                                       text "," <+> 
-                                       printTType' 1 (f:bs) fs t
-printTType' i bs (f:fs) (TExists t) =  parenIf (i > 1) $
-                                       text "exists" <+>
-                                       text f <>
-                                       text "," <+>
-                                       printTType' 1 (f:bs) fs t
-printTType' i bs fs (TAnd t u) = parenIf (i < 1) $ 
-                                 printTType' 2 bs fs t <+>
-                                 text "/\\" <+>
-                                 printTType' 0 bs fs u
-printTType' i bs fs (TOr t u) = parenIf (i < 1) $ 
-                                 printTType' 2 bs fs t <+>
-                                 text "\\/" <+>
-                                 printTType' 0 bs fs u
+printTType' :: [String] -> Int -> [String] -> [String] -> TType -> Doc
+printTType' op _ bs _ (TBound n) = text $ bs !! n
+printTType' op _ bs _ (TFree n) = text n
+printTType' op i bs fs (TFun t u) = parenIf (i > 1) $ 
+                                    printTType' op 2 bs fs t <+>
+                                    text "->" <+>
+                                    printTType' op 0 bs fs u
+printTType' op i bs (f:fs) (TForAll t) =  parenIf (i > 1) $ 
+                                          text "forall" <+> 
+                                          text f <> 
+                                          text "," <+> 
+                                          printTType' op 1 (f:bs) fs t
+printTType' op i bs fs (RenameTTy n ts) = parenIf (i > 1) $ 
+                                          text (op !! n) <+>
+                                          foldl (\r x -> r <+> printTType' op 1 bs fs x) empty ts
+-- printTType' i bs (f:fs) (TExists t) =  parenIf (i > 1) $
+--                                        text "exists" <+>
+--                                        text f <>
+--                                        text "," <+>
+--                                        printTType' 1 (f:bs) fs t
 
 
 printTypeFromMaybe :: Maybe Type -> Doc
@@ -172,18 +166,13 @@ printType' False (ForAll v t) = text "forall" <+>
                                 text v <>
                                 text "," <+>
                                 printType' False t
-printType' False (Exists v t) = text "exists" <+>
-                                text v <>
-                                text "," <+>
-                                printType' False t
+printType' False (RenameTy s ts) = text s <+>
+                                   foldl (\r x -> r <+> printType' False x) empty ts
 printType' True t             = PP.parens $ printType' False t
-printType' False (And t1 t2)  = printType' True t1 <+> 
-                                text "/\\"         <+> 
-                                printType' False t2
-printType' False (Or t1 t2)   = printType' True t1 <+> 
-                                text "\\/"         <+> 
-                                printType' False t2
-
+-- printType' False (Exists v t) = text "exists" <+>
+--                                 text v <>
+--                                 text "," <+>
+--                                 printType' False t
                                     
 printProof :: Int -> [Int] -> [TypeContext] -> [Context] -> [Maybe Type] -> Doc
 printProof tp (n:_) (tc:_) (c:_) tys =

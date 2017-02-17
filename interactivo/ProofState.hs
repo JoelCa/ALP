@@ -1,8 +1,9 @@
 module ProofState where
 
 import Common
+import Control.Monad.State.Lazy (get, modify)
 
-getAttribute :: (ProofState -> [a]) -> Proof a
+getAttribute :: (ProofConstruction -> [a]) -> Proof a
 getAttribute f = do ps <- get
                     let x = f ps
                     if null x
@@ -34,26 +35,26 @@ getSubPLevel f = do ps <- get
 incrementPosition :: (Int -> Int) -> Proof ()
 incrementPosition f = modify $ incrementPosition' f
   
-incrementPosition' :: (Int -> Int) -> ProofState -> ProofState
-incrementPosition' f ps@(PState {position=n:ns}) = ps {position = (f n) : ns}
+incrementPosition' :: (Int -> Int) -> ProofConstruction -> ProofConstruction
+incrementPosition' f ps@(PConstruction {position=n:ns}) = ps {position = (f n) : ns}
 
 incrementQuantifier :: (Int -> Int) -> Proof ()
 incrementQuantifier f = modify $ incrementQuantifier' f
   
-incrementQuantifier' :: (Int -> Int) -> ProofState -> ProofState
-incrementQuantifier' f ps@(PState {quantifier=n:ns}) = ps {quantifier = (f n) : ns}
+incrementQuantifier' :: (Int -> Int) -> ProofConstruction -> ProofConstruction
+incrementQuantifier' f ps@(PConstruction {quantifier=n:ns}) = ps {quantifier = (f n) : ns}
 
 addContext :: TypeVar -> Proof ()
 addContext x = modify (addContext' x)
 
-addContext' :: TypeVar -> ProofState -> ProofState
-addContext' x ps@(PState {context=c:cs})= ps {context = (x:c):cs}
+addContext' :: TypeVar -> ProofConstruction -> ProofConstruction
+addContext' x ps@(PConstruction {context=c:cs})= ps {context = (x:c):cs}
 
 addTypeContext :: String -> Proof ()
 addTypeContext x = modify (addTypeContext' x)
 
-addTypeContext' :: String -> ProofState -> ProofState
-addTypeContext' x ps@(PState {typeContext=tc:tcs})= ps {typeContext = (x:tc):tcs}
+addTypeContext' :: String -> ProofConstruction -> ProofConstruction
+addTypeContext' x ps@(PConstruction {typeContext=tc:tcs})= ps {typeContext = (x:tc):tcs}
 
 replaceType :: (Type, TType) -> Proof ()
 replaceType x = modifyType (\tys -> Just x : tail tys)
@@ -84,14 +85,14 @@ modifySubPLevel n
   | (n > 1) || (n == 0) = modify $ modifySubPLevel' n
   | n == 1 = error "error: modifySubPLevel."
 
-modifySubPLevel' :: Int -> ProofState -> ProofState
-modifySubPLevel' 0 ps@(PState {subplevel=s:spl})
+modifySubPLevel' :: Int -> ProofConstruction -> ProofConstruction
+modifySubPLevel' 0 ps@(PConstruction {subplevel=s:spl})
   | s > 1 = ps {subplevel = (s-1) : spl}
   | s == 1 = case spl of
                [] -> ps {subplevel = []}
                x:xs -> ps {subplevel = (x-1):xs}
 modifySubPLevel' 1 _ = error "error: modifySubPLevel'."
-modifySubPLevel' x ps@(PState {subplevel=s:spl})
+modifySubPLevel' x ps@(PConstruction {subplevel=s:spl})
   | s > 1 = ps {subplevel = x : s : spl}
   | s == 1 = ps {subplevel = x :  spl}
 

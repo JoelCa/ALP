@@ -1,0 +1,191 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[left=1.5cm,top=2.0cm,right=1.5cm,bottom=2.0cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[spanish]{babel}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{amssymb}
+\usepackage{tikz}
+\usetikzlibrary{positioning, babel}
+\newdimen\nodeDist
+\nodeDist=35mm
+
+\newcommand\tab[1][0.5cm]{\hspace*{#1}}
+
+\title{}
+\author{}
+
+\begin{document}
+
+\maketitle
+
+\begin{center}
+\section*{Análisis de lenguajes de programación} 
+\end{center}
+
+\newpage{\pagestyle{empty}\cleardoublepage}
+
+\section{Data types}
+
+\begin{verbatim}
+data ProofState = PState { position :: [Int]
+                         , context :: [Context]
+                         , typeContext :: [TypeContext]
+                         , ty :: [Maybe (Type, TType)]
+                         , term :: [SpecialTerm]
+                         , subp :: Int
+                         , name :: String
+                         , tyFromCut :: [Type]
+                         , subplevel :: [Int]
+                         }
+\end{verbatim}
+
+\begin{itemize}
+  \item position: cantidad de variables de términos ligadas, para cada prueba.
+  \item context: contexto de variables de términos, para cada prueba.
+  \item typeContext: contexto de variables de tipo, para cada prueba.
+  \item ty: tipos objetivos de las pruebas no concluidas.
+  \item term: representa al lambda término, el cual se va construyendo por partes.
+  \item subp: cantidad total de pruebas no terminadas, o activas.
+  \item name: ?.
+  \item tyFromCut: ?.
+  \item subplevel : Indica la cantidad de sub-pruebas que están activas por nivel.
+\end{itemize}
+
+
+\begin{verbatim}
+data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) |
+                   Term Term | TypeH TypeHole
+
+data TypeHole = HTe ((Type, TType) -> Term) | HTy ((Type, TType) -> TypeHole)
+\end{verbatim}
+
+El data type \texttt{SpecialTerm} representa a un lamba término que puede tener dos tipos de agujero: lambda términos o tipos, de manera
+exclusiva, es decir solo puede tener un solo tipo de agujero.
+
+El data type \texttt{TypeHole} representa agujeros de tipos en un lambda término.
+
+
+\section{Observaciones}
+\begin{itemize}
+  \item El comando \texttt{apply} puede actuar como el comando \texttt{assumption}.
+  \item Cuando aplicamos el comando \texttt{intro} sobre un goal con ``para todo'', las variables
+  ligadas al/los para todo/s, pasan a ser libres en el nuevo goal. 
+  \item La substitución que encuentra el algoritmo de unificación es un termino cerrado.
+  \item Sean $\Gamma_{t}$ el contexto de tipos inicial, y $\alpha$ un tipo dado por el usuario. Luego, $FV(\alpha) \subseteq \Gamma_{t}$.
+  Además, si $FV(\alpha) \cap BV(\alpha) \neq  \emptyset$, se encuentra mediante substituciones de variables de tipos ligadas, un tipo $\alpha'$ 
+  equivalente a $\alpha$, tal que $FV(\alpha') \cap BV(\alpha') = \emptyset$, y $FV(\alpha') = FV(\alpha)$.
+  
+  El contexto de tipos inicial, se define a partir del comando \texttt{Props}.
+  
+  \item Al implementar el comando \texttt{intro} sobre un ``para todo'', no es necesario chequear que no la variable de tipo ligada no se encuentre
+  en el contexto de tipos, pues ya sabemos que no está allí, gracias al renombramiento de variables de tipos ligadas.
+  
+  \item Construimos un lambda término $t$, tal que $t:\alpha$, donde $\alpha$ es el tipo (asociado a una fórmula lógica), dado por el usuario. El isomorfismo
+  de Curry-Howard, nos permite relacionar a los tipos con fórmulas lógicas, y a las pruebas con lambda términos.
+  El lambda término $t$, se construye a partir de la prueba que da el usuario.
+  El teorema de Curry-Howard, nos asegura que, si $t:\alpha$, entonces la fórmula asociada a $\alpha$ es válida.
+  
+  \item La función \texttt{habitar} se encarga de construir el lambda término asociado a la prueba que va dando el usuario.
+  A cada regla de la deducción natural del sistema IFC, le corresponde una regla de tipo, en el lambda cálculo simplemente
+  tipado. ¿Como construimos el término $t$, asociado a una prueba lógica?.
+  A cada aplicación de una regla de tipo, le corresponde un lambda término ``vació''.
+  Es decir, si se busca un lambda término de tipo $\beta \rightarrow \gamma$, por ejemplo, y se lo quiere construir mediante la regla 
+  de tipo \textbf{T-Abs}, entonces, tenemos el término vació, $t_{1} = \lambda x:\beta. \; ?$, donde $? : \gamma$.
+  Representamos a los términos vacíos, mediante funciones, en el caso anterior, tendríamos la función:
+
+  \begin{verse}
+  $t_{1}$ :: \texttt{Term} $\rightarrow$  \texttt{Term} \\
+  $t_{1}$ $t$ = $\lambda x:\beta. \; t$
+  \end{verse}
+
+  Donde, \texttt{Term} es el tipo de los lambda términos. El argumento que se le pase a $t_{1}$, debería tener tipo $\gamma$.
+  Esto se chequea de acuerdo a qué regla de tipo quiere aplicar el usuario.
+  Por lo tanto, $t = (t_{1} . t_{2} \dots t_{n-2} . t_{n-1}) \; t_{n}$, donde $t_{n}$ es un lambda término no vació, que sirve de argumento a la composiciones
+  de funciones. Cada $t_{i}$, con $i \in \{ 1 \dots n \}$, se corresponde con una regla de tipado, que a su vez se corresponde con una regla de deducción natural, 
+  que da el usuario.
+  
+  \item Utilizamos el siguiente AST para representar a un lambda término:
+  \begin{verbatim}
+  data Term  = Bound Int
+             | Free Name 
+             | Term :@: Term
+             | Lam (Type,TType) Term
+             | BLam Var Term
+             | Term :!: (Type,TType)
+  \end{verbatim}
+
+  Donde, \texttt{Type} es el AST de los tipos, y \texttt{TType} es el AST de los tipos sin nombres, es decir que estos emplean la notación De Bruijn.
+  \texttt{Type} nos es útil a la hora de imprimir en pantalla el tipo del lambda término, de modo tal que tenga el tipo ingresado por el usuario.
+  Mientras que, \texttt{TType} lo usamos en todas las operatorias sobre los tipos de los lambda términos, por ejemplo, en la unificación de tipos, que
+  se realiza cuando se aplica la regla de eliminación del \textbf{para todo}.
+  
+  Si solo emplearíamos \texttt{TType}, el tipo de lambda término no coincidiría con el tipo dado por el usuario.
+  
+  \item Cuando el tipo $\alpha$ no contiene \textbf{para todos} ni \textbf{existes}, la representación de $\alpha$ mediante el AST \texttt{Type} es 
+  prácticamente la misma que \texttt{TType}, solo varían en el nombre de los constructores.
+  
+  \item Cuando creamos sub-pruebas es necesario mantener una copia de los siguientes atributos de la prueba actual.
+  \begin{itemize}
+    \item position.
+    \item context.
+    \item typeContext.
+  \end{itemize}
+   Una vez que termina una prueba, la siguiente puede continuar a partir del estado de los atributos copiados.
+   La idea del algoritmo que implementamos es la siguiente. Cuando un usuario crea $n$ pruebas en un estado $s_{0}$, donde $n > 1$, hacemos en total $n-1$ copias 
+   de $s_{0}$, una copia cada vez que termina una sub-prueba. Consideramos a un estado como una instancia de los tres atributos dados anteriormente.
+   Sean $s$ una lista de estados, $s_{i}$ un elemento de $s$, y tanto $spt$, como $spl$, listas de enteros. Donde, $spt$ y $spl$ se corresponden a los campos 
+   \texttt{subp} y \texttt{subplevel} del registro \texttt{ProofState}.
+   Podemos ver en la Figura \ref{Estados}, como se aplica el algoritmo para un caso específico. 
+   
+  \begin{figure} 
+  \begin{tikzpicture}[node distance=2cm] 
+  \path 
+    (0,0) node(A)[align=center,   below] {$n = 0$ \\ $s = [ x_{0} ]$ \\ $spt = 1$ \\ $spl = [1]$}
+    (3,0) node(B)[align=center, below] {$n = 2$ \\ $s = [ x_{0}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [2]$}
+    (6,0) node(C)[align=center,  below] {$n = 0$ \\ $s = [ x_{1}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [2]$}
+    (9,0) node(D)[align=center,  below] {$n = 2$ \\ $s = [ x_{1}, x_{1}, x_{0} ]$ \\ $spt = 3$ \\ $spl = [2,2]$}
+    (12,0) node(E)[align=center,  below] {$n = 0$ \\ $s = [ x_{2}, x_{1}, x_{0} ]$ \\ $spt = 3$ \\ $spl = [2,2]$}
+    (15,0) node(F)[align=center,  below] {$n = -1$ \\ $s = [ x_{1}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [1,2]$}
+    (15,-3) node(G)[align=center,  below] {$n = 0$ \\ $s = [ x_{3}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [1,2]$}
+    (12,-3) node(H)[align=center,  below] {$n = -1$ \\ $s = [ x_{0} ]$ \\ $spt = 1$ \\ $spl = [1]$}
+    (9,-3) node(I)[align=center,  below] {$n = 0$ \\ $s = [ x_{4} ]$ \\ $spt = 1$ \\ $spl = [1]$}
+    (6,-3) node(J)[align=center,  below] {$n = -1$ \\ $s = [ \; ]$ \\ $spt = 0$ \\ $spl = [ \; ]$};
+  
+  \draw[->]
+    (A) edge (B) (B) edge (C) (C) edge (D) (D) edge (E)  (E) edge (F) (F) edge (G)
+    (G) edge (H) (H) edge (I) (I) edge (J);
+ 
+  \end{tikzpicture}
+  \caption{Diagrama de estados.} \label{Estados}
+  \end{figure}
+  
+  \item Aunque halla un lambda término con variables de tipo que tengan el mismo nombre que las variables de términos, su semántica de tipos está
+  bien determinada.
+  
+
+\end{itemize}
+
+
+\section{Lo que falta}
+\begin{itemize}
+  \item Arreglar el parser del lambda calculo, en el caso de la ``aplicación''.
+  \item Incluir la eliminación e introducción de bottom.
+\end{itemize}
+
+
+
+
+
+
+
+
+
+
+
+
+\end{document}

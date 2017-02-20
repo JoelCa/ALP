@@ -210,6 +210,7 @@ errorMessage (PropRepeated2 s) = outputStrLn $ "error: proposición \""++ s ++"\
 errorMessage (PropNotExists s) = outputStrLn $ "error: proposición \""++ s ++"\" no existe en el entorno."
 errorMessage (OpE s) = outputStrLn $ "error: la operación \""++ s ++"\" no existe."
 errorMessage (ExactE1 ty) = outputStrLn $ "error: el término ingresado no tiene el tipo \"" ++ render (printType ty) ++ "\". "
+errorMessage (ExactE2 ty) = outputStrLn $ "error: debe ingresar una prueba de \"" ++ render (printType ty) ++ "\". "
 errorMessage PSE = outputStrLn "error: operación sobre el estado interno inválida"
 errorMessage (TermE x) = outputStrLn $ "error: el tipo \"" ++ x ++ "\" no fue declarado."
 errorMessage (InferE1 x) = outputStrLn $ "error: la variable de término \"" ++ x ++ "\" no fue declarada."

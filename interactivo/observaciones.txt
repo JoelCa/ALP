@@ -61,3 +61,7 @@ Por ej: infer \a.\x:a.\a.\b.\y:a->b. (y) x.
 
 - Aquellas variables de tipo que declaramos, mediante el comando "Props", aparecen como variables
 de tipo libre en el lambda término que las utiliza.
+
+- La unificación, con el comando "apply", sobre una variable de término H, trata de unificar 
+todos los "para todos" seguidos más externos de H. En algunos casos, basta con encontrar la 
+unificación solo para algunos "para todos".

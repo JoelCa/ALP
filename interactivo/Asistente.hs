@@ -3,9 +3,9 @@ module Asistente where
 import Common
 import Data.Char (isDigit)
 import Data.List (findIndex, elemIndex)
-import Control.Monad (unless)
+import Control.Monad (unless, when)
 import qualified Data.Map as M (Map, lookup, insert, empty, size)
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, isJust)
 import ProofState
 
 habitar :: Tactic -> Proof ()
@@ -65,7 +65,6 @@ habitar Split = do x <- getType
                                                             :@: x :@: y)
                        else throw CommandInvalid
                      _ -> throw CommandInvalid
--- TERMINAR
 habitar (Exact (Right te)) = do op <- getOpers
                                 n <- getPosition
                                 tc <- getTypeContext
@@ -79,9 +78,14 @@ habitar (Exact (Right te)) = do op <- getOpers
                                 unless (t' == tt') $ throw $ ExactE1 tt
                                 modifySubProofs 0 id
                                 modifyTerm $ simplify te'
-
-
-                                
+habitar (Exact (Left ty)) = do x <- getType
+                               when (isJust x) $ throw $ ExactE2 $ fst $ fromJust x
+                               op <- getOpers
+                               tc <- getTypeContext
+                               q <- getQuantifier
+                               ty' <- eitherToProof $ typeWhitoutName op q tc ty
+                               modifySubProofs 0 id
+                               modifyTerm $ simplifyTypeInTerm (ty,ty')                                
 -- habitar (PState {name=name,
 --                  subp=p,
 --                  position=n:ns,

@@ -38,7 +38,9 @@ Para probar la unificación.
 Para probar la unificación.
 -Theorem t16: forall b, forall c, (forall a, a -> c) -> forall qq, (forall h, h -> c).
 Para probar la unificación.
-- Theorem tt1 : forall a, forall b, a /\ b -> a.
-  Theorem tt2 : forall p, forall q, forall r, p /\ q -> (p -> r) -> r.
-Para probar el comando exact en la prueba de tt2, de la siguiente manera:
-exact (H1 (t1 [p] [q] H0)). 
+- Theorem tt17 : forall a, forall b, a /\ b -> a.
+  Theorem tt17' : forall p, forall q, forall r, p /\ q -> (p -> r) -> r.
+Para probar el comando exact en la prueba de tt17', de la siguiente manera:
+exact (H1 (tt17 [p] [q] H0)).
+- Theorem t18: (forall x, forall y, forall z, x -> z) -> (forall x, forall z, x -> z). 
+Para chequear si podemos instanciar el tipo "vacio", mediante "exact".

@@ -92,14 +92,16 @@ data Tactic = Assumption | Apply String | Intro | Intros | Split
 
 
   -- Excepciones
-data ProofExceptions = PNotFinished | PNotStarted | PExist String |
-                       PNotExist String | SyntaxE | AssuE | IntroE1 |
-                       ApplyE1 Type Type | ApplyE2 | Unif1 |
-                       Unif2 | Unif3 | Unif4 | ElimE1 |
-                       CommandInvalid | PropRepeated1 String | PropRepeated2 String |
-                       PropNotExists String | OpE String | ExactE1 Type | PSE | EmptyType |
-                       TermE String | InferE1 String | InferE2 Type |
-                       InferE3 Type | InferE4 Type
+data ProofExceptions = PNotFinished | PNotStarted | PExist String
+                     | PNotExist String | SyntaxE | AssuE
+                     | IntroE1 | ApplyE1 Type Type | ApplyE2
+                     | Unif1 | Unif2 | Unif3 | Unif4
+                     | ElimE1 | CommandInvalid | PropRepeated1 String
+                     | PropRepeated2 String | PropNotExists String
+                     | OpE String | ExactE1 Type | ExactE2 Type
+                     | PSE | EmptyType | TermE String
+                     | InferE1 String | InferE2 Type | InferE3 Type
+                     | InferE4 Type
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions

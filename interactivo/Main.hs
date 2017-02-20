@@ -19,7 +19,10 @@ type ProverInputState a = InputT (StateT ProverState IO) a
 --      get = lift . get
 --      put = lift . put
 
--- TERMINAR
+operations :: [String]
+operations = [and_op, or_op]
+
+
 initialT' = [ ("intro_and", intro_and),
               ("elim_and", elim_and),
               ("intro_or1", intro_or1),
@@ -39,7 +42,7 @@ main = do args <- getArgs
 
 
 initProverState :: ProverState
-initProverState = PSt {global=PGlobal {terms=initialT, props=[]}, proof=Nothing}
+initProverState = PSt {global=PGlobal {teorems=initialT, props=[], opers=operations}, proof=Nothing}
 
 
 prover :: ProverInputState ()
@@ -53,29 +56,36 @@ prover = do minput <- getInputLine "> "
               Just x -> catch (do command <- returnInput $ getCommand x
                                   checkCommand command) (\e -> errorMessage (e :: ProofExceptions) >> prover)
 
-newProof :: String -> Type -> TType -> TypeContext -> ProofState
-newProof name ty tty ps = PState { name=name,
-                                   subp=1,
-                                   position=[0],
-                                   typeContext = [ps],
-                                   context=[[]],
-                                   ty=[Just (ty, tty)],
-                                   term=[HoleT id],
-                                   tyFromCut=[],
-                                   subplevel=[1],
-                                   quantifier=[0] }
+newProof :: ProverGlobal -> String -> Type -> TType -> ProofState
+newProof (PGlobal {props = p, teorems = te, opers = op}) name ty tty =
+  let c = PConstruction { subp=1
+                        , position=[0]
+                        , typeContext = [p]
+                        , context=[[]]
+                        , ty=[Just (ty, tty)]
+                        , term=[HoleT id]
+                        , tyFromCut=[]
+                        , subplevel=[1]
+                        , quantifier=[0]
+                        , copers=op
+                        , cteorems=te
+                        }
+  in PState { name = name
+            , types = (ty, tty)
+            , constr = c
+            }
 
 renderNewProof :: Type -> String
 renderNewProof ty = render $ printProof 1 [0] [[]] [[]] [Just ty]
 
-renderFinalTerm :: ProofState -> String
+renderFinalTerm :: ProofConstruction -> String
 renderFinalTerm p = render $ printTerm $ getTermFromProof p
 
 --PRUEBA
-renderFinalTermWithoutName :: ProofState -> String
-renderFinalTermWithoutName p = render $ printTermTType $ getTermFromProof p
+renderFinalTermWithoutName :: [String] -> ProofConstruction -> String
+renderFinalTermWithoutName op p = render $ printTermTType op $ getTermFromProof p
 
-renderProof :: ProofState -> String
+renderProof :: ProofConstruction -> String
 renderProof p = render $ printProof (subp p) (position p) (typeContext p) (context p) (map (maybe Nothing (Just . fst)) (ty p))
 
 
@@ -96,11 +106,12 @@ propRepeated1 (p:ps)
 checkCommand :: Command -> ProverInputState ()
 checkCommand (Ty name ty) = do s <- lift get
                                when (isJust $ proof s) (throwIO PNotFinished)
-                               when (Map.member name (terms $ global s)) (throwIO $ PExist name)
-                               (tyr,tty) <- returnInput $ getRenameWhitException (props $ global s) ty
-                               let p = newProof name tyr tty (props $ global s)
-                               lift $ put $ PSt {global=global s, proof=Just p}
-                               outputStrLn $ renderProof p               
+                               let glo = global s
+                               when (Map.member name (teorems $ glo)) (throwIO $ PExist name)
+                               (tyr,tty) <- returnInput $ rename (props glo) (opers glo) ty
+                               let p = newProof glo name tyr tty
+                               lift $ put $ PSt {global=glo, proof=Just p}
+                               outputStrLn $ renderProof $ constr p
                                prover
                                
 checkCommand (Props ps) = do s <- lift get
@@ -110,32 +121,36 @@ checkCommand (Props ps) = do s <- lift get
                              let pr2 = propRepeated2 ps gps
                              when (isJust pr1) (throwIO $ PropRepeated1 $ fromJust pr1)
                              when (isJust pr2) (throwIO $ PropRepeated2 $ fromJust pr2)
-                             lift $ put $ PSt {global=PGlobal {terms=terms $ global s, props=ps++gps}, proof=proof s}
+                             lift $ put $ s {global = (global s) {teorems=teorems $ global s, props=ps++gps}}
                              prover
 
+-- TERMINAR
+-- checkCommand (TypeDef (op, flagInfix, t)) = 
+
 checkCommand (Ta (Print x)) = do s <- lift get
-                                 let ter = terms $ global s
+                                 let ter = teorems $ global s
                                  when (Map.notMember x ter) (throwIO $ PNotExist x)
-                                 outputStrLn $ render $ printTerm $ ter Map.! x
+                                 outputStrLn $ render $ printTerm $ fst $ ter Map.! x
                                  prover
 
 checkCommand (Ta (Infer x)) = do s <- lift get
                                  outputStrLn $ show x ++ "\n"         -- Borrar SHOW
-                                 te <- returnInput $ withoutName (props $ global s) x
+                                 te <- returnInput $ withoutName (opers $ global s) 0 0 (props $ global s) x
                                  outputStrLn $ show te ++ "\n"
-                                 (ty,ty') <- returnInput $ inferType (terms $ global s) te
+                                 (ty,ty') <- returnInput $ inferType 0 [] (teorems $ global s) te
                                  outputStrLn $ render $ printType ty
-                                 outputStrLn $ render $ printTType ty'
+                                 outputStrLn $ render $ printTType (opers $ global s) ty'
                                  prover
                                  
 checkCommand (Ta ta) = do  s <- lift get
                            when (isNothing $ proof s) (throwIO PNotStarted)
-                           (_ , p) <- returnInput $ runStateExceptions (habitar ta) (fromJust $ proof s)
-                           lift $ put $ PSt {global=global s, proof=Just p}
+                           let pr = fromJust $ proof s
+                           (_ , p) <- returnInput $ runStateExceptions (habitar ta) (constr $ pr)
+                           lift $ put $ s {proof = Just $ pr {constr = p}}
                            if (isFinalTerm p)
                              then ((outputStrLn $ "Prueba completa.\n"
                                      ++ renderFinalTerm p ++ "\n"
-                                     ++ renderFinalTermWithoutName p ++ "\n"
+                                     ++ renderFinalTermWithoutName (opers $ global s) p ++ "\n"
                                      ++ show (getTermFromProof p) ++ "\n") -- Borrar SHOWs
                                    >> reloadProver)
                              else (outputStrLn (renderProof p) >> (outputStrLn $ show $ length $ term p))
@@ -149,16 +164,19 @@ resetProof = do s <- lift get
 reloadProver :: ProverInputState ()
 reloadProver = do s <- lift get
                   let p = fromJust $ proof s
-                  lift $ put $ PSt {global=PGlobal {terms=Map.insert (name p) (getTermFromProof p) (terms $ global s),
-                                                   props=props $ global s},
-                                    proof=Nothing}
+                  lift $ put $ PSt { global= (global s)
+                                             {teorems=Map.insert (name p)
+                                                    (getTermFromProof (constr p), types p)
+                                                    (teorems $ global s)}
+                                   , proof = Nothing
+                                   }
 
-isFinalTerm :: ProofState -> Bool
-isFinalTerm (PState {term=[Term _]}) = True
+isFinalTerm :: ProofConstruction -> Bool
+isFinalTerm (PConstruction {term=[Term _]}) = True
 isFinalTerm _ = False
 
-getTermFromProof :: ProofState -> Term
-getTermFromProof (PState {term=[Term t]}) = t
+getTermFromProof :: ProofConstruction -> Term
+getTermFromProof (PConstruction {term=[Term t]}) = t
 getTermFromProof _ = error "getTermFromProof: no debería pasar"
 
 
@@ -186,11 +204,12 @@ errorMessage Unif3 = outputStrLn "error: unificación inválida 3."
 errorMessage Unif4 = outputStrLn "error: unificación inválida 4."
 errorMessage ElimE1 = outputStrLn "error: comando elim mal aplicado."
 errorMessage CommandInvalid = outputStrLn "error: comando inválido."
-errorMessage EmptyType = outputStrLn "error: comando inválido (usar comando \"exact\")."
+errorMessage EmptyType = outputStrLn "error: comando inválido (debe añadir una fórmula mediante \"exact\")."
 errorMessage (PropRepeated1 s) = outputStrLn $ "error: proposición \""++ s ++"\" repetida."
 errorMessage (PropRepeated2 s) = outputStrLn $ "error: proposición \""++ s ++"\" ya existe."
 errorMessage (PropNotExists s) = outputStrLn $ "error: proposición \""++ s ++"\" no existe en el entorno."
-errorMessage ExactE = outputStrLn "error: no es posible aplicar el comando exact."
+errorMessage (OpE s) = outputStrLn $ "error: la operación \""++ s ++"\" no existe."
+errorMessage (ExactE1 ty) = outputStrLn $ "error: el término ingresado no tiene el tipo \"" ++ render (printType ty) ++ "\". "
 errorMessage PSE = outputStrLn "error: operación sobre el estado interno inválida"
 errorMessage (TermE x) = outputStrLn $ "error: el tipo \"" ++ x ++ "\" no fue declarado."
 errorMessage (InferE1 x) = outputStrLn $ "error: la variable de término \"" ++ x ++ "\" no fue declarada."

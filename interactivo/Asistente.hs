@@ -24,14 +24,14 @@ habitar Intros = introsComm
 habitar (Apply h) = do x <- getType
                        (t,t') <- maybeToProof EmptyType x
                        n <- getPosition
-                       i <- getHypothesisValue n h
+                       i <- maybeToProof ApplyE2 $ getHypothesisValue n h
                        c <- getContext
                        q <- getQuantifier
                        applyComm (n-i-1) (t,t') (getTypeVar q $ c !! (n-i-1))
 habitar (Elim h) = do x <- getType
                       (t,t') <- maybeToProof EmptyType x
                       n <- getPosition
-                      i <- getHypothesisValue n h
+                      i <- maybeToProof ApplyE2 $ getHypothesisValue n h
                       c <- getContext
                       q <- getQuantifier
                       elimComm i (t,t') (getTypeVar q $ c !! (n-i-1))
@@ -65,6 +65,43 @@ habitar Split = do x <- getType
                                                             :@: x :@: y)
                        else throw CommandInvalid
                      _ -> throw CommandInvalid
+-- TERMINAR
+habitar (Exact (Right te)) = do op <- getOpers
+                                n <- getPosition
+                                tc <- getTypeContext
+                                q <- getQuantifier
+                                te' <- eitherToProof $ withoutName op n q tc te
+                                c <- getContext
+                                teo <- getTeorems
+                                (_,t') <- eitherToProof $ inferType q c teo te'
+                                x <- getType
+                                (tt,tt') <- maybeToProof EmptyType x
+                                unless (t' == tt') $ throw $ ExactE1 tt
+                                modifySubProofs 0 id
+                                modifyTerm $ simplify te'
+
+
+                                
+-- habitar (PState {name=name,
+--                  subp=p,
+--                  position=n:ns,
+--                  typeContext=tc:tcs,
+--                  context=c:cs,
+--                  tyFromCut = cut,
+--                  ty=Nothing:tys,
+--                  term=ts}) (Exact x) =
+--   return $ PState {name=name,
+--                    subp=p-1,
+--                    position=ns,
+--                    typeContext=tcs,
+--                    context=cs,
+--                    tyFromCut = cut,
+--                    ty=tys,
+--                    term= simplifyTypeInTerm (x,x') ts}
+--   where x' = typeWithoutName x
+-- habitar (PState {ty=Just _ : tys}) (Exact x) = throw ExactE
+
+
 
 -- habitar (CExists x) = do y <- getType
 --                          case y of
@@ -94,25 +131,6 @@ habitar Split = do x <- getType
 --                    ty=Just (x,x') : Just (Fun x t,TFun x' t') : tys,
 --                    term=addDHT (\x y -> y :@: x) ts}
 --   where x' = typeWithoutName x
--- --Modificar Exact
--- habitar (PState {name=name,
---                  subp=p,
---                  position=n:ns,
---                  typeContext=tc:tcs,
---                  context=c:cs,
---                  tyFromCut = cut,
---                  ty=Nothing:tys,
---                  term=ts}) (Exact x) =
---   return $ PState {name=name,
---                    subp=p-1,
---                    position=ns,
---                    typeContext=tcs,
---                    context=cs,
---                    tyFromCut = cut,
---                    ty=tys,
---                    term= simplifyTypeInTerm (x,x') ts}
---   where x' = typeWithoutName x
--- habitar (PState {ty=Just _ : tys}) (Exact x) = throw ExactE
 
 
 ----------------------------------------------------------------------------------------------------------------------
@@ -510,13 +528,13 @@ addDHT :: (Term->Term->Term) -> [SpecialTerm] -> [SpecialTerm]
 addDHT et ((HoleT et'):ts) = (DoubleHoleT $ (\f -> et' . f) . et):ts
 addDHT et ((DoubleHoleT et'):ts) = (DoubleHoleT et):(DoubleHoleT et'):ts
 
-getHypothesisValue :: Int -> String -> Proof Int
+getHypothesisValue :: Int -> String -> Maybe Int
 getHypothesisValue n h
   | isDefault h = let x = getValue h
                   in if isValidValue n x
                      then return x
-                     else throw ApplyE2
-  | otherwise = throw ApplyE2
+                     else Nothing
+  | otherwise = Nothing
 
 isDefault :: String -> Bool
 isDefault ('H':xs) = isNumber xs
@@ -670,39 +688,50 @@ rename' rv bv fv op (RenameTy s ts) =
 --------------------------------------------------------------------
 
 -- Genera el lambda término, sin nombre de término ni de tipo.
--- Además, chequea que las variables de tipo sean válidas de acuerdo al contexto
--- dado por el 1º arg.
-withoutName :: [String] -> TypeContext -> LamTerm -> Either ProofExceptions Term
-withoutName = withoutName' [] []
+-- Chequea que las variables de tipo sean válidas de acuerdo al contexto
+-- dado por el 4º arg., y que las variables de términos también lo sean, de
+-- acuerdo la longitud del contexto de variables de términos "iniciales", dado por el 2º arg.
+-- El 3º argumento indica la profundidad de los cuantificadores. Es útil para saber
+-- cuando una variable de tipo está ligada a algún cuantificador, o si esta es libre.
+-- El 1º argumento, es la tabla de operaciones "custom".
+withoutName :: [String] -> Int -> Int -> TypeContext -> LamTerm -> Either ProofExceptions Term
+withoutName = withoutName' []
 
-withoutName' :: [String] -> [String] -> [String] -> TypeContext -> LamTerm -> Either ProofExceptions Term
-withoutName' _ teb _ tyc (LVar x) = case elemIndex x teb of
-                                       Just n -> return $ Bound n
-                                       Nothing -> return $ Free $ Global x
-withoutName' tyb teb op tyc (Abs x t e) = do t' <- typeWhitoutName op tyc tyb t
-                                             e' <- withoutName' tyb (x:teb) op tyc e
+withoutName' :: [String] -> [String] -> Int -> Int -> TypeContext -> LamTerm -> Either ProofExceptions Term
+withoutName' teb _ n _ _ (LVar x)
+  | n == 0 = case elemIndex x teb of
+               Just m -> return $ Bound m
+               Nothing -> return $ Free $ Global x
+  | n > 0 = case elemIndex x teb of
+               Just m -> return $ Bound m
+               Nothing -> case getHypothesisValue n x of
+                            Just h -> return $ Bound $ n - h - 1
+                            Nothing -> return $ Free $ Global x
+  | otherwise = error "error: withoutName', no debería pasar."
+withoutName' teb op n q tyc (Abs x t e) = do t' <- typeWhitoutName op q tyc t
+                                             e' <- withoutName' (x:teb) op n q tyc e
                                              return $ Lam (t, t') e'
-withoutName' tyb teb op tyc (App e1 e2) = do e1' <- withoutName' tyb teb op tyc e1
-                                             e2' <- withoutName' tyb teb op tyc e2
+withoutName' teb op n q tyc (App e1 e2) = do e1' <- withoutName' teb op n q tyc e1
+                                             e2' <- withoutName' teb op n q tyc e2
                                              return $ e1' :@: e2'
-withoutName' tyb teb op tyc (BAbs x e) = do e' <- withoutName' (x:tyb) teb op tyc e
+withoutName' teb op n q tyc (BAbs x e) = do e' <- withoutName' teb op n (q+1) (x:tyc) e
                                             return $ BLam x e'
-withoutName' tyb teb op tyc (BApp e t) = do e' <- withoutName' tyb teb op tyc e
-                                            t' <- typeWhitoutName op tyc tyb t
+withoutName' teb op n q tyc (BApp e t) = do e' <- withoutName' teb op n q tyc e
+                                            t' <- typeWhitoutName op q tyc t
                                             return $ e' :!: (t,t')
 
---TERMINAR
-typeWhitoutName :: [String] -> TypeContext -> [String] -> Type -> Either ProofExceptions TType
-typeWhitoutName _ tyc xs (B x) = case elemIndex x xs of
-                                   Just n -> return $ TBound n
-                                   Nothing -> case elemIndex x tyc of
-                                                Just m -> return $ TFree x
-                                                Nothing -> throw $ TermE x
-typeWhitoutName op tyc xs (ForAll x t) = do r <- typeWhitoutName op tyc (x:xs) t
-                                            return $ TForAll r
-typeWhitoutName op tyc xs (Fun t1 t2 ) = do r1 <- typeWhitoutName op tyc xs t1
-                                            r2 <- typeWhitoutName op tyc xs t2
-                                            return $ TFun r1 r2
+
+typeWhitoutName :: [String] -> Int -> TypeContext -> Type -> Either ProofExceptions TType
+typeWhitoutName _ q tyc (B x) = case elemIndex x tyc of
+                                   Just n -> if (n < q)
+                                             then return $ TBound n
+                                             else return $ TFree x   --variable de tipo declarado por "props".
+                                   Nothing -> throw $ TermE x
+typeWhitoutName op q tyc (ForAll x t) = do r <- typeWhitoutName op (q+1) (x:tyc) t
+                                           return $ TForAll r
+typeWhitoutName op q tyc (Fun t1 t2) = do r1 <- typeWhitoutName op q tyc t1
+                                          r2 <- typeWhitoutName op q tyc t2
+                                          return $ TFun r1 r2
 typeWhitoutName op tyc xs (RenameTy s ts) =
   case elemIndex s op of
     Just n -> do rs <- sequence $ map (typeWhitoutName op tyc xs) ts
@@ -716,33 +745,33 @@ typeWhitoutName op tyc xs (RenameTy s ts) =
 -- lista de teoremas dada por el 1º arg.
 -- Suponemos que ninguna de las pruebas de los teoremas son recursivas.
 -- Es decir, que su lambda término es recursivo.
-inferType :: M.Map String (Term,(Type,TType)) -> Term -> Either ProofExceptions (Type, TType)
-inferType = inferType' 0 []
-
-inferType' :: Int -> [(Int,Type,TType)] -> M.Map String (Term,(Type,TType)) -> Term -> Either ProofExceptions (Type, TType)
-inferType' n _ te (Free (Global x)) =
+-- El 1º arg. indica la profundidad (respecto al cuantificador "para todo")
+-- desde la que se quiere inferir.
+-- El 2º arg. es el contexto de variables de términos, desde el que se quiere inferir.
+inferType :: Int -> Context -> M.Map String (Term,(Type,TType)) -> Term -> Either ProofExceptions (Type, TType)
+inferType n _ te (Free (Global x)) =
   case M.lookup x te of
     Just (_,t) -> return t
     Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean teoremas.
-inferType' n c te (Bound x) = let (m,t,t') = c !! x
-                              in return (t,renameTType (n-m) t')
-inferType' n c te (Lam (t,t') x) = do (tt,tt') <- inferType' n ((n,t,t'):c) te x
-                                      return (Fun t tt, TFun t' tt')
-inferType' n c te (x :@: y) = do (tt1, tt1') <- inferType' n c te x
-                                 case (tt1, tt1') of
-                                   (Fun _ t2, TFun t1' t2') ->
-                                     do (tt2, tt2') <- inferType' n c te y
-                                        if tt2' == t1'
-                                          then return (t2, t2')
-                                          else throw $ InferE2 tt2
-                                   _ -> throw $ InferE3 tt1
-inferType' n c te (BLam v x) = do (t,t') <- inferType' (n+1) c te x
-                                  return (ForAll v t, TForAll t')
-inferType' n c te (x :!: (t,t')) = do (tt,tt') <- inferType' n c te x
-                                      case (tt, tt') of
-                                        (ForAll _ t1, TForAll t1') ->
-                                          return $ inferReplaceType (t1,t1') (t,t')
-                                        _ -> throw $ InferE4 tt
+inferType n c te (Bound x) = let (m,t,t') = c !! x
+                             in return (t,renameTType (n-m) t')
+inferType n c te (Lam (t,t') x) = do (tt,tt') <- inferType n ((n,t,t'):c) te x
+                                     return (Fun t tt, TFun t' tt')
+inferType n c te (x :@: y) = do (tt1, tt1') <- inferType n c te x
+                                case (tt1, tt1') of
+                                  (Fun _ t2, TFun t1' t2') ->
+                                    do (tt2, tt2') <- inferType n c te y
+                                       if tt2' == t1'
+                                         then return (t2, t2')
+                                         else throw $ InferE2 tt2
+                                  _ -> throw $ InferE3 tt1
+inferType n c te (BLam v x) = do (t,t') <- inferType (n+1) c te x
+                                 return (ForAll v t, TForAll t')
+inferType n c te (x :!: (t,t')) = do (tt,tt') <- inferType n c te x
+                                     case (tt, tt') of
+                                       (ForAll _ t1, TForAll t1') ->
+                                         return $ inferReplaceType (t1,t1') (t,t')
+                                       _ -> throw $ InferE4 tt
 
 -- Renombra todas las variables de tipo ligadas "escapadas", nos referimos a aquellas
 -- variables cuyo cuantificador no figura en el lambda término (el 2º arg.)

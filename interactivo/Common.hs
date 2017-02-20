@@ -87,7 +87,7 @@ data Command = Ty String Type
 -- Arreglar el Exact para que tome lambda términos
 data Tactic = Assumption | Apply String | Intro | Intros | Split
             | Elim String | CLeft | CRight | Print String 
-            | CExists Type | Cut Type | Exact Type | Infer LamTerm
+            | CExists Type | Cut Type | Exact (Either Type LamTerm) | Infer LamTerm
             deriving (Show)
 
 
@@ -97,7 +97,7 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String |
                        ApplyE1 Type Type | ApplyE2 | Unif1 |
                        Unif2 | Unif3 | Unif4 | ElimE1 |
                        CommandInvalid | PropRepeated1 String | PropRepeated2 String |
-                       PropNotExists String | OpE String | ExactE | PSE | EmptyType |
+                       PropNotExists String | OpE String | ExactE1 Type | PSE | EmptyType |
                        TermE String | InferE1 String | InferE2 Type |
                        InferE3 Type | InferE4 Type
                      deriving (Show, Typeable)
@@ -109,9 +109,9 @@ data ProverState = PSt { proof :: Maybe ProofState
                        , global :: ProverGlobal
                        }
                    
-data ProverGlobal = PGlobal { props :: TypeContext                      -- Proposiciones de tipos.
-                            , terms :: Map String (Term,(Type,TType))   -- Teoremas.
-                            , op :: [String]                            -- Operaciones
+data ProverGlobal = PGlobal { props :: TypeContext                         -- Proposiciones de tipos.
+                            , teorems :: Map String (Term,(Type,TType))    -- Teoremas.
+                            , opers :: [String]                            -- Operaciones
                             }
 
 data ProofState = PState { name :: String
@@ -121,7 +121,8 @@ data ProofState = PState { name :: String
 
 data ProofConstruction = PConstruction { position :: [Int]
                                        , context :: [Context]
-                                       , typeContext :: [TypeContext]
+                                       , typeContext :: [TypeContext] -- Indica las proposiciones de tipos disponibles.
+                                                                      -- por nivel. Util para el pretty printer.
                                        , ty :: [Maybe (Type, TType)]
                                        , term :: [SpecialTerm]
                                        , subp :: Int           -- Cantidad de subpruebas activas en total.
@@ -129,6 +130,8 @@ data ProofConstruction = PConstruction { position :: [Int]
                                        , subplevel :: [Int]    -- Indica la cantidad de subpruebas que están activas
                                                                -- por nivel.
                                        , quantifier :: [Int]   -- Indica la cantidad de variables de tipo en el contexto.
+                                       , copers :: [String]     -- Conjunto de operaciones "custom". Copia del dato global.
+                                       , cteorems :: Map String (Term,(Type,TType)) -- Teoremas. Copia del dato global.
                                        }
 
                                     

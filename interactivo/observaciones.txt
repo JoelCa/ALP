@@ -30,9 +30,10 @@ Proof.
   assumption.
 Qed.
 
-- Cuando se aplica la introducción del "para todo" sobre la variable de tipo "x", se reemplaza
+- YA NO VALE. Cuando se aplica la introducción del "para todo" sobre la variable de tipo "x", se reemplaza
 en el tipo sin nombre el término "TBound 0" por "TFree x". Es util cuando se comparan tipos
 en el comando "assumption".
+
 
 - El lambda término final tiene un tipo alpha equivalente al dado por el usuario.
 Por ejemplo, si el tipo es: (forall k, k -> k) -> (forall j, j) -> (forall y, y).
@@ -50,7 +51,13 @@ en término de los tipos del sistema F.
 - ¿Por qué es necesario declarar las proposiciones (o variables de tipo)?. Lo hacemos para tener un
 un mejor algoritmo de reescritura de variables de tipos ligadas sobre el tipo que da el usuario.
 
-- Casos de pruebas para el inferidor de tipos sin nombres:
+- Casos de pruebas para el inferidor de tipos:
 infer \d.\a.\x: a -> d.\b.\y:b.x.
 infer \a.\b.\x:a->b.\c.\y:a->c.\d.\z:a->b.y.
 infer \a.\b.\w:a->b.(\c.\x:a->c.\d.\y:forall o, d->c. y [d]) [a].
+
+- El inferidos de tipo permite superposición de variables ligadas.
+Por ej: infer \a.\x:a.\a.\b.\y:a->b. (y) x.
+
+- Aquellas variables de tipo que declaramos, mediante el comando "Props", aparecen como variables
+de tipo libre en el lambda término que las utiliza.

@@ -30,7 +30,7 @@ Para chequear el pretty printer de las subpruebas, con el nuevo algoritmo.
 Para probar la unificación y el pretty printer.
 - Theorem t12: forall a, forall b, (a -> b) -> (forall c, forall d, a -> b).
 Para probar el comando apply.
-- Theorem t13: forall o, (forall b, (forall a, a) -> (forall c, forall d, b) -> b) -> (forall a, a) -> (forall w, forall r, (forall t, o)) -> (forall t, o).
+- Theorem t13: forall o, (forall b, (forall a, a) -> (forall c, forall d, b) -> b) -> (forall a, a) -> (forall w, forall r, (forall t, o /\ t)) -> (forall t, o /\ t).
 Para probar la unificación.
 - Theorem t14: Theorem rr: forall d, (forall a, a -> d)-> forall b, forall c, b -> d.
 Para probar la unificación.
@@ -38,3 +38,7 @@ Para probar la unificación.
 Para probar la unificación.
 -Theorem t16: forall b, forall c, (forall a, a -> c) -> forall qq, (forall h, h -> c).
 Para probar la unificación.
+- Theorem tt1 : forall a, forall b, a /\ b -> a.
+  Theorem tt2 : forall p, forall q, forall r, p /\ q -> (p -> r) -> r.
+Para probar el comando exact en la prueba de tt2, de la siguiente manera:
+exact (H1 (t1 [p] [q] H0)). 

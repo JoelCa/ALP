@@ -132,9 +132,7 @@ termTac = assumptionP
           <|> splitP
           <|> leftP
           <|> rightP
-          <|> existsP
           <|> printP
-          <|> cutP
           <|> exactP
           <|> inferP
 
@@ -166,15 +164,20 @@ elimP = tacticIdentArg "elim" Elim
 printP :: Parser Tactic
 printP = tacticIdentArg "print" Print
 
-existsP :: Parser Tactic
-existsP = tacticTypeArg "exists" CExists
+-- existsP :: Parser Tactic
+-- existsP = undefined
 
-cutP :: Parser Tactic
-cutP = tacticTypeArg "cut" Cut
+-- cutP :: Parser Tactic
+-- cutP = undefined
 
 exactP :: Parser Tactic
-exactP = tacticTypeArg "exact" Exact
-
+exactP = do symbol "exact"
+            (do ty <- exprTy'
+                char '.'
+                return $ Exact $ Left ty
+             <|> do te <- expLam
+                    char '.'
+                    return $ Exact $ Right te)
 
 tacticZeroArg :: String -> Tactic -> Parser Tactic
 tacticZeroArg s tac = do symbol s
@@ -185,13 +188,7 @@ tacticIdentArg :: String -> (String -> Tactic) -> Parser Tactic
 tacticIdentArg s tac = do symbol s
                           x <- identifier
                           char '.'
-                          return $ tac x
-          
-tacticTypeArg :: String -> (Type -> Tactic) -> Parser Tactic
-tacticTypeArg s tac = do symbol s
-                         t <- exprTy'
-                         char '.'
-                         return $ tac t          
+                          return $ tac x                            
 
 inferP :: Parser Tactic
 inferP = do symbol "infer"

@@ -2,6 +2,7 @@ module ProofState where
 
 import Common
 import Control.Monad.State.Lazy (get, modify)
+import Data.Map (Map)
 
 getAttribute :: (ProofConstruction -> [a]) -> Proof a
 getAttribute f = do ps <- get
@@ -31,6 +32,14 @@ getSubPLevel f = do ps <- get
                     if null x
                       then return $ Nothing
                       else return $ f (head x)
+
+getOpers :: Proof [String]
+getOpers = do ps <- get
+              return $ copers ps
+
+getTeorems :: Proof (Map String (Term,(Type,TType)))
+getTeorems = do ps <- get
+                return $ cteorems ps
 
 incrementPosition :: (Int -> Int) -> Proof ()
 incrementPosition f = modify $ incrementPosition' f

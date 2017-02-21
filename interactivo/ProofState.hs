@@ -2,7 +2,7 @@ module ProofState where
 
 import Common
 import Control.Monad.State.Lazy (get, modify)
-import Data.Map (Map)
+import qualified Data.Sequence as S
 
 getAttribute :: (ProofConstruction -> [a]) -> Proof a
 getAttribute f = do ps <- get
@@ -14,74 +14,74 @@ getAttribute f = do ps <- get
 getType :: Proof (Maybe (Type, TType))
 getType = getAttribute ty
 
-getContext :: Proof Context
-getContext = getAttribute context
+getTermContext :: Proof TermContext
+getTermContext = getAttribute termContexts
 
-getPosition :: Proof Int
-getPosition = getAttribute position
+getBTypeContext :: Proof BTypeContext
+getBTypeContext = getAttribute bTContexts
 
-getQuantifier :: Proof Int
-getQuantifier = getAttribute quantifier
-
-getTypeContext :: Proof TypeContext
-getTypeContext = getAttribute typeContext
-
-getSubPLevel :: (Int -> Maybe Int) -> Proof (Maybe Int)
-getSubPLevel f = do ps <- get
-                    let x = subplevel ps
+getLevelSubp :: (Int -> Maybe Int) -> Proof (Maybe Int)
+getLevelSubp f = do ps <- get
+                    let x = lsubp ps
                     if null x
                       then return $ Nothing
                       else return $ f (head x)
 
 getOpers :: Proof [String]
 getOpers = do ps <- get
-              return $ copers ps
+              return $ opers $ cglobal $ ps
 
-getTeorems :: Proof (Map String (Term,(Type,TType)))
+getTeorems :: Proof Teorems
 getTeorems = do ps <- get
-                return $ cteorems ps
+                return $ teorems $ cglobal $ ps
 
-incrementPosition :: (Int -> Int) -> Proof ()
-incrementPosition f = modify $ incrementPosition' f
+getFTypeContext :: Proof FTypeContext
+getFTypeContext = do ps <- get
+                     return $ fTContext $ cglobal $ ps
+
+getTVars :: Proof Int
+getTVars = getAttribute tvars
+
+getTTermVars :: Proof Int
+getTTermVars = do c <- getAttribute termContexts
+                  return $ S.length c
+
+getTBTypeVars :: Proof Int
+getTBTypeVars = do tc <- getAttribute bTContexts
+                   return $ S.length tc
+
+incrementTVars :: (Int -> Int) -> Proof ()
+incrementTVars f = modify $ incrementTVars' f
   
-incrementPosition' :: (Int -> Int) -> ProofConstruction -> ProofConstruction
-incrementPosition' f ps@(PConstruction {position=n:ns}) = ps {position = (f n) : ns}
+incrementTVars' :: (Int -> Int) -> ProofConstruction -> ProofConstruction
+incrementTVars' f ps@(PConstruction {tvars=n:ns}) = ps {tvars = (f n) : ns}
 
-incrementQuantifier :: (Int -> Int) -> Proof ()
-incrementQuantifier f = modify $ incrementQuantifier' f
-  
-incrementQuantifier' :: (Int -> Int) -> ProofConstruction -> ProofConstruction
-incrementQuantifier' f ps@(PConstruction {quantifier=n:ns}) = ps {quantifier = (f n) : ns}
+addTermContext :: TermVar -> Proof ()
+addTermContext x = modify (addTermContext' x)
 
-addContext :: TypeVar -> Proof ()
-addContext x = modify (addContext' x)
+addTermContext' :: TermVar -> ProofConstruction -> ProofConstruction
+addTermContext' x ps@(PConstruction {termContexts=c:cs})= ps {termContexts = (x S.<| c ):cs}
 
-addContext' :: TypeVar -> ProofConstruction -> ProofConstruction
-addContext' x ps@(PConstruction {context=c:cs})= ps {context = (x:c):cs}
+addBTypeContext :: BTypeVar -> Proof ()
+addBTypeContext x = modify (addBTypeContext' x)
 
-addTypeContext :: String -> Proof ()
-addTypeContext x = modify (addTypeContext' x)
-
-addTypeContext' :: String -> ProofConstruction -> ProofConstruction
-addTypeContext' x ps@(PConstruction {typeContext=tc:tcs})= ps {typeContext = (x:tc):tcs}
+addBTypeContext' :: BTypeVar -> ProofConstruction -> ProofConstruction
+addBTypeContext' x ps@(PConstruction {bTContexts=tc:tcs})= ps {bTContexts = (x S.<| tc):tcs}
 
 replaceType :: (Type, TType) -> Proof ()
 replaceType x = modifyType (\tys -> Just x : tail tys)
 
-modifySubP :: (Int -> Int) -> Proof ()
-modifySubP f = modify (\ps -> ps {subp = f $ subp ps})
+modifyTotalSubp :: (Int -> Int) -> Proof ()
+modifyTotalSubp f = modify (\ps -> ps {tsubp = f $ tsubp ps})
 
-modifyPosition :: ([Int] -> [Int]) -> Proof ()
-modifyPosition f = modify (\ps -> ps {position = f $ position ps})
+modifyTVars :: ([Int] -> [Int]) -> Proof ()
+modifyTVars f = modify (\ps -> ps {tvars = f $ tvars ps})
 
-modifyQuantifier :: ([Int] -> [Int]) -> Proof ()
-modifyQuantifier f = modify (\ps -> ps {quantifier = f $ quantifier ps})
+modifyBTypeCont :: ([BTypeContext] -> [BTypeContext]) -> Proof ()
+modifyBTypeCont f = modify (\ps -> ps {bTContexts = f $ bTContexts ps})
 
-modifyTypeCont :: ([TypeContext] -> [TypeContext]) -> Proof ()
-modifyTypeCont f = modify (\ps -> ps {typeContext = f $ typeContext ps})
-
-modifyContext :: ([Context] -> [Context]) -> Proof ()
-modifyContext f = modify (\ps -> ps {context = f $ context ps})
+modifyTermContext :: ([TermContext] -> [TermContext]) -> Proof ()
+modifyTermContext f = modify (\ps -> ps {termContexts = f $ termContexts ps})
 
 modifyTerm :: ([SpecialTerm] -> [SpecialTerm]) -> Proof ()
 modifyTerm f = modify (\ps -> ps {term = f $ term ps})
@@ -89,21 +89,21 @@ modifyTerm f = modify (\ps -> ps {term = f $ term ps})
 modifyType :: ([Maybe (Type, TType)] -> [Maybe (Type, TType)]) -> Proof ()
 modifyType f = modify (\ps -> ps {ty = f $ ty ps})
 
-modifySubPLevel :: Int -> Proof ()
-modifySubPLevel n
-  | (n > 1) || (n == 0) = modify $ modifySubPLevel' n
+modifyLevelSubp :: Int -> Proof ()
+modifyLevelSubp n
+  | (n > 1) || (n == 0) = modify $ modifyLevelSubp' n
   | n == 1 = error "error: modifySubPLevel."
 
-modifySubPLevel' :: Int -> ProofConstruction -> ProofConstruction
-modifySubPLevel' 0 ps@(PConstruction {subplevel=s:spl})
-  | s > 1 = ps {subplevel = (s-1) : spl}
+modifyLevelSubp' :: Int -> ProofConstruction -> ProofConstruction
+modifyLevelSubp' 0 ps@(PConstruction {lsubp=s:spl})
+  | s > 1 = ps {lsubp = (s-1) : spl}
   | s == 1 = case spl of
-               [] -> ps {subplevel = []}
-               x:xs -> ps {subplevel = (x-1):xs}
-modifySubPLevel' 1 _ = error "error: modifySubPLevel'."
-modifySubPLevel' x ps@(PConstruction {subplevel=s:spl})
-  | s > 1 = ps {subplevel = x : s : spl}
-  | s == 1 = ps {subplevel = x :  spl}
+               [] -> ps {lsubp = []}
+               x:xs -> ps {lsubp = (x-1):xs}
+modifyLevelSubp' 1 _ = error "error: modifySubPLevel'."
+modifyLevelSubp' x ps@(PConstruction {lsubp=s:spl})
+  | s > 1 = ps {lsubp = x : s : spl}
+  | s == 1 = ps {lsubp = x :  spl}
 
 ------------------------------------------------------------------------------
 
@@ -117,27 +117,24 @@ repeatHead n xs
 modifySubProofs :: Int -> ([Maybe (Type, TType)] -> [Maybe (Type, TType)]) -> Proof ()
 modifySubProofs n f
   | n > 1 =
-      do modifySubP (+ (n-1))
-         modifySubPLevel n
-         modifyQuantifier $ repeatHead 1
-         modifyPosition $ repeatHead 1
-         modifyTypeCont $ repeatHead 1
-         modifyContext $ repeatHead 1
+      do modifyTotalSubp (+ (n-1))
+         modifyLevelSubp n
+         modifyTVars $ repeatHead 1
+         modifyBTypeCont $ repeatHead 1
+         modifyTermContext $ repeatHead 1
          modifyType (\tys -> f $ tail tys)
   | n == 0 =
-      do modifySubP (+ (n-1))
-         modifySubPLevel n
+      do modifyTotalSubp (+ (n-1))
+         modifyLevelSubp n
          modifyType (\tys -> f $ tail tys)
-         w <- getSubPLevel (\x -> if x == 1 then Nothing else Just x)
+         w <- getLevelSubp (\x -> if x == 1 then Nothing else Just x)
          case w of
            Nothing ->
-             do modifyQuantifier tail
-                modifyPosition tail
-                modifyTypeCont tail
-                modifyContext tail
+             do modifyTVars tail
+                modifyBTypeCont tail
+                modifyTermContext tail
            Just _ -> 
-             do modifyQuantifier $ repeatHead 1 . tail
-                modifyPosition $ repeatHead 1 . tail
-                modifyTypeCont $ repeatHead 1 . tail
-                modifyContext $ repeatHead 1 . tail
+             do modifyTVars $ repeatHead 1 . tail
+                modifyBTypeCont $ repeatHead 1 . tail
+                modifyTermContext $ repeatHead 1 . tail
   | n == 1 = modifyType (\tys -> f $ tail tys)

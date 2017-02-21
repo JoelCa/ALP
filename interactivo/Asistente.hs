@@ -5,16 +5,17 @@ import Data.Char (isDigit)
 import Data.List (findIndex, elemIndex)
 import Control.Monad (unless, when)
 import qualified Data.Map as M (Map, lookup, insert, empty, size)
+import qualified Data.Sequence as S
 import Data.Maybe (fromJust, isJust)
 import ProofState
 
 habitar :: Tactic -> Proof ()
 habitar Assumption = do x <- getType
                         (_,tw) <- maybeToProof EmptyType x 
-                        c <- getContext
-                        q <- getQuantifier
-                        i <- maybeToProof AssuE (findIndex
-                                                  (\(p,_,t) -> renameTType (q - p) t == tw)
+                        c <- getTermContext
+                        q <- getTBTypeVars
+                        i <- maybeToProof AssuE (S.findIndexL
+                                                  (\(_,p,_,t) -> renameTType (q - p) t == tw)
                                                   c)
                         modifySubProofs 0 id
                         modifyTerm $ simplify (Bound i)
@@ -23,18 +24,18 @@ habitar Intro = do x <- getType
 habitar Intros = introsComm
 habitar (Apply h) = do x <- getType
                        (t,t') <- maybeToProof EmptyType x
-                       n <- getPosition
+                       n <- getTTermVars
                        i <- maybeToProof ApplyE2 $ getHypothesisValue n h
-                       c <- getContext
-                       q <- getQuantifier
-                       applyComm (n-i-1) (t,t') (getTypeVar q $ c !! (n-i-1))
+                       c <- getTermContext
+                       q <- getTBTypeVars
+                       applyComm (n-i-1) (t,t') (getTypeVar q $ S.index c (n-i-1))
 habitar (Elim h) = do x <- getType
                       (t,t') <- maybeToProof EmptyType x
-                      n <- getPosition
+                      n <- getTTermVars
                       i <- maybeToProof ApplyE2 $ getHypothesisValue n h
-                      c <- getContext
-                      q <- getQuantifier
-                      elimComm i (t,t') (getTypeVar q $ c !! (n-i-1))
+                      c <- getTermContext
+                      q <- getTBTypeVars
+                      elimComm i (t,t') (getTypeVar q $ S.index c (n-i-1))
 habitar CLeft = do x <- getType
                    case x of
                      Just (RenameTy s [t1,t2] , RenameTTy _ [t1',t2']) ->
@@ -66,12 +67,13 @@ habitar Split = do x <- getType
                        else throw CommandInvalid
                      _ -> throw CommandInvalid
 habitar (Exact (Right te)) = do op <- getOpers
-                                n <- getPosition
-                                tc <- getTypeContext
-                                q <- getQuantifier
-                                te' <- eitherToProof $ withoutName op n q tc te
-                                c <- getContext
+                                n <- getTTermVars
+                                btc <- getBTypeContext
+                                ftc <- getFTypeContext
+                                te' <- eitherToProof $ withoutName op n (ftc,btc) te
+                                c <- getTermContext
                                 teo <- getTeorems
+                                q <- getTBTypeVars
                                 (_,t') <- eitherToProof $ inferType q c teo te'
                                 x <- getType
                                 (tt,tt') <- maybeToProof EmptyType x
@@ -81,9 +83,9 @@ habitar (Exact (Right te)) = do op <- getOpers
 habitar (Exact (Left ty)) = do x <- getType
                                when (isJust x) $ throw $ ExactE2 $ fst $ fromJust x
                                op <- getOpers
-                               tc <- getTypeContext
-                               q <- getQuantifier
-                               ty' <- eitherToProof $ typeWhitoutName op q tc ty
+                               btc <- getBTypeContext
+                               ftc <- getFTypeContext
+                               ty' <- eitherToProof $ typeWhitoutName op (ftc,btc) ty
                                modifySubProofs 0 id
                                modifyTerm $ simplifyTypeInTerm (ty,ty')                                
 -- habitar (PState {name=name,
@@ -142,14 +144,16 @@ habitar (Exact (Left ty)) = do x <- getType
 
 introComm :: Maybe (Type, TType) -> Proof ()
 introComm (Just (Fun t1 t2, TFun t1' t2')) =
-  do incrementPosition (+1)
-     q <- getQuantifier
-     addContext (q,t1,t1')
+  do incrementTVars (+1)
+     q <- getTBTypeVars
+     tv <- getTVars
+     addTermContext (tv,q,t1,t1')
      replaceType (t2, t2')
      modifyTerm $ addHT (\x -> Lam (t1,t1') x)
 introComm (Just (ForAll v t, TForAll t')) =
-  do addTypeContext v
-     incrementQuantifier (+1)
+  do incrementTVars (+1)
+     tv <- getTVars
+     addBTypeContext (tv, v)
      replaceType (t, t')
      modifyTerm $ addHT (\x -> BLam v x)
 introComm Nothing = throw EmptyType
@@ -692,17 +696,15 @@ rename' rv bv fv op (RenameTy s ts) =
 --------------------------------------------------------------------
 
 -- Genera el lambda término, sin nombre de término ni de tipo.
--- Chequea que las variables de tipo sean válidas de acuerdo al contexto
--- dado por el 4º arg., y que las variables de términos también lo sean, de
+-- Chequea que las variables de tipo sean válidas de acuerdo al contexto de tipos
+-- dado por 3º arg., y que las variables de términos también lo sean, de
 -- acuerdo la longitud del contexto de variables de términos "iniciales", dado por el 2º arg.
--- El 3º argumento indica la profundidad de los cuantificadores. Es útil para saber
--- cuando una variable de tipo está ligada a algún cuantificador, o si esta es libre.
 -- El 1º argumento, es la tabla de operaciones "custom".
-withoutName :: [String] -> Int -> Int -> TypeContext -> LamTerm -> Either ProofExceptions Term
+withoutName :: [String] -> Int -> (FTypeContext, BTypeContext) -> LamTerm -> Either ProofExceptions Term
 withoutName = withoutName' []
 
-withoutName' :: [String] -> [String] -> Int -> Int -> TypeContext -> LamTerm -> Either ProofExceptions Term
-withoutName' teb _ n _ _ (LVar x)
+withoutName' :: [String] -> [String] -> Int -> (FTypeContext, BTypeContext) -> LamTerm -> Either ProofExceptions Term
+withoutName' teb _ n _ (LVar x)
   | n == 0 = case elemIndex x teb of
                Just m -> return $ Bound m
                Nothing -> return $ Free $ Global x
@@ -712,33 +714,33 @@ withoutName' teb _ n _ _ (LVar x)
                             Just h -> return $ Bound $ n - h - 1
                             Nothing -> return $ Free $ Global x
   | otherwise = error "error: withoutName', no debería pasar."
-withoutName' teb op n q tyc (Abs x t e) = do t' <- typeWhitoutName op q tyc t
-                                             e' <- withoutName' (x:teb) op n q tyc e
-                                             return $ Lam (t, t') e'
-withoutName' teb op n q tyc (App e1 e2) = do e1' <- withoutName' teb op n q tyc e1
-                                             e2' <- withoutName' teb op n q tyc e2
-                                             return $ e1' :@: e2'
-withoutName' teb op n q tyc (BAbs x e) = do e' <- withoutName' teb op n (q+1) (x:tyc) e
-                                            return $ BLam x e'
-withoutName' teb op n q tyc (BApp e t) = do e' <- withoutName' teb op n q tyc e
-                                            t' <- typeWhitoutName op q tyc t
-                                            return $ e' :!: (t,t')
+withoutName' teb op n tyc (Abs x t e) = do t' <- typeWhitoutName op tyc t
+                                           e' <- withoutName' (x:teb) op n tyc e
+                                           return $ Lam (t, t') e'
+withoutName' teb op n tyc (App e1 e2) = do e1' <- withoutName' teb op n tyc e1
+                                           e2' <- withoutName' teb op n tyc e2
+                                           return $ e1' :@: e2'
+withoutName' teb op n (ftyc,btyc) (BAbs x e) = do e' <- withoutName' teb op n (ftyc, (0,x) S.<| btyc) e
+                                                  return $ BLam x e'
+withoutName' teb op n tyc (BApp e t) = do e' <- withoutName' teb op n tyc e
+                                          t' <- typeWhitoutName op tyc t
+                                          return $ e' :!: (t,t')
 
 
-typeWhitoutName :: [String] -> Int -> TypeContext -> Type -> Either ProofExceptions TType
-typeWhitoutName _ q tyc (B x) = case elemIndex x tyc of
-                                   Just n -> if (n < q)
-                                             then return $ TBound n
-                                             else return $ TFree x   --variable de tipo declarado por "props".
-                                   Nothing -> throw $ TermE x
-typeWhitoutName op q tyc (ForAll x t) = do r <- typeWhitoutName op (q+1) (x:tyc) t
-                                           return $ TForAll r
-typeWhitoutName op q tyc (Fun t1 t2) = do r1 <- typeWhitoutName op q tyc t1
-                                          r2 <- typeWhitoutName op q tyc t2
-                                          return $ TFun r1 r2
-typeWhitoutName op tyc xs (RenameTy s ts) =
+typeWhitoutName :: [String] -> (FTypeContext, BTypeContext) -> Type -> Either ProofExceptions TType
+typeWhitoutName _ (ftyc,btyc) (B x) = case S.findIndexL (\y-> snd y == x) btyc of
+                                        Just n -> return $ TBound n
+                                        Nothing -> if elem x ftyc
+                                                   then return $ TFree x
+                                                   else throw $ TermE x
+typeWhitoutName op (ftyc,btyc) (ForAll x t) = do r <- typeWhitoutName op (ftyc, (0,x) S.<| btyc) t
+                                                 return $ TForAll r
+typeWhitoutName op tyc (Fun t1 t2) = do r1 <- typeWhitoutName op tyc t1
+                                        r2 <- typeWhitoutName op tyc t2
+                                        return $ TFun r1 r2
+typeWhitoutName op tyc (RenameTy s ts) =
   case elemIndex s op of
-    Just n -> do rs <- sequence $ map (typeWhitoutName op tyc xs) ts
+    Just n -> do rs <- sequence $ map (typeWhitoutName op tyc) ts
                  return $ RenameTTy n rs
     Nothing -> throw $ OpE s
 -- typeWhitoutName _ tyc xs (Exists x t) = do r <- typeWhitoutName tyc (x:xs) t
@@ -746,20 +748,20 @@ typeWhitoutName op tyc xs (RenameTy s ts) =
 
 
 -- Infiere el tipo sin nombre de un lambda término, de acuerdo a la
--- lista de teoremas dada por el 1º arg.
+-- lista de teoremas dada por el 3º arg.
 -- Suponemos que ninguna de las pruebas de los teoremas son recursivas.
 -- Es decir, que su lambda término es recursivo.
 -- El 1º arg. indica la profundidad (respecto al cuantificador "para todo")
 -- desde la que se quiere inferir.
 -- El 2º arg. es el contexto de variables de términos, desde el que se quiere inferir.
-inferType :: Int -> Context -> M.Map String (Term,(Type,TType)) -> Term -> Either ProofExceptions (Type, TType)
+inferType :: Int -> TermContext -> Teorems -> Term -> Either ProofExceptions (Type, TType)
 inferType n _ te (Free (Global x)) =
   case M.lookup x te of
     Just (_,t) -> return t
     Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean teoremas.
-inferType n c te (Bound x) = let (m,t,t') = c !! x
+inferType n c te (Bound x) = let (_,m,t,t') = S.index c x
                              in return (t,renameTType (n-m) t')
-inferType n c te (Lam (t,t') x) = do (tt,tt') <- inferType n ((n,t,t'):c) te x
+inferType n c te (Lam (t,t') x) = do (tt,tt') <- inferType n ((0,n,t,t') S.<| c) te x
                                      return (Fun t tt, TFun t' tt')
 inferType n c te (x :@: y) = do (tt1, tt1') <- inferType n c te x
                                 case (tt1, tt1') of
@@ -819,10 +821,10 @@ inferReplaceType' n (RenameTy s ts, RenameTTy op ts') t =
 --                                                    in (Exists v tt, TExists tt')
 
 
--- Obtiene la variable de tipo renombrada de acuerdo a la profundidad que se quiere
--- con el 1º argumento.
-getTypeVar :: Int -> TypeVar -> (Type, TType)
-getTypeVar n (m, t, t') = (t, renameTType (n-m) t')
+-- Obtiene el tipo de la variable de término, renombrando su tipo sin nombres, de acuerdo
+-- a la profundidad dada por el 1º argumento.
+getTypeVar :: Int -> TermVar -> (Type, TType)
+getTypeVar n (_,m, t, t') = (t, renameTType (n-m) t')
 
 --------------------------------------------------------------------
 

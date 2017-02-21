@@ -4,7 +4,7 @@ import Common
 import Text.PrettyPrint.HughesPJ hiding (parens)
 import qualified Text.PrettyPrint.HughesPJ as PP 
 import Data.List
-
+import qualified Data.Sequence as S
 
 -----------------------
 --- pretty printer
@@ -149,11 +149,6 @@ printTType' op i bs fs (RenameTTy n ts) = parenIf (i > 1) $
 --                                        text "," <+>
 --                                        printTType' 1 (f:bs) fs t
 
-
-printTypeFromMaybe :: Maybe Type -> Doc
-printTypeFromMaybe (Just ty) = printType' False ty
-printTypeFromMaybe Nothing = text "Prop"
-
 printType :: Type -> Doc
 printType = printType' False
 
@@ -174,42 +169,99 @@ printType' True t             = PP.parens $ printType' False t
 --                                 text "," <+>
 --                                 printType' False t
                                     
-printProof :: Int -> [Int] -> [TypeContext] -> [Context] -> [Maybe Type] -> Doc
-printProof tp (n:_) (tc:_) (c:_) tys =
+printProof :: Int -> FTypeContext -> BTypeContext -> TermContext -> [Maybe (Type, TType)] -> Doc
+printProof tp ftc btc c tys =
   (text $ "Hay " ++ show tp ++ " sub pruebas.\n") $$
-  printContext n tc c $$
-  printSubProofs 1 tp tys
+  printContext ftc btc c $$
+  printGoals tp tys
 
-printSubProofs :: Int -> Int -> [Maybe Type] -> Doc
-printSubProofs _ _ [] = empty
-printSubProofs i tp (ty:tys)
+
+printGoals :: Int -> [Maybe (Type, TType)] -> Doc
+printGoals = printGoals' 1
+
+printGoals' :: Int -> Int -> [Maybe (Type, TType)] -> Doc
+printGoals' _ _ [] = empty
+printGoals' i tp (ty:tys)
   | i <= tp = (text $ "___________________["++(show i)++"/"++(show tp)++"]") $$
-              printTypeFromMaybe ty $$
-              printSubProofs (i+1) tp tys
+              printGoal ty $$
+              printGoals' (i+1) tp tys
   | otherwise = empty
 
+printGoal :: Maybe (Type, TType) -> Doc
+printGoal (Just (ty,_)) = printType' False ty
+printGoal Nothing = text "Prop"
 
-printContext :: Int -> TypeContext -> Context -> Doc
-printContext n tc c = printQuantifiers tc $$
-                      printHypothesis n c
 
-printQuantifiers :: TypeContext -> Doc
-printQuantifiers [] = empty
-printQuantifiers (q:tc) = text q <+>
-                          text ":" <+>
-                          text "Prop" $$
-                          printQuantifiers tc
+printContext :: FTypeContext -> BTypeContext -> TermContext -> Doc
+printContext ftc btc c = printFTypeContext ftc $$
+                         printRestContext btc c
 
-printHypothesis :: Int -> Context -> Doc
-printHypothesis 0 [] = empty
-printHypothesis 1 [(_,x,y)] = text "H0" <+>
-                            text ":" <+>
-                            printType x
-printHypothesis n ((_,x,y):xs) 
-  | n > 0 = printHypothesis (n-1) xs $$
-            text "H" <>
-            text (show (n-1)) <+> 
-            text ":" <+>
-            printType x
-  | otherwise = error "error: printHypothesis, no debería pasar"
-printHypothesis _ _ = error "error: printHypothesis, no debería pasar"
+
+printFTypeContext :: FTypeContext -> Doc
+printFTypeContext [] = empty
+printFTypeContext (x:ftc) = printFTypeVar x $$
+                            printFTypeContext ftc
+
+printFTypeVar :: FTypeVar -> Doc
+printFTypeVar x = text x <+>
+                  text ":" <+>
+                  text "Prop"
+
+printRestContext :: BTypeContext -> TermContext -> Doc
+printRestContext btc c
+  | S.null btc = printRestTermC c
+  | S.null c = printRestBTypeC btc
+  | otherwise = let x = S.index btc 0
+                    y = S.index c 0
+                in if fst x > fst4 y
+                   then printRestContext (S.drop 1 btc) c $$
+                        printBTypeVar x
+                   else printRestContext btc (S.drop 1 c) $$
+                        printTermVar (S.length c) y
+
+printRestTermC :: TermContext -> Doc
+printRestTermC c
+  | S.null c = empty
+  | otherwise = printRestTermC (S.drop 1 c) $$
+                printTermVar (S.length c) (S.index c 0)
+
+printRestBTypeC :: BTypeContext -> Doc
+printRestBTypeC btc
+  | S.null btc = empty
+  | otherwise = printRestBTypeC (S.drop 1 btc) $$
+                printBTypeVar (S.index btc 0)
+
+printTermVar :: Int -> TermVar -> Doc
+printTermVar n (_,_,t,_) = text "H" <>
+                           text (show (n-1)) <+> 
+                           text ":" <+>
+                           printType t
+
+printBTypeVar :: BTypeVar -> Doc
+printBTypeVar (_,x) = text x <+>
+                      text ":" <+>
+                      text "Prop"
+
+fst4 :: (a, b, c, d) -> a
+fst4 (x, _, _, _) = x
+
+-- printQuantifiers :: TypeContext -> Doc
+-- printQuantifiers [] = empty
+-- printQuantifiers (q:tc) = text q <+>
+--                           text ":" <+>
+--                           text "Prop" $$
+--                           printQuantifiers tc
+
+-- printHypothesis :: Int -> TermContext -> Doc
+-- printHypothesis 0 [] = empty
+-- printHypothesis 1 [(_,x,_)] = text "H0" <+>
+--                             text ":" <+>
+--                             printType x
+-- printHypothesis n ((_,x,_):xs) 
+--   | n > 0 = printHypothesis (n-1) xs $$
+--             text "H" <>
+--             text (show (n-1)) <+> 
+--             text ":" <+>
+--             printType x
+--   | otherwise = error "error: printHypothesis, no debería pasar"
+-- printHypothesis _ _ = error "error: printHypothesis, no debería pasar"

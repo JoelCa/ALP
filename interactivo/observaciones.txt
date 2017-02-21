@@ -65,3 +65,7 @@ de tipo libre en el lambda término que las utiliza.
 - La unificación, con el comando "apply", sobre una variable de término H, trata de unificar 
 todos los "para todos" seguidos más externos de H. En algunos casos, basta con encontrar la 
 unificación solo para algunos "para todos".
+
+- Utilizé las estructuras de datos Map y Seq.
+
+- Utilizé el tipo de datos Doc, como pretty printer.

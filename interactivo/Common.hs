@@ -9,6 +9,7 @@ import System.Console.Haskeline.MonadException (Exception)
 import Data.Map (Map)
 import Control.Monad (ap, liftM)
 import Control.Monad.State.Lazy
+import Data.Sequence (Seq)
 
   -- Tipos de los nombres
 data Name
@@ -56,26 +57,41 @@ data Term  = Bound Int
            | Term :!: (Type,TType)
            deriving (Show, Eq)
 
--- data TypeOp = Op2 Int String Bool (Type -> Type -> Type)
---             | Op1 Int String Bool (Type -> Type)
 
-data TypeBody = Unary ((Type, TType) -> (Type, TType))
-              | Double ((Type, TType) -> (Type, TType) -> (Type, TType))
+-- data TypeBody = Unary ((Type, TType) -> (Type, TType))
+--               | Double ((Type, TType) -> (Type, TType) -> (Type, TType))
 
   -- Valores
-data Value = VLam Type Term
+-- data Value = VLam Type Term
 
-  -- Contextos del tipado.
+  -- Para cada variable de término, tenemos (por posición en la 4-tupla):
+  -- 1. Su posición en el contexto, a la hora de imprimirlo.
+  -- 2. La profundidad con la que se añadio al contexto,
+  -- (la profundidad se refiere a la cantidad de cuantificadores construidos).
+  -- 3-4. Su tipo con y sin nombres, respectivamente.
+type TermVar = (Int,Int,Type,TType)
 
-type TypeVar = (Int,Type,TType)
-  -- Contexto de variables de términos. Para cada variable, tenemos
-  -- su tipo con y sin nombre, junto con la profundidad con la que se
-  -- añadio al contexto (la profundidad se refiere a la cantidad de
-  -- cuantificadores construidos).
-type Context = [TypeVar]
-  -- Contexto de variables de tipos.
-type TypeContext = [String]
-  
+  -- Contexto de variables de términos. 
+type TermContext = Seq TermVar
+
+  -- Para cada variable de tipo ligada, tenemos (por posición en la tupla):
+  -- 1. Su posición en el contexto. Útil a la hora de imprimirlo.
+  -- 2. El nombre.
+type BTypeVar = (Int,String)
+
+  -- Contexto de variables de tipo ligadas.
+type BTypeContext = Seq BTypeVar
+
+  -- Tabla de teoremas
+  -- Clave: Nombre del teorema.
+  -- Valor: El lambda término de la prueba, junto con su tipo, con y sin nombres.
+type Teorems = Map String (Term,(Type,TType))
+
+type FTypeVar = String
+
+  -- Contexto de variables de tipo libre.
+type FTypeContext = [FTypeVar]
+
   --Comandos
 data Command = Ty String Type
              | Ta Tactic
@@ -111,9 +127,9 @@ data ProverState = PSt { proof :: Maybe ProofState
                        , global :: ProverGlobal
                        }
                    
-data ProverGlobal = PGlobal { props :: TypeContext                         -- Proposiciones de tipos.
-                            , teorems :: Map String (Term,(Type,TType))    -- Teoremas.
-                            , opers :: [String]                            -- Operaciones
+data ProverGlobal = PGlobal { fTContext :: FTypeContext
+                            , teorems :: Teorems                -- Teoremas.
+                            , opers :: [String]                 -- Operaciones "custom".
                             }
 
 data ProofState = PState { name :: String
@@ -121,22 +137,20 @@ data ProofState = PState { name :: String
                          , constr :: ProofConstruction
                          }
 
-data ProofConstruction = PConstruction { position :: [Int]
-                                       , context :: [Context]
-                                       , typeContext :: [TypeContext] -- Indica las proposiciones de tipos disponibles.
-                                                                      -- por nivel. Util para el pretty printer.
+data ProofConstruction = PConstruction { termContexts :: [TermContext]
+                                       , bTContexts :: [BTypeContext] -- Indica las proposiciones de tipos disponibles.
+                                                                      -- por nivel. Útil para el pretty printer.
                                        , ty :: [Maybe (Type, TType)]
                                        , term :: [SpecialTerm]
-                                       , subp :: Int           -- Cantidad de subpruebas activas en total.
-                                       , tyFromCut :: [Type]
-                                       , subplevel :: [Int]    -- Indica la cantidad de subpruebas que están activas
-                                                               -- por nivel.
-                                       , quantifier :: [Int]   -- Indica la cantidad de variables de tipo en el contexto.
-                                       , copers :: [String]     -- Conjunto de operaciones "custom". Copia del dato global.
-                                       , cteorems :: Map String (Term,(Type,TType)) -- Teoremas. Copia del dato global.
+                                       , tsubp :: Int           -- Cantidad de subpruebas activas en total.
+                                       , lsubp :: [Int]         -- Indica la cantidad de subpruebas que están activas
+                                                                -- por nivel.
+                                       , tvars :: [Int]         -- La cantidad total de variables de tipo y términos disponibles.
+                                                                -- Útil para el pretty printer.
+                                       , cglobal :: ProverGlobal  -- Copia del dato global.
                                        }
 
-                                    
+                         
 data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) |
                    Term Term | TypeH TypeHole
 

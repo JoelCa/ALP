@@ -11,6 +11,7 @@ import Control.Monad.State.Strict
 import Control.Monad.IO.Class
 import Data.Maybe
 import qualified Data.Map as Map
+import qualified Data.Sequence as S
 import Data.List (findIndex, elemIndex)
 
 type ProverInputState a = InputT (StateT ProverState IO) a
@@ -42,7 +43,7 @@ main = do args <- getArgs
 
 
 initProverState :: ProverState
-initProverState = PSt {global=PGlobal {teorems=initialT, props=[], opers=operations}, proof=Nothing}
+initProverState = PSt {global=PGlobal {teorems=initialT, fTContext=[], opers=operations}, proof=Nothing}
 
 
 prover :: ProverInputState ()
@@ -57,26 +58,20 @@ prover = do minput <- getInputLine "> "
                                   checkCommand command) (\e -> errorMessage (e :: ProofExceptions) >> prover)
 
 newProof :: ProverGlobal -> String -> Type -> TType -> ProofState
-newProof (PGlobal {props = p, teorems = te, opers = op}) name ty tty =
-  let c = PConstruction { subp=1
-                        , position=[0]
-                        , typeContext = [p]
-                        , context=[[]]
+newProof pglobal name ty tty =
+  let c = PConstruction { bTContexts = [S.empty]
+                        , termContexts = [S.empty]
                         , ty=[Just (ty, tty)]
                         , term=[HoleT id]
-                        , tyFromCut=[]
-                        , subplevel=[1]
-                        , quantifier=[0]
-                        , copers=op
-                        , cteorems=te
+                        , tsubp=1
+                        , lsubp=[1]
+                        , tvars = [length $ fTContext $ pglobal]
+                        , cglobal = pglobal
                         }
   in PState { name = name
             , types = (ty, tty)
             , constr = c
             }
-
-renderNewProof :: Type -> String
-renderNewProof ty = render $ printProof 1 [0] [[]] [[]] [Just ty]
 
 renderFinalTerm :: ProofConstruction -> String
 renderFinalTerm p = render $ printTerm $ getTermFromProof p
@@ -86,8 +81,7 @@ renderFinalTermWithoutName :: [String] -> ProofConstruction -> String
 renderFinalTermWithoutName op p = render $ printTermTType op $ getTermFromProof p
 
 renderProof :: ProofConstruction -> String
-renderProof p = render $ printProof (subp p) (position p) (typeContext p) (context p) (map (maybe Nothing (Just . fst)) (ty p))
-
+renderProof p = render $ printProof (tsubp p) (fTContext $ cglobal p) (head $ bTContexts p) (head $ termContexts p) (ty p)
 
 propRepeated2 :: [String] -> [String] -> Maybe String
 propRepeated2 _ [] = Nothing
@@ -108,7 +102,7 @@ checkCommand (Ty name ty) = do s <- lift get
                                when (isJust $ proof s) (throwIO PNotFinished)
                                let glo = global s
                                when (Map.member name (teorems $ glo)) (throwIO $ PExist name)
-                               (tyr,tty) <- returnInput $ rename (props glo) (opers glo) ty
+                               (tyr,tty) <- returnInput $ rename (fTContext glo) (opers glo) ty
                                let p = newProof glo name tyr tty
                                lift $ put $ PSt {global=glo, proof=Just p}
                                outputStrLn $ renderProof $ constr p
@@ -116,12 +110,12 @@ checkCommand (Ty name ty) = do s <- lift get
                                
 checkCommand (Props ps) = do s <- lift get
                              when (isJust $ proof s) (throwIO PNotFinished)
-                             let gps = props $ global s
+                             let gps = fTContext $ global s
                              let pr1 = propRepeated1 ps
                              let pr2 = propRepeated2 ps gps
                              when (isJust pr1) (throwIO $ PropRepeated1 $ fromJust pr1)
                              when (isJust pr2) (throwIO $ PropRepeated2 $ fromJust pr2)
-                             lift $ put $ s {global = (global s) {teorems=teorems $ global s, props=ps++gps}}
+                             lift $ put $ s {global = (global s) {teorems=teorems $ global s, fTContext=ps++gps}}
                              prover
 
 -- TERMINAR
@@ -135,9 +129,9 @@ checkCommand (Ta (Print x)) = do s <- lift get
 
 checkCommand (Ta (Infer x)) = do s <- lift get
                                  outputStrLn $ show x ++ "\n"         -- Borrar SHOW
-                                 te <- returnInput $ withoutName (opers $ global s) 0 0 (props $ global s) x
+                                 te <- returnInput $ withoutName (opers $ global s) 0 (fTContext $ global s, S.empty) x
                                  outputStrLn $ show te ++ "\n"
-                                 (ty,ty') <- returnInput $ inferType 0 [] (teorems $ global s) te
+                                 (ty,ty') <- returnInput $ inferType 0 S.empty (teorems $ global s) te
                                  outputStrLn $ render $ printType ty
                                  outputStrLn $ render $ printTType (opers $ global s) ty'
                                  prover

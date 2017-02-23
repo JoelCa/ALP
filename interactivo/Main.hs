@@ -20,10 +20,6 @@ type ProverInputState a = InputT (StateT ProverState IO) a
 --      get = lift . get
 --      put = lift . put
 
-operations :: [String]
-operations = [and_op, or_op]
-
-
 initialT' = [ ("intro_and", intro_and),
               ("elim_and", elim_and),
               ("intro_or1", intro_or1),
@@ -43,19 +39,21 @@ main = do args <- getArgs
 
 
 initProverState :: ProverState
-initProverState = PSt {global=PGlobal {teorems=initialT, fTContext=[], opers=operations}, proof=Nothing}
+initProverState = PSt {global=PGlobal {teorems=initialT, fTContext=[], opers=[]}, proof=Nothing}
 
 
 prover :: ProverInputState ()
-prover = do minput <- getInputLine "> "
+prover = do s <- lift get
+            minput <- getInputLine "> "
             case minput of
               Nothing -> return ()
               Just "-quit" -> do outputStrLn "Saliendo."
                                  return ()
               Just "-r" -> resetProof
               Just "" -> prover
-              Just x -> catch (do command <- returnInput $ getCommand x
-                                  checkCommand command) (\e -> errorMessage (e :: ProofExceptions) >> prover)
+              Just x -> catch (do command <- returnInput $ getCommand x (opers $ global s)
+                                  checkCommand command)
+                        (\e -> errorMessage (opers $ global s) (e :: ProofExceptions) >> prover)
 
 newProof :: ProverGlobal -> String -> Type -> TType -> ProofState
 newProof pglobal name ty tty =
@@ -74,14 +72,14 @@ newProof pglobal name ty tty =
             }
 
 renderFinalTerm :: ProofConstruction -> String
-renderFinalTerm p = render $ printTerm $ getTermFromProof p
+renderFinalTerm p = render $ printTerm (opers $ cglobal p) $ getTermFromProof p
 
 --PRUEBA
-renderFinalTermWithoutName :: [String] -> ProofConstruction -> String
-renderFinalTermWithoutName op p = render $ printTermTType op $ getTermFromProof p
+renderFinalTermWithoutName :: ProofConstruction -> String
+renderFinalTermWithoutName p = render $ printTermTType (opers $ cglobal p) $ getTermFromProof p
 
 renderProof :: ProofConstruction -> String
-renderProof p = render $ printProof (tsubp p) (fTContext $ cglobal p) (head $ bTContexts p) (head $ termContexts p) (ty p)
+renderProof p = render $ printProof (tsubp p) (opers $ cglobal p) (fTContext $ cglobal p, head $ bTContexts p) (head $ termContexts p) (ty p)
 
 propRepeated2 :: [String] -> [String] -> Maybe String
 propRepeated2 _ [] = Nothing
@@ -124,7 +122,7 @@ checkCommand (Props ps) = do s <- lift get
 checkCommand (Ta (Print x)) = do s <- lift get
                                  let ter = teorems $ global s
                                  when (Map.notMember x ter) (throwIO $ PNotExist x)
-                                 outputStrLn $ render $ printTerm $ fst $ ter Map.! x
+                                 outputStrLn $ render $ printTerm (opers $ global s) $ fst $ ter Map.! x
                                  prover
 
 checkCommand (Ta (Infer x)) = do s <- lift get
@@ -132,7 +130,7 @@ checkCommand (Ta (Infer x)) = do s <- lift get
                                  te <- returnInput $ withoutName (opers $ global s) 0 (fTContext $ global s, S.empty) x
                                  outputStrLn $ show te ++ "\n"
                                  (ty,ty') <- returnInput $ inferType 0 S.empty (teorems $ global s) te
-                                 outputStrLn $ render $ printType ty
+                                 outputStrLn $ render $ printType (opers $ global s) ty
                                  outputStrLn $ render $ printTType (opers $ global s) ty'
                                  prover
                                  
@@ -144,7 +142,7 @@ checkCommand (Ta ta) = do  s <- lift get
                            if (isFinalTerm p)
                              then ((outputStrLn $ "Prueba completa.\n"
                                      ++ renderFinalTerm p ++ "\n"
-                                     ++ renderFinalTermWithoutName (opers $ global s) p ++ "\n"
+                                     ++ renderFinalTermWithoutName p ++ "\n"
                                      ++ show (getTermFromProof p) ++ "\n") -- Borrar SHOWs
                                    >> reloadProver)
                              else (outputStrLn (renderProof p) >> (outputStrLn $ show $ length $ term p))
@@ -179,39 +177,39 @@ returnInput (Left exception) = throwIO exception
 returnInput (Right x) = return x
 
 
-errorMessage :: ProofExceptions -> ProverInputState ()
-errorMessage SyntaxE = outputStrLn "error de sintaxis."
-errorMessage PNotFinished = outputStrLn "error: prueba no terminada."
-errorMessage PNotStarted = outputStrLn "error: prueba no comenzada."
-errorMessage (PExist s) = outputStrLn $ "error: " ++ s ++ " ya existe."
-errorMessage (PNotExist s) = outputStrLn $ "error: " ++ s ++ " no existe."
-errorMessage AssuE = outputStrLn "error: comando assumption mal aplicado."
-errorMessage IntroE1 = outputStrLn "error: comando intro mal aplicado."
-errorMessage (ApplyE1 t1 t2) =
+errorMessage :: [UserOperation] -> ProofExceptions -> ProverInputState ()
+errorMessage _ SyntaxE = outputStrLn "error de sintaxis."
+errorMessage _ PNotFinished = outputStrLn "error: prueba no terminada."
+errorMessage _ PNotStarted = outputStrLn "error: prueba no comenzada."
+errorMessage _ (PExist s) = outputStrLn $ "error: " ++ s ++ " ya existe."
+errorMessage _ (PNotExist s) = outputStrLn $ "error: " ++ s ++ " no existe."
+errorMessage _ AssuE = outputStrLn "error: comando assumption mal aplicado."
+errorMessage _ IntroE1 = outputStrLn "error: comando intro mal aplicado."
+errorMessage op (ApplyE1 t1 t2) =
   outputStrLn $ "error: comando apply mal aplicado, \"" ++
-  (render $ printType t1) ++  "\" no coincide con \"" ++
-  (render $ printType t2) ++ "\"."
-errorMessage ApplyE2 = outputStrLn "error: comando apply, hipótesis no existe."
-errorMessage Unif1 = outputStrLn "error: unificación inválida 1."
-errorMessage Unif2 = outputStrLn "error: unificación inválida 2."
-errorMessage Unif3 = outputStrLn "error: unificación inválida 3."
-errorMessage Unif4 = outputStrLn "error: unificación inválida 4."
-errorMessage ElimE1 = outputStrLn "error: comando elim mal aplicado."
-errorMessage CommandInvalid = outputStrLn "error: comando inválido."
-errorMessage EmptyType = outputStrLn "error: comando inválido (debe añadir una fórmula mediante \"exact\")."
-errorMessage (PropRepeated1 s) = outputStrLn $ "error: proposición \""++ s ++"\" repetida."
-errorMessage (PropRepeated2 s) = outputStrLn $ "error: proposición \""++ s ++"\" ya existe."
-errorMessage (PropNotExists s) = outputStrLn $ "error: proposición \""++ s ++"\" no existe en el entorno."
-errorMessage (OpE s) = outputStrLn $ "error: la operación \""++ s ++"\" no existe."
-errorMessage (ExactE1 ty) = outputStrLn $ "error: el término ingresado no tiene el tipo \"" ++ render (printType ty) ++ "\". "
-errorMessage (ExactE2 ty) = outputStrLn $ "error: debe ingresar una prueba de \"" ++ render (printType ty) ++ "\". "
-errorMessage PSE = outputStrLn "error: operación sobre el estado interno inválida"
-errorMessage (TermE x) = outputStrLn $ "error: el tipo \"" ++ x ++ "\" no fue declarado."
-errorMessage (InferE1 x) = outputStrLn $ "error: la variable de término \"" ++ x ++ "\" no fue declarada."
-errorMessage (InferE2 ty) = outputStrLn $ errorInferPrintTerm ty ++ "El tipo no unifica con la función."
-errorMessage (InferE3 ty) = outputStrLn $ errorInferPrintTerm ty ++ "El tipo no es una función."
-errorMessage (InferE4 ty) = outputStrLn $ errorInferPrintTerm ty ++ "El tipo no es un para todo."
+  (render $ printType op t1) ++  "\" no coincide con \"" ++
+  (render $ printType op t2) ++ "\"."
+errorMessage _ ApplyE2 = outputStrLn "error: comando apply, hipótesis no existe."
+errorMessage _ Unif1 = outputStrLn "error: unificación inválida 1."
+errorMessage _ Unif2 = outputStrLn "error: unificación inválida 2."
+errorMessage _ Unif3 = outputStrLn "error: unificación inválida 3."
+errorMessage _ Unif4 = outputStrLn "error: unificación inválida 4."
+errorMessage _ ElimE1 = outputStrLn "error: comando elim mal aplicado."
+errorMessage _ CommandInvalid = outputStrLn "error: comando inválido."
+errorMessage _ EmptyType = outputStrLn "error: comando inválido (debe añadir una fórmula mediante \"exact\")."
+errorMessage _ (PropRepeated1 s) = outputStrLn $ "error: proposición \""++ s ++"\" repetida."
+errorMessage _ (PropRepeated2 s) = outputStrLn $ "error: proposición \""++ s ++"\" ya existe."
+errorMessage _ (PropNotExists s) = outputStrLn $ "error: proposición \""++ s ++"\" no existe en el entorno."
+errorMessage _ (OpE s) = outputStrLn $ "error: la operación \""++ s ++"\" no existe."
+errorMessage op (ExactE1 ty) = outputStrLn $ "error: el término ingresado no tiene el tipo \"" ++ render (printType op ty) ++ "\". "
+errorMessage op (ExactE2 ty) = outputStrLn $ "error: debe ingresar una prueba de \"" ++ render (printType op ty) ++ "\". "
+errorMessage _ PSE = outputStrLn "error: operación sobre el estado interno inválida"
+errorMessage _ (TermE x) = outputStrLn $ "error: el tipo \"" ++ x ++ "\" no fue declarado."
+errorMessage _ (InferE1 x) = outputStrLn $ "error: la variable de término \"" ++ x ++ "\" no fue declarada."
+errorMessage op (InferE2 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El tipo no unifica con la función."
+errorMessage op (InferE3 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El tipo no es una función."
+errorMessage op (InferE4 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El tipo no es un para todo."
 
-errorInferPrintTerm :: Type -> String
-errorInferPrintTerm ty =
-  "error: no se esperaba el tipo \"" ++ render (printType ty) ++ "\". "
+errorInferPrintTerm :: [UserOperation] -> Type -> String
+errorInferPrintTerm op ty =
+  "error: no se esperaba el tipo \"" ++ render (printType op ty) ++ "\". "

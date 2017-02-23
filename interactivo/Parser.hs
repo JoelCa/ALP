@@ -6,17 +6,15 @@ import Control.Applicative
 
 type ProofCommand = Either ProofExceptions Command
 
-type Parser a = ParserState [(String, Bool)] a
+type Parser a = ParserState [UserOperation] a
 
 lambda = [head "\\"]
 reservedWords = ["forall", "exists"]
-initState = [(and_op, True), (or_op, False)]
 
-getCommand :: String -> ProofCommand
-getCommand s = case parse exprTy s initState of
-  [(x,[],s)] -> return x
-  _ -> throw SyntaxE
-
+getCommand :: String -> [UserOperation] -> ProofCommand
+getCommand s op = case parse exprTy s op of
+                    [(x,[],y)] -> return x
+                    _ -> throw SyntaxE
 
 exprTy :: Parser Command
 exprTy = do symbol "Theorem"
@@ -46,23 +44,34 @@ exprTy' = do t <- termTy
                  symbol ","
                  e <- exprTy'
                  return (ForAll t e)
-          -- <|> do symbol "exists"
-          --        t <- validIdent reservedWords
-          --        symbol ","
-          --        e <- exprTy'
-          --        return (Exists t e)
 
 
 termTy :: Parser Type
 termTy = do t <- termTy'
-            (do symbol and_op
-                t' <- termTy
-                return $ RenameTy and_op [t, t']
-             <|> do symbol or_op
-                    t' <- termTy
-                    return $ RenameTy or_op [t, t']
+            (binDefaultsOp defaults_op t
              <|> return t)
-            
+
+-- do symbol and_text
+--                 t' <- termTy
+--                 return $ RenameTy and_text [t, t']
+--              <|> do symbol or_text
+--                     t' <- termTy
+--                     return $ RenameTy or_op [t, t']
+
+binDefaultsOp :: [(String,Bool)] -> Type -> Parser Type
+binDefaultsOp = binDefaultsOp' 0
+
+binDefaultsOp' :: Int -> [(String,Bool)] -> Type -> Parser Type
+binDefaultsOp' _ [] t = empty
+binDefaultsOp' n ((s,True):xs) t =
+  do symbol s
+     t' <- termTy
+     return $ RenameTy s [t, t']
+  <|> binDefaultsOp' (n+1) xs t
+binDefaultsOp' n ((s,False):xs) t =
+  binDefaultsOp' (n+1) xs t
+
+  
 termTy' :: Parser Type
 termTy' = do char '('
              e <- exprTy'

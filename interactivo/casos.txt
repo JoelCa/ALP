@@ -20,7 +20,7 @@ Para chequear que se imprima bien el lambda término.
 - Theorem t8 : (forall qw, qw /\ qw) -> forall nm, nm /\ nm.
 Para chequear que se imprima bien el lambda término.
 - Theorem t9 : p -> q -> (p /\ (p /\ q)) /\ q.
-Para chequear que funcione bien el algoritmo que maneja la construcción de las subpruebaso
+Para chequear que funcione bien el algoritmo que maneja la construcción de las subpruebas.
 - Props p q r t y.
   Theorem t10: p -> q -> r -> t -> (p -> q -> r -> t -> y) -> y.
 Para chequear el pretty printer de las subpruebas, con el nuevo algoritmo.

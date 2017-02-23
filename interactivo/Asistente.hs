@@ -39,7 +39,7 @@ habitar (Elim h) = do x <- getType
 habitar CLeft = do x <- getType
                    case x of
                      Just (RenameTy s [t1,t2] , RenameTTy _ [t1',t2']) ->
-                       if s == or_op
+                       if s == or_text
                           then do replaceType (t1,t1')
                                   modifyTerm $ addHT (\x -> ((Free $ Global "intro_or1")
                                                              :!: (t1,t1') :!: (t2,t2'))
@@ -49,7 +49,7 @@ habitar CLeft = do x <- getType
 habitar CRight = do x <- getType
                     case x of
                       Just (RenameTy s [t1,t2] , RenameTTy _ [t1',t2']) ->
-                        if s == or_op
+                        if s == or_text
                         then do replaceType (t2,t2')
                                 modifyTerm $ addHT (\x -> ((Free $ Global "intro_or2")
                                                            :!: (t1,t1') :!: (t2,t2'))
@@ -59,14 +59,14 @@ habitar CRight = do x <- getType
 habitar Split = do x <- getType
                    case x of
                      Just (RenameTy s [t1,t2], RenameTTy _ [t1',t2']) ->
-                       if s == and_op
+                       if s == and_text
                        then do modifySubProofs 2 (\tys -> Just (t1,t1') : Just (t2,t2') : tys)
                                modifyTerm $ addDHT (\x y -> ((Free $ Global "intro_and")
                                                              :!: (t1,t1') :!: (t2,t2'))
                                                             :@: x :@: y)
                        else throw CommandInvalid
                      _ -> throw CommandInvalid
-habitar (Exact (Right te)) = do op <- getOpers
+habitar (Exact (Right te)) = do op <- getUsrOpers
                                 n <- getTTermVars
                                 btc <- getBTypeContext
                                 ftc <- getFTypeContext
@@ -82,7 +82,7 @@ habitar (Exact (Right te)) = do op <- getOpers
                                 modifyTerm $ simplify te'
 habitar (Exact (Left ty)) = do x <- getType
                                when (isJust x) $ throw $ ExactE2 $ fst $ fromJust x
-                               op <- getOpers
+                               op <- getUsrOpers
                                btc <- getBTypeContext
                                ftc <- getFTypeContext
                                ty' <- eitherToProof $ typeWhitoutName op (ftc,btc) ty
@@ -172,15 +172,15 @@ introsComm = catch (do habitar Intro
 -- Asumimos que las tuplas del 2º arg. , tienen la forma correcta.
 elimComm :: Int -> (Type, TType) -> (Type, TType) -> Proof ()
 elimComm i (t,t') (RenameTy s [t1,t2], RenameTTy _ [t1',t2'])
-  | s == and_op = do replaceType (Fun t1 (Fun t2 t), TFun t1' (TFun t2' t'))
-                     modifyTerm $ addHT (\x -> ((Free $ Global "elim_and")
-                                                 :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
-                                               :@: (Bound i) :@: x)
-  | s == or_op = do modifySubProofs 2 (\tys -> Just (Fun t1 t, TFun t1' t') :
-                                               Just (Fun t2 t, TFun t2' t') : tys)
-                    modifyTerm $ addDHT (\x y -> ((Free $ Global "elim_or")
+  | s == and_text = do replaceType (Fun t1 (Fun t2 t), TFun t1' (TFun t2' t'))
+                       modifyTerm $ addHT (\x -> ((Free $ Global "elim_and")
                                                    :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
-                                                 :@: (Bound i) :@: x :@: y)
+                                                 :@: (Bound i) :@: x)
+  | s == or_text = do modifySubProofs 2 (\tys -> Just (Fun t1 t, TFun t1' t') :
+                                          Just (Fun t2 t, TFun t2' t') : tys)
+                      modifyTerm $ addDHT (\x y -> ((Free $ Global "elim_or")
+                                                     :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
+                                                   :@: (Bound i) :@: x :@: y)
   | otherwise = throw ElimE1
 elimComm _ _ _ = throw ElimE1
 
@@ -443,8 +443,8 @@ intro_and =
     Lam (Fun (B "a") $ Fun (B "b") (B "c"), TFun (TBound 2) $ TFun (TBound 1) (TBound 0)) $
     (Bound 0 :@: Bound 2) :@: Bound 1
   , (
-      ForAll "a" $ ForAll "b" $ Fun (B "a") $ Fun (B "b") $ RenameTy and_op [B "a", B "b"]
-    , TForAll $ TForAll $ TFun (TBound 1) $ TFun (TBound 0) $ RenameTTy 0 [TBound 1, TBound 0]
+      ForAll "a" $ ForAll "b" $ Fun (B "a") $ Fun (B "b") $ RenameTy and_text [B "a", B "b"]
+    , TForAll $ TForAll $ TFun (TBound 1) $ TFun (TBound 0) $ RenameTTy and_code [TBound 1, TBound 0]
     )
   )
 
@@ -452,13 +452,13 @@ intro_and =
 elim_and :: (Term, (Type,TType))
 elim_and =
   (
-    BLam "a" $ BLam "b" $ BLam "c" $ Lam (RenameTy and_op [B "a", B "b"], RenameTTy 0 [TBound 2, TBound 1]) $
+    BLam "a" $ BLam "b" $ BLam "c" $ Lam (RenameTy and_text [B "a", B "b"], RenameTTy and_code [TBound 2, TBound 1]) $
     Lam (Fun (B "a") (Fun (B "b") (B "c")), TFun (TBound 2) (TFun (TBound 1) (TBound 0))) $
     (Bound 1) :!: (B "c", TBound 0) :@: (Bound 0)
   , (
-      ForAll "a" $ ForAll "b" $ ForAll "c" $ Fun (RenameTy and_op [B "a", B "b"]) $
+      ForAll "a" $ ForAll "b" $ ForAll "c" $ Fun (RenameTy and_text [B "a", B "b"]) $
       Fun (Fun (B "a") $ Fun (B "b") (B "c")) $ B "c"
-    , TForAll $ TForAll $ TForAll $ TFun (RenameTTy 0 [TBound 2, TBound 1]) $
+    , TForAll $ TForAll $ TForAll $ TFun (RenameTTy and_code [TBound 2, TBound 1]) $
       TFun (TFun (TBound 2) (TFun (TBound 1) (TBound 0))) $ TBound 0
     )
   )
@@ -481,8 +481,8 @@ intro_or1 =
     Lam (Fun (B "b") (B "c"), TFun (TBound 1) (TBound 0)) $ Bound 1 :@: Bound 2
   ,
     (
-      ForAll "a" $ ForAll "b" $ Fun (B "a") $ RenameTy or_op [B "a", B "b"]
-    , TForAll $ TForAll $ TFun (TBound 1) $ RenameTTy 1 [TBound 1, TBound 0]
+      ForAll "a" $ ForAll "b" $ Fun (B "a") $ RenameTy or_text [B "a", B "b"]
+    , TForAll $ TForAll $ TFun (TBound 1) $ RenameTTy or_code [TBound 1, TBound 0]
     )
    )
 
@@ -493,22 +493,22 @@ intro_or2 =
     Lam (Fun (B "a") (B "c"), TFun (TBound 2) (TBound 0)) $
     Lam (Fun (B "b") (B "c"), TFun (TBound 1) (TBound 0)) $ Bound 0 :@: Bound 2
   , (
-      ForAll "a" $ ForAll "b" $ Fun (B "b") $ RenameTy or_op [B "a", B "b"]
-    , TForAll $ TForAll $ TFun (TBound 0) $ RenameTTy 1 [TBound 1, TBound 0]
+      ForAll "a" $ ForAll "b" $ Fun (B "b") $ RenameTy or_text [B "a", B "b"]
+    , TForAll $ TForAll $ TFun (TBound 0) $ RenameTTy or_code [TBound 1, TBound 0]
     )
   )
 
 elim_or :: (Term, (Type,TType))
 elim_or =
   (
-    BLam "a" $ BLam "b" $ BLam "c" $ Lam (RenameTy or_op [B "a",B "b"], RenameTTy 1 [TBound 2, TBound 1]) $
+    BLam "a" $ BLam "b" $ BLam "c" $ Lam (RenameTy or_text [B "a",B "b"], RenameTTy or_code [TBound 2, TBound 1]) $
     Lam (Fun (B "a") (B "c"), TFun (TBound 2) (TBound 0)) $
     Lam (Fun (B "b") (B "c"), TFun (TBound 1) (TBound 0)) $
     ((Bound 2 :!: (B "c", TBound 0)) :@: Bound 1) :@: Bound 0
   , (
-      ForAll "a" $ ForAll "b" $ ForAll "c" $ Fun (RenameTy or_op [B "a", B "b"]) $
+      ForAll "a" $ ForAll "b" $ ForAll "c" $ Fun (RenameTy or_text [B "a", B "b"]) $
       Fun (Fun (B "a") (B "c")) $ Fun (Fun (B "b") (B "c")) $ B "c"
-    , TForAll $ TForAll $ TForAll $ TFun (RenameTTy 1 [TBound 2, TBound 1]) $
+    , TForAll $ TForAll $ TForAll $ TFun (RenameTTy or_code [TBound 2, TBound 1]) $
       TFun (TFun (TBound 2) (TBound 0)) $ TFun (TFun (TBound 1) (TBound 0)) $ TBound 0
     )
   )
@@ -666,12 +666,12 @@ getRename v fv rv
 -- Retorna el tipo de su segundo arg. con las siguientes características:
 -- Un tipo equivalente si hay conflicto con las variables ligadas.
 -- En notación de brujin.
--- El 1º arg. son el conj. de proposiciones válidas, y el 2º las operaciones "custom"
-rename :: [String] -> [String] -> Type -> Either ProofExceptions (Type, TType)
+-- El 1º arg. son el conj. de proposiciones válidas, y el 2º las operaciones "custom".
+rename :: [String] -> [UserOperation] -> Type -> Either ProofExceptions (Type, TType)
 rename = rename' [] []
 
-rename' :: [String] -> [String] -> [String] -> [String] -> Type -> Either ProofExceptions (Type, TType)
-rename' rv bv fv op (B v) =
+rename' :: [String] -> [String] -> [String] -> [UserOperation] -> Type -> Either ProofExceptions (Type, TType)
+rename' rv bv fv _ (B v) =
   case v `elemIndex` bv of
     Just i -> return (B $ rv!!i, TBound i)
     Nothing -> if elem v fv
@@ -684,14 +684,15 @@ rename' rv bv fv op (Fun t t') = do (x,y) <- rename' rv bv fv op t
                                     (x',y') <- rename' rv bv fv op t'
                                     return (Fun x x', TFun y y')
 rename' rv bv fv op (RenameTy s ts) =
-  case elemIndex s op of
-    Just n -> do rs <- sequence $ map (rename' rv bv fv op) ts
-                 let (xs,ys) = unzip rs
-                 return (RenameTy s xs, RenameTTy n ys)
-    Nothing -> throw $ OpE s
--- rename' rv bv fv op (Exists v t) = do let v' = getRename v fv rv
---                                    (x,y) <- rename' (v':rv) (v:bv) fv op t
---                                    return (Exists v' x, TExists y)
+    case findIndex (\(x,_) -> x == s) defaults_op of
+      Just n -> do rs <- sequence $ map (rename' rv bv fv op) ts
+                   let (xs,ys) = unzip rs
+                   return (RenameTy s xs, RenameTTy (n-num_defaults_op) ys)
+      Nothing ->  case findIndex (\(x,_,_) -> x == s) op of
+                    Just m -> do rs <- sequence $ map (rename' rv bv fv op) ts
+                                 let (xs,ys) = unzip rs
+                                 return (RenameTy s xs, RenameTTy m ys)
+                    Nothing -> throw $ OpE s
   
 --------------------------------------------------------------------
 
@@ -700,10 +701,10 @@ rename' rv bv fv op (RenameTy s ts) =
 -- dado por 3º arg., y que las variables de términos también lo sean, de
 -- acuerdo la longitud del contexto de variables de términos "iniciales", dado por el 2º arg.
 -- El 1º argumento, es la tabla de operaciones "custom".
-withoutName :: [String] -> Int -> (FTypeContext, BTypeContext) -> LamTerm -> Either ProofExceptions Term
+withoutName :: [UserOperation] -> Int -> (FTypeContext, BTypeContext) -> LamTerm -> Either ProofExceptions Term
 withoutName = withoutName' []
 
-withoutName' :: [String] -> [String] -> Int -> (FTypeContext, BTypeContext) -> LamTerm -> Either ProofExceptions Term
+withoutName' :: [String] -> [UserOperation] -> Int -> (FTypeContext, BTypeContext) -> LamTerm -> Either ProofExceptions Term
 withoutName' teb _ n _ (LVar x)
   | n == 0 = case elemIndex x teb of
                Just m -> return $ Bound m
@@ -727,7 +728,7 @@ withoutName' teb op n tyc (BApp e t) = do e' <- withoutName' teb op n tyc e
                                           return $ e' :!: (t,t')
 
 
-typeWhitoutName :: [String] -> (FTypeContext, BTypeContext) -> Type -> Either ProofExceptions TType
+typeWhitoutName :: [UserOperation] -> (FTypeContext, BTypeContext) -> Type -> Either ProofExceptions TType
 typeWhitoutName _ (ftyc,btyc) (B x) = case S.findIndexL (\y-> snd y == x) btyc of
                                         Just n -> return $ TBound n
                                         Nothing -> if elem x ftyc
@@ -739,12 +740,13 @@ typeWhitoutName op tyc (Fun t1 t2) = do r1 <- typeWhitoutName op tyc t1
                                         r2 <- typeWhitoutName op tyc t2
                                         return $ TFun r1 r2
 typeWhitoutName op tyc (RenameTy s ts) =
-  case elemIndex s op of
+  case findIndex (\(x,_) -> x == s) defaults_op of
     Just n -> do rs <- sequence $ map (typeWhitoutName op tyc) ts
-                 return $ RenameTTy n rs
-    Nothing -> throw $ OpE s
--- typeWhitoutName _ tyc xs (Exists x t) = do r <- typeWhitoutName tyc (x:xs) t
---                                            return $ TExists r
+                 return $ RenameTTy (n - num_defaults_op) rs
+    Nothing -> case findIndex (\(x,_,_) -> x == s) op of
+                 Just m -> do rs <- sequence $ map (typeWhitoutName op tyc) ts
+                              return $ RenameTTy m rs
+                 Nothing -> throw $ OpE s
 
 
 -- Infiere el tipo sin nombre de un lambda término, de acuerdo a la

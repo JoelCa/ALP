@@ -27,9 +27,9 @@ getLevelSubp f = do ps <- get
                       then return $ Nothing
                       else return $ f (head x)
 
-getOpers :: Proof [String]
-getOpers = do ps <- get
-              return $ opers $ cglobal $ ps
+getUsrOpers :: Proof [UserOperation]
+getUsrOpers = do ps <- get
+                 return $ opers $ cglobal $ ps
 
 getTeorems :: Proof Teorems
 getTeorems = do ps <- get

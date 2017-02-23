@@ -37,9 +37,6 @@ data TType = TBound Int
            | RenameTTy Int [TType]
            deriving (Show, Eq)
 
-and_op = "/" ++ [head "\\"]
-or_op = [head "\\"] ++ "/"
-
   -- Términos con nombres
 data LamTerm  =  LVar String
               |  Abs String Type LamTerm
@@ -100,7 +97,7 @@ data Command = Ty String Type
              deriving (Show)
 
   -- Tácticas
--- Arreglar el Exact para que tome lambda términos
+  -- Arreglar el Exact para que tome lambda términos
 data Tactic = Assumption | Apply String | Intro | Intros | Split
             | Elim String | CLeft | CRight | Print String 
             | CExists Type | Cut Type | Exact (Either Type LamTerm) | Infer LamTerm
@@ -122,6 +119,35 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String
                               
 instance Exception ProofExceptions
 
+  -- Operaciones no básicas, donde:
+  -- 1. Texto de la operación.
+  -- 2. Es True si es un operador binario.
+and_ = ("/" ++ [head "\\"], True)
+or_ = ([head "\\"] ++ "/", True)
+
+and_text = fst and_
+
+and_code :: Int
+and_code = -2
+
+or_text = fst or_
+
+or_code :: Int
+or_code = -1
+
+  -- Conjunto de operaciones no básicas.
+defaults_op :: [(String,Bool)]
+defaults_op = [and_, or_]
+
+num_defaults_op :: Int
+num_defaults_op = 2
+
+  -- Operación (a lo sumo binaria), definida por el usuario, donde:
+  -- 1. El texto que la identifica.
+  -- 2. Es True si es un operador infijo.
+  -- 3. Es True si es un operador binario.
+type UserOperation = (String, Bool, Bool)
+
   -- Estado de la prueba
 data ProverState = PSt { proof :: Maybe ProofState
                        , global :: ProverGlobal
@@ -129,7 +155,7 @@ data ProverState = PSt { proof :: Maybe ProofState
                    
 data ProverGlobal = PGlobal { fTContext :: FTypeContext
                             , teorems :: Teorems                -- Teoremas.
-                            , opers :: [String]                 -- Operaciones "custom".
+                            , opers :: [UserOperation]              -- Operaciones "custom".
                             }
 
 data ProofState = PState { name :: String

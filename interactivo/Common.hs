@@ -37,7 +37,7 @@ data TType = TBound Int
            | RenameTTy Int [TType]
            deriving (Show, Eq)
 
-  -- Términos con nombres
+  -- Términos con nombresd
 data LamTerm  =  LVar String
               |  Abs String Type LamTerm
               |  App LamTerm LamTerm
@@ -54,12 +54,9 @@ data Term  = Bound Int
            | Term :!: (Type,TType)
            deriving (Show, Eq)
 
-
--- data TypeBody = Unary ((Type, TType) -> (Type, TType))
---               | Double ((Type, TType) -> (Type, TType) -> (Type, TType))
-
   -- Valores
--- data Value = VLam Type Term
+data Value = VLam (Type,TType) Term
+           | VBVam Var Term
 
   -- Para cada variable de término, tenemos (por posición en la 4-tupla):
   -- 1. Su posición en el contexto, a la hora de imprimirlo.
@@ -93,7 +90,7 @@ type FTypeContext = [FTypeVar]
 data Command = Ty String Type
              | Ta Tactic
              | Props [String]
-             | TypeDef (String, Bool, Type)
+             | TypeDef (String, BodyOperation, Bool)
              deriving (Show)
 
   -- Tácticas
@@ -114,39 +111,60 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String
                      | OpE String | ExactE1 Type | ExactE2 Type
                      | PSE | EmptyType | TermE String
                      | InferE1 String | InferE2 Type | InferE3 Type
-                     | InferE4 Type
+                     | InferE4 Type | DefE1 String
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
 
-  -- Operaciones no básicas, donde:
+data BodyOperation = BEmpty Type
+                   | BUnary Var Type
+                   | BBinary Var Var Type
+                   deriving (Show)
+
+data Operands a = Empty a
+                | Unary (a -> a)
+                | Binary (a -> a -> a)
+
+type NoBodyOperands = Operands ()
+
+  -- Operaciones por default, donde:
   -- 1. Texto de la operación.
-  -- 2. Es True si es un operador binario.
-and_ = ("/" ++ [head "\\"], True)
-or_ = ([head "\\"] ++ "/", True)
+  -- 2. Código que identifica a la operación.
+  -- 3. Cantidad de operandos (a lo sumo 2).
+  -- 4. Es True si es un operador foldeable.
+and_ = ("/" ++ [head "\\"], -1, Binary (\x y -> x), False)
+or_ = ([head "\\"] ++ "/", -2, Binary (\x y -> x), False)
+bottom_ = ("False", -3, Empty (), False)
+not_ = ("~", -4, Unary id, True)
 
-and_text = fst and_
+and_text = fst4 and_
+or_text = fst4 or_
+bottom_text = fst4 bottom_
+not_text = fst4 not_
 
-and_code :: Int
-and_code = -2
-
-or_text = fst or_
-
-or_code :: Int
-or_code = -1
+and_code = snd4 and_
+or_code = snd4 or_
+bottom_code = snd4 bottom_
+not_code = snd4 not_
 
   -- Conjunto de operaciones no básicas.
-defaults_op :: [(String,Bool)]
-defaults_op = [and_, or_]
+defaults_op :: [(String, Int, NoBodyOperands, Bool)]
+defaults_op = [and_, or_, bottom_, not_]
 
 num_defaults_op :: Int
-num_defaults_op = 2
+num_defaults_op = 4
 
-  -- Operación (a lo sumo binaria), definida por el usuario, donde:
+  -- Operación, definida por el usuario, donde:
   -- 1. El texto que la identifica.
-  -- 2. Es True si es un operador infijo.
-  -- 3. Es True si es un operador binario.
-type UserOperation = (String, Bool, Bool)
+  -- 2. Cuerpo de la operación (a lo sumo 2 operandos).
+  -- 3. Es True si es un operador infijo.
+  -- Todas las operaciones que define el usuario son foldeables.
+type UOperation = (String, (TypeOperands, TTypeOperands), Bool)
+type UserOperations = [UOperation]
+
+type TypeOperands = Operands Type
+type TTypeOperands = Operands TType
+
 
   -- Estado de la prueba
 data ProverState = PSt { proof :: Maybe ProofState
@@ -155,7 +173,7 @@ data ProverState = PSt { proof :: Maybe ProofState
                    
 data ProverGlobal = PGlobal { fTContext :: FTypeContext
                             , teorems :: Teorems                -- Teoremas.
-                            , opers :: [UserOperation]              -- Operaciones "custom".
+                            , opers :: UserOperations           -- Operaciones "custom".
                             }
 
 data ProofState = PState { name :: String
@@ -220,3 +238,9 @@ instance MonadException (Either e) e where
   catch m f = case m of
                 Left x -> f x
                 Right x -> Right x
+
+fst4 :: (a, b, c, d) -> a
+fst4 (x, _, _, _) = x
+
+snd4 :: (a, b, c, d) -> b
+snd4 (_, x, _, _) = x

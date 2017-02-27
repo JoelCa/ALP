@@ -6,12 +6,12 @@ import Control.Applicative
 
 type ProofCommand = Either ProofExceptions Command
 
-type Parser a = ParserState [UserOperation] a
+type Parser a = ParserState UserOperations a
 
 lambda = [head "\\"]
-reservedWords = ["forall", "exists"]
+reservedWords = ["forall", "exists", "False"]
 
-getCommand :: String -> [UserOperation] -> ProofCommand
+getCommand :: String -> UserOperations -> ProofCommand
 getCommand s op = case parse exprTy s op of
                     [(x,[],y)] -> return x
                     _ -> throw SyntaxE
@@ -48,28 +48,13 @@ exprTy' = do t <- termTy
 
 termTy :: Parser Type
 termTy = do t <- termTy'
-            (binDefaultsOp defaults_op t
+            (do symbol and_text
+                t' <- termTy
+                return $ RenameTy and_text [t, t']
+             <|> do symbol or_text
+                    t' <- termTy
+                    return $ RenameTy or_text [t, t']
              <|> return t)
-
--- do symbol and_text
---                 t' <- termTy
---                 return $ RenameTy and_text [t, t']
---              <|> do symbol or_text
---                     t' <- termTy
---                     return $ RenameTy or_op [t, t']
-
-binDefaultsOp :: [(String,Bool)] -> Type -> Parser Type
-binDefaultsOp = binDefaultsOp' 0
-
-binDefaultsOp' :: Int -> [(String,Bool)] -> Type -> Parser Type
-binDefaultsOp' _ [] t = empty
-binDefaultsOp' n ((s,True):xs) t =
-  do symbol s
-     t' <- termTy
-     return $ RenameTy s [t, t']
-  <|> binDefaultsOp' (n+1) xs t
-binDefaultsOp' n ((s,False):xs) t =
-  binDefaultsOp' (n+1) xs t
 
   
 termTy' :: Parser Type
@@ -77,8 +62,27 @@ termTy' = do char '('
              e <- exprTy'
              char ')'
              return e
+          <|> do char '~'
+                 t <- termTy'
+                 return $ RenameTy not_text [t]
           <|> do v <- validIdent reservedWords
-                 return (B v)
+                 return $ B v
+          <|> do symbol "False"
+                 return $ RenameTy bottom_text []
+
+-- binDefaultsOp :: [(String,Bool)] -> Type -> Parser Type
+-- binDefaultsOp = binDefaultsOp' 0
+
+-- binDefaultsOp' :: Int -> [(String,Bool)] -> Type -> Parser Type
+-- binDefaultsOp' _ [] t = empty
+-- binDefaultsOp' n ((s,True):xs) t =
+--   do symbol s
+--      t' <- termTy
+--      return $ RenameTy s [t, t']
+--   <|> binDefaultsOp' (n+1) xs t
+-- binDefaultsOp' n ((s,False):xs) t =
+--   binDefaultsOp' (n+1) xs t
+
 
 -- Parser del lambda término con nombre.
 expLam :: Parser LamTerm
@@ -117,18 +121,34 @@ expLam' = do v <- validIdent reservedWords
                  return e
 
 -- Parser de definición de tipos.
-typeDef :: Parser (String, Bool, Type)
-typeDef = do symbol "Notation"
-             op <- itemWithoutSpace
-             a <- validIdent reservedWords
-             b <- validIdent reservedWords
-             symbol ":="
-             t <- exprTy'
-             (do symbol "("
-                 symbol "infix"
-                 symbol ")"
-                 return (op, True, t)
-              <|> return (op, False, t))
+typeDef :: Parser (String, BodyOperation, Bool)
+typeDef = do symbol "Definition"
+             op <- validIdent reservedWords
+             (do a <- validIdent reservedWords
+                 (do b <- validIdent reservedWords
+                     symbol ":="
+                     t <- exprTy'
+                     inf <- isInfix
+                     symbol "."
+                     return (op, BBinary a b t, inf))
+                  <|> do symbol ":="
+                         t <- exprTy'
+                         inf <- isInfix
+                         symbol "."
+                         return (op, BUnary a t, inf))
+              <|> do symbol ":="
+                     t <- exprTy'
+                     inf <- isInfix
+                     symbol "."
+                     return (op, BEmpty t, inf)
+
+
+isInfix :: Parser Bool
+isInfix = do symbol "("
+             symbol "infix"
+             symbol ")"
+             return True
+          <|> return False
 
 
 -- Parser de las tácticas.

@@ -160,12 +160,12 @@ Ignoring spacing
 > symbol xs                     =  token (string xs)
 
 > validIdent ::  [String] -> ParserState s String
-> validIdent xs = do y <- ident
+> validIdent xs = do y <- identifier
 >                    when (foldl (\w x ->  (y == x) || w) False xs) failure    
 >                    return y
 
 > itemWithoutSpace :: ParserState s String
-> itemWithoutSpace = many $ sat (/= ' ')
+> itemWithoutSpace = token $ many $ sat (/= ' ')
 >
 
 -- usar: string-insert-rectangle, para insertar ">"

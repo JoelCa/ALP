@@ -27,7 +27,7 @@ getLevelSubp f = do ps <- get
                       then return $ Nothing
                       else return $ f (head x)
 
-getUsrOpers :: Proof [UserOperation]
+getUsrOpers :: Proof UserOperations
 getUsrOpers = do ps <- get
                  return $ opers $ cglobal $ ps
 

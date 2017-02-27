@@ -52,9 +52,13 @@ en término de los tipos del sistema F.
 un mejor algoritmo de reescritura de variables de tipos ligadas sobre el tipo que da el usuario.
 
 - Casos de pruebas para el inferidor de tipos:
+Válidos:
 infer \d.\a.\x: a -> d.\b.\y:b.x.
 infer \a.\b.\x:a->b.\c.\y:a->c.\d.\z:a->b.y.
 infer \a.\b.\w:a->b.(\c.\x:a->c.\d.\y:forall o, d->c. y [d]) [a].
+
+Inválidos:
+infer (\a.\x:a.\a.\b.\y:a->b. (y) x).
 
 - El inferidos de tipo permite superposición de variables ligadas.
 Por ej: infer \a.\x:a.\a.\b.\y:a->b. (y) x.

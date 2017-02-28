@@ -85,32 +85,32 @@ termTy' = do char '('
 
 infixBinaryOp :: UserOperations -> Type -> Parser Type
 infixBinaryOp [] t = empty
-infixBinaryOp ((s,_,True):xs) t =
+infixBinaryOp ((s,_,Binary,True):xs) t =
   do symbol s
      t' <- termTy
      return $ RenameTy s [t, t']
   <|> infixBinaryOp xs t
-infixBinaryOp ((_,_,False):xs) t =
+infixBinaryOp ((_,_,_,False):xs) t =
   infixBinaryOp xs t
 
 prefixOps :: UserOperations -> Parser Type
 prefixOps [] = empty
-prefixOps ((s,(Empty _,_),False):xs) =
+prefixOps ((s,_,Empty,False):xs) =
   do symbol s
      return $ RenameTy s []
   <|> prefixOps xs
-prefixOps ((s,(Unary _, _),False):xs) =
+prefixOps ((s,_,Unary,False):xs) =
   do symbol s
      t <- termTy
      return $ RenameTy s [t]
   <|> prefixOps xs
-prefixOps ((s,(Binary _, _),False): xs) =
+prefixOps ((s,_,Binary,False): xs) =
   do symbol s
      t <- termTy
      t' <- termTy
      return $ RenameTy s [t, t']
   <|> prefixOps xs
-prefixOps ((_,_,True):xs) =
+prefixOps ((_,_,Binary,True):xs) =
   prefixOps xs
 
 -- Parser del lambda término con nombre.
@@ -150,7 +150,7 @@ expLam' = do v <- validIdent1
                  return e
 
 -- Parser de definición de tipos.
-typeDef :: Parser (String, BodyOperation, Bool)
+typeDef :: Parser (String, Type, Operands, Bool)
 typeDef = do symbol "Definition"
              op <- validIdent2
              (do a <- validIdent1
@@ -159,17 +159,17 @@ typeDef = do symbol "Definition"
                      t <- exprTy'
                      inf <- isInfix
                      symbol "."
-                     return (op, BBinary a b t, inf))
+                     return (op, ForAll a $ ForAll b t, Binary, inf))
                   <|> do symbol ":="
                          t <- exprTy'
                          inf <- isInfix
                          symbol "."
-                         return (op, BUnary a t, False))
+                         return (op, ForAll a t, Unary, False))
               <|> do symbol ":="
                      t <- exprTy'
                      inf <- isInfix                     
                      symbol "."
-                     return (op, BEmpty t, False)
+                     return (op, t, Empty, False)
 
 
 isInfix :: Parser Bool

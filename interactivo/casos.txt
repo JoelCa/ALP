@@ -44,9 +44,12 @@ Para probar el comando exact en la prueba de tt17', de la siguiente manera:
 exact (H1 (tt17 [p] [q] H0)).
 - Theorem t18: (forall x, forall y, forall z, x -> z) -> (forall x, forall z, x -> z). 
 Para chequear si podemos instanciar el tipo "vacio", mediante "exact".
-- Definition sii x y := (x -> y) /\ (y -> x) (infix).
-  Theorem t19 : forall x, forall y, x /\ y -> x sii y.
+- Definition <-> x y := (x -> y) /\ (y -> x) (infix).
+  Theorem t19 : forall x, forall y, x /\ y -> x <-> y.
 Para chequear la definición de operandos.
 - Definition <-> x y := (x -> y) /\ (y -> x) (infix).
   Theorem t20: forall g, forall w, (g <-> w) -> (g -> w).
 Para chequear la definición de operandos.
+
+Definition -- x y := forall w, (w /\ x) /\ y -> w (infix).
+Theorem tt: forall w, forall p, w -> p -> (forall p, p /\ w \/ w) -- (forall w, forall p, w /\ p).

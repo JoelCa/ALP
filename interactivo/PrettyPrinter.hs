@@ -145,7 +145,7 @@ printTType' op i bs fs (RenameTTy n [t1,t2])
             printBinOpInfix (getTextFromDefaultOp n)
             (printTType' op 2 bs fs t1)
             (printTType' op 0 bs fs t2)
-  | otherwise = let (s,_,inf) = op !! n
+  | otherwise = let (s,_,_,inf) = op !! n
                 in if inf
                    then parenIf (i > 1) $
                         printBinOpInfix s
@@ -159,13 +159,13 @@ printTType' op i bs fs (RenameTTy n [t])
   | n < 0 = parenIf (i > 1) $
             printUnaryOpPrefix (getTextFromDefaultOp n)
             (printTType' op 2 bs fs t)
-  | otherwise = let (s,_,_) = op !! n
+  | otherwise = let (s,_,_,_) = op !! n
                 in parenIf (i > 1) $
                    printUnaryOpPrefix s
                    (printTType' op 2 bs fs t)
 printTType' op i bs fs (RenameTTy n [])
   | n < 0 = text $ getTextFromDefaultOp n
-  | otherwise = let (s,_,_) = op !! n
+  | otherwise = let (s,_,_,_) = op !! n
                 in text s
 printTType' _ _ _ _ (RenameTTy _ _) = error "error: printTType', no debería pasar."
 
@@ -190,8 +190,8 @@ printType' False op (ForAll v t) = text "forall" <+>
                                    text "," <+>
                                    printType' False op t
 printType' False op (RenameTy s [t1, t2]) =
-  case find (\(x,_,_) -> x == s) op of
-    Just (_,_,False) -> printBinOpPrefix s
+  case find (\(x,_,_,_) -> x == s) op of
+    Just (_,_,_,False) -> printBinOpPrefix s
                         (printType' True op t1)
                         (printType' False op t2)
     _ -> printBinOpInfix s

@@ -119,14 +119,15 @@ checkCommand (Props ps) = do s <- lift get
                              prover
 
 -- TERMINAR
-checkCommand (TypeDef (op, body, isInfix)) = do s <- lift get
-                                                let glo = global s
-                                                when (isJust $ find (\(x,_,_)-> x == op) $ opers glo) (throwIO $ DefE op)
-                                                (t,t') <- returnInput $ getRenamedOperation (fTContext glo) (opers glo) body
-                                                lift $ put $ s {global = glo {opers = (op, (t,t'), isInfix) : opers glo}}
-                                                s' <- lift get        -- BORRAR
-                                                outputStrLn $ show $ opers $ global s'
-                                                prover
+checkCommand (TypeDef (op, body, operands, isInfix)) =
+  do s <- lift get
+     let glo = global s
+     when (isJust $ find (\(x,_,_,_)-> x == op) $ opers glo) (throwIO $ DefE op)
+     (t,t') <- returnInput $ rename (fTContext glo) (opers glo) body
+     lift $ put $ s {global = glo {opers = (op, (t,t'), operands, isInfix) : opers glo}}
+     s' <- lift get        -- BORRAR
+     outputStrLn $ show $ opers $ global s'
+     prover
 
 checkCommand (Ta (Print x)) = do s <- lift get
                                  let ter = teorems $ global s
@@ -211,7 +212,8 @@ errorMessage _ EmptyType = outputStrLn "error: comando inválido (debe añadir u
 errorMessage _ (PropRepeated1 s) = outputStrLn $ "error: proposición \""++ s ++"\" repetida."
 errorMessage _ (PropRepeated2 s) = outputStrLn $ "error: proposición \""++ s ++"\" ya existe."
 errorMessage _ (PropNotExists s) = outputStrLn $ "error: proposición \""++ s ++"\" no existe en el entorno."
-errorMessage _ (OpE s) = outputStrLn $ "error: la operación \""++ s ++"\" no existe."
+errorMessage _ (OpE1 s) = outputStrLn $ "error: cantidad de operandos en la operación \""++ s ++"\"."
+errorMessage _ (OpE2 s) = outputStrLn $ "error: la operación \""++ s ++"\" no existe."
 errorMessage op (ExactE1 ty) = outputStrLn $ "error: el término ingresado no tiene el tipo \"" ++ render (printType op ty) ++ "\". "
 errorMessage op (ExactE2 ty) = outputStrLn $ "error: debe ingresar una prueba de \"" ++ render (printType op ty) ++ "\". "
 errorMessage _ PSE = outputStrLn "error: operación sobre el estado interno inválida"
@@ -229,13 +231,3 @@ errorMessage op UnfoldE3 = outputStrLn $ "error: comando unfold, la hipótesis n
 errorInferPrintTerm :: UserOperations -> Type -> String
 errorInferPrintTerm op ty =
   "error: no se esperaba el tipo \"" ++ render (printType op ty) ++ "\". "
-------------------------------------------------------------
--- Prueba:
-applyOP :: a -> a -> Operands a -> a
-applyOP _ _ (Empty t) = t
-applyOP x _ (Unary f) = f x
-applyOP x y (Binary f) = f x y
-
-isEmpty :: Operands a -> Bool
-isEmpty (Empty _) = True
-isEmpty _ = False

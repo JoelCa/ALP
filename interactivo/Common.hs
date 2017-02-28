@@ -90,7 +90,7 @@ type FTypeContext = [FTypeVar]
 data Command = Ty String Type
              | Ta Tactic
              | Props [String]
-             | TypeDef (String, BodyOperation, Bool)
+             | TypeDef (String, Type, Operands, Bool)
              deriving (Show)
 
   -- Tácticas
@@ -108,8 +108,8 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String
                      | Unif1 | Unif2 | Unif3 | Unif4
                      | ElimE1 | CommandInvalid | PropRepeated1 String
                      | PropRepeated2 String | PropNotExists String
-                     | OpE String | ExactE1 Type | ExactE2 Type
-                     | PSE | EmptyType | TermE String
+                     | OpE1 String | OpE2 String | ExactE1 Type
+                     | ExactE2 Type | PSE | EmptyType | TermE String
                      | InferE1 String | InferE2 Type | InferE3 Type
                      | InferE4 Type | DefE String | UnfoldE1
                      | UnfoldE2 Type | UnfoldE3
@@ -117,31 +117,20 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String
                               
 instance Exception ProofExceptions
 
-data BodyOperation = BEmpty Type
-                   | BUnary Var Type
-                   | BBinary Var Var Type
-                   deriving (Show)
-
-data Operands a = Empty a
-                | Unary (a -> a)
-                | Binary (a -> a -> a)
-
-instance Show (Operands a) where
-  show (Empty _) = "Empty"
-  show (Unary _) = "Unary"
-  show (Binary _) = "Binary"
-  
-type NoBodyOperands = Operands ()
+data Operands = Empty
+              | Unary
+              | Binary
+              deriving (Show)
 
   -- Operaciones por default, donde:
   -- 1. Texto de la operación.
   -- 2. Código que identifica a la operación.
   -- 3. Cantidad de operandos (a lo sumo 2).
   -- 4. Es True si es un operador foldeable.
-and_ = ("/" ++ [head "\\"], -1, Binary (\x y -> x), False)
-or_ = ([head "\\"] ++ "/", -2, Binary (\x y -> x), False)
-bottom_ = ("False", -3, Empty (), False)
-not_ = ("~", -4, Unary id, True)
+and_ = ("/" ++ [head "\\"], -1, Binary, False)
+or_ = ([head "\\"] ++ "/", -2, Binary, False)
+bottom_ = ("False", -3, Empty, False)
+not_ = ("~", -4, Unary, True)
 
 and_text = fst4 and_
 or_text = fst4 or_
@@ -154,7 +143,7 @@ bottom_code = snd4 bottom_
 not_code = snd4 not_
 
   -- Conjunto de operaciones no básicas.
-defaults_op :: [(String, Int, NoBodyOperands, Bool)]
+defaults_op :: [(String, Int, Operands, Bool)]
 defaults_op = [and_, or_, bottom_, not_]
 
 num_defaults_op :: Int
@@ -165,11 +154,8 @@ num_defaults_op = 4
   -- 2. Cuerpo de la operación (a lo sumo 2 operandos).
   -- 3. Es True si es un operador infijo.
   -- Todas las operaciones que define el usuario son foldeables.
-type UOperation = (String, (TypeOperands, TTypeOperands), Bool)
+type UOperation = (String, (Type, TType), Operands, Bool)
 type UserOperations = [UOperation]
-
-type TypeOperands = Operands Type
-type TTypeOperands = Operands TType
 
 
   -- Estado de la prueba

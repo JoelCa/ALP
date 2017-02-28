@@ -8,6 +8,7 @@ import qualified Data.Map as M (Map, lookup, insert, empty, size)
 import qualified Data.Sequence as S
 import Data.Maybe (fromJust, isJust)
 import ProofState
+import Data.Foldable (foldl)
 
 habitar :: Tactic -> Proof ()
 habitar Assumption = do x <- getType
@@ -35,7 +36,7 @@ habitar (Elim h) = do x <- getType
                       i <- maybeToProof ApplyE2 $ getHypothesisValue n h
                       c <- getTermContext
                       q <- getTBTypeVars
-                      elimComm i (t,t') (getTypeVar q $ S.index c (n-i-1))
+                      elimComm (n-i-1) (t,t') (getTypeVar q $ S.index c (n-i-1))
 habitar CLeft = do x <- getType
                    case x of
                      Just (RenameTy _ [t1,t2] , RenameTTy n [t1',t2']) ->
@@ -95,8 +96,10 @@ habitar (Unfold s Nothing) = do x <- getType
                                   Just (RenameTy _ ts , RenameTTy n ts') ->
                                     if n >= 0
                                     then do op <- getUsrOpers
-                                            let (_, (f,g),_) = op !! n
-                                            replaceType (unfoldOP f ts, unfoldOP g ts')
+                                            let (_, (t,t'), _, _) = op !! n
+                                            btc <- getBTypeContext
+                                            ftc <- getFTypeContext
+                                            replaceType $ applyTypes ftc btc (t,t') $ zip ts ts'
                                     else throw UnfoldE1
                                   _ -> throw UnfoldE1
 habitar (Unfold s (Just h)) = do n <- getTTermVars
@@ -107,16 +110,13 @@ habitar (Unfold s (Just h)) = do n <- getTTermVars
                                    (RenameTy _ ts , RenameTTy m ts') ->
                                      if m >= 0
                                      then do op <- getUsrOpers
-                                             let (_, (f,g),_) = op !! m
-                                             updateTermContext (n-i-1) (x, y, unfoldOP f ts, unfoldOP g ts')
+                                             let (_, (t,t'),_,_) = op !! m
+                                             btc <- getBTypeContext
+                                             ftc <- getFTypeContext
+                                             let (r,r') = applyTypes ftc btc (t,t') $ zip ts ts'
+                                             updateTermContext (n-i-1) (x,y,r,r')
                                      else throw $ UnfoldE2 tt
                                    _ -> throw $ UnfoldE2 tt
-
-unfoldOP :: Operands a -> [a] -> a
-unfoldOP (Empty t) [] = t
-unfoldOP (Unary t) [x] = t x
-unfoldOP (Binary t) [x,y] = t x y
-unfoldOP _ _ = error "error: unfoldOP, no debería pasar."
 
 -- habitar (CExists x) = do y <- getType
 --                          case y of
@@ -360,6 +360,63 @@ addTypeTerm (HTe h) x = HTe $ \y -> h y :!: x
 addTypeTerm (HTy h) x = HTy $ \y -> addTypeTerm (h y) x
 
 ----------------------------------------------------------------------------------------------------------------------
+-- Comando UNFOLD
+
+-- Realiza la sustitución de tipos: (((t [T1]) [T2])..) [Tn].
+-- Para ello, hace dos cosas:
+-- 1. Renombra todas las variables de tipo ligadas "escapadas" (sin nombres),
+-- nos referimos a aquellas variables cuyo cuantificador no figura en el tipo
+-- (sin nombre) del 3º arg.
+-- 2. Renombra las variables de tipo ligadas (con nombres), de modo tal que no halla
+-- dos var. de tipo ligadas con el mismo nombre, una más anidada que la otra.
+-- Argumentos:
+-- 1. Conjunto de variables de tipo de libres.
+-- 2. Conjunto de variables de tipo ligadas (con nombres), con las que empieza la sust.
+-- 3. Cuerpo del tipo (con nombres y sin nombres), sobre el que se realiza la sust.
+-- 4. Tipos T1,..,Tn.
+applyTypes :: FTypeContext -> BTypeContext -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
+applyTypes _ _ t [] = t
+applyTypes fs bs t xs = let l = length xs
+                        in applyTypes' l 0 (fs ++ (foldl (\xs (_,x) -> x : xs )[] bs)) [] [] (getBodyForAll l t) xs
+
+-- Realiza la sust. de tipos.
+-- 1. Cantidad de tipos a reemplazar.
+-- 2. Profundidad ("para todos"), procesados.
+-- 3. Conjunto de variables de tipo libres.
+-- 4. Conjunto de variables de tipo ligadas (con nombres), con las que empieza la sust.
+-- 5. Conjunto de los renombres de las variables de tipo ligadas (con nombres).
+-- 6. Tipo sobre el que se hace la sust. Sin los "para todos" que se van a sustituir.
+-- 7. Tipos que se sustituyen.
+
+-- TERMINAR (hay que renombrar Type creo que con fs ++ rs)
+applyTypes' :: Int -> Int -> FTypeContext -> [String] -> [String]
+           -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
+applyTypes' l n fs bs rs (B v, TBound m) ts
+  | (n <= m) && (m < l) = let (x,y) = ts !! (l - m - 1)
+                          in (x, renameTType n y )
+  | otherwise = case findIndex (\x -> x == v) bs of
+                  Just i -> (B $ rs !! i, TBound m)
+                  Nothing -> error "error: applyTypes', no debería pasar."
+applyTypes' _ _ _ _ _ x@(_, TFree f) _ = x
+applyTypes' l n fs bs rs (ForAll v t1, TForAll t1') ts =
+  let v' = getRename v fs rs
+      (tt, tt') = applyTypes' (l+1) (n+1) fs (v:bs) (v':rs) (t1,t1') ts
+  in (ForAll v' tt, TForAll tt')
+applyTypes' l n fs bs rs (Fun t1 t2, TFun t1' t2') ts =
+  let (tt1, tt1') = applyTypes' l n fs bs rs (t1,t1') ts
+      (tt2, tt2') = applyTypes' l n fs bs rs (t2,t2') ts
+  in (Fun tt1 tt2, TFun tt1' tt2')
+applyTypes' l n fs bs rs (RenameTy s xs, RenameTTy op xs') ts =
+  let (r, r') = unzip $ map (\x -> applyTypes' l n fs bs rs x ts) $ zip xs xs'
+  in (RenameTy s r, RenameTTy op r')
+
+-- Función auxiliar.
+getBodyForAll :: Int -> (Type, TType) -> (Type, TType)
+getBodyForAll 0 t = t
+getBodyForAll n (ForAll _ t, TForAll t') = getBodyForAll (n-1) (t, t')
+getBodyForAll _ _ = error "error: getBodyForAll, no debería pasar."
+
+----------------------------------------------------------------------------------------------------------------------
 -- -- Comando EXISTS
 
 -- -- Funciones auxiliares
@@ -587,18 +644,7 @@ isValidValue :: Int -> Int -> Bool
 isValidValue n value = (value >= 0) && (value < n)
 
 --------------------------------------------------------------------
-
--- typeWithoutName :: Type -> TType
--- typeWithoutName = typeWithoutName' []
-
--- typeWithoutName' :: [String] -> Type -> TType
--- typeWithoutName' xs (B t) = maybe (TFree t) TBound (t `elemIndex` xs)
--- typeWithoutName' xs (Fun t t') = TFun (typeWithoutName' xs t) (typeWithoutName' xs t')
--- typeWithoutName' xs (ForAll v t) = TForAll $ typeWithoutName' (v:xs) t
--- -- typeWithoutName' xs (Exists v t) = TExists $ typeWithoutName' (v:xs) t
--- typeWithoutName' xs (And t t') = TAnd (typeWithoutName' xs t) (typeWithoutName' xs t')
--- typeWithoutName' xs (Or t t') = TOr (typeWithoutName' xs t) (typeWithoutName' xs t')
-
+-- Unificación para el comando APPLY.
 
 unification :: Bool -> Int -> TType -> (Type,TType) ->
   Either ProofExceptions (M.Map Int (Type,TType))
@@ -665,8 +711,6 @@ substitution' m n (RenameTy s ts, RenameTTy op ts') =
 substitution' m n (ForAll v t, TForAll t') =
   do (x,x') <- substitution' (m+1) (n+1) (t,t')
      return (ForAll v x, TForAll x')
--- substitution' m n (Exists v t, TExists t') = do (x,x') <- substitution' (m+1) (n+1) (t,t')
---                                                 return (Exists v x, TExists x')
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Renombramiento
@@ -711,14 +755,33 @@ rename' rv bv fv op (Fun t t') = do (x,y) <- rename' rv bv fv op t
                                     return (Fun x x', TFun y y')
 rename' rv bv fv op (RenameTy s ts) =
     case find (\(x,_,_,_) -> x == s) defaults_op of
-      Just (_,n,_,_) -> do rs <- sequence $ map (rename' rv bv fv op) ts
-                           let (xs,ys) = unzip rs
-                           return (RenameTy s xs, RenameTTy n ys)
-      Nothing ->  case findIndex (\(x,_,_) -> x == s) op of
-                    Just m -> do rs <- sequence $ map (rename' rv bv fv op) ts
+      Just (_,n,to,_) -> if checkOperands to ts
+                         then do rs <- sequence $ map (rename' rv bv fv op) ts
                                  let (xs,ys) = unzip rs
-                                 return (RenameTy s xs, RenameTTy m ys)
-                    Nothing -> throw $ OpE s
+                                 return (RenameTy s xs, RenameTTy n ys)
+                         else throw $ OpE1 s
+      Nothing ->  case getCodeFromOP s op of
+                    Just (m, to) -> if checkOperands to ts
+                                    then do rs <- sequence $ map (rename' rv bv fv op) ts
+                                            let (xs,ys) = unzip rs
+                                            return (RenameTy s xs, RenameTTy m ys)
+                                    else throw $ OpE1 s
+                    Nothing -> throw $ OpE2 s
+                    
+getCodeFromOP :: String -> UserOperations -> Maybe (Int, Operands)
+getCodeFromOP = getCodeFromOP' 0
+
+getCodeFromOP' :: Int -> String -> UserOperations -> Maybe (Int, Operands)
+getCodeFromOP' _ _ [] = Nothing
+getCodeFromOP' n x ((y,_,o,_):ys)
+  | x == y = return (n,o)
+  | otherwise = getCodeFromOP' (n+1) x ys
+
+checkOperands :: Operands -> [a] -> Bool
+checkOperands Empty [] = True
+checkOperands Unary [_] = True
+checkOperands Binary [_,_] = True
+checkOperands _ _ = False
   
 --------------------------------------------------------------------
 
@@ -767,13 +830,16 @@ typeWhitoutName op tyc (Fun t1 t2) = do r1 <- typeWhitoutName op tyc t1
                                         return $ TFun r1 r2
 typeWhitoutName op tyc (RenameTy s ts) =
   case find (\(x,_,_,_) -> x == s) defaults_op of
-    Just (_,n,_,_) -> do rs <- sequence $ map (typeWhitoutName op tyc) ts
-                         return $ RenameTTy n rs
-    Nothing -> case findIndex (\(x,_,_) -> x == s) op of
-                 Just m -> do rs <- sequence $ map (typeWhitoutName op tyc) ts
-                              return $ RenameTTy m rs
-                 Nothing -> throw $ OpE s
-
+    Just (_,n,to,_) -> if checkOperands to ts
+                       then do rs <- sequence $ map (typeWhitoutName op tyc) ts
+                               return $ RenameTTy n rs
+                       else throw $ OpE1 s
+    Nothing -> case getCodeFromOP s op of
+                 Just (m,to) -> if checkOperands to ts
+                                then do rs <- sequence $ map (typeWhitoutName op tyc) ts
+                                        return $ RenameTTy m rs
+                                else throw $ OpE1 s
+                 Nothing -> throw $ OpE2 s
 
 -- Infiere el tipo sin nombre de un lambda término, de acuerdo a la
 -- lista de teoremas dada por el 3º arg.
@@ -808,7 +874,7 @@ inferType n c te (x :!: (t,t')) = do (tt,tt') <- inferType n c te x
                                        _ -> throw $ InferE4 tt
 
 -- Renombra todas las variables de tipo ligadas "escapadas", nos referimos a aquellas
--- variables cuyo cuantificador no figura en el lambda término (el 2º arg.)
+-- variables cuyo cuantificador en el tipo del 2º arg.
 renameTType :: Int -> TType -> TType
 renameTType 0 = id
 renameTType n = renameTType' 0 n
@@ -854,119 +920,6 @@ getTypeVar n (_,m, t, t') = (t, renameTType (n-m) t')
 --------------------------------------------------------------------
 -- Definition de nuevos operadores.
 
-getRenamedOperation :: FTypeContext -> UserOperations -> BodyOperation
-                    -> Either ProofExceptions (TypeOperands, TTypeOperands)
-getRenamedOperation fv op (BEmpty t) = do (tt,tt') <- rename fv op t
-                                          return (Empty tt, Empty tt')
-getRenamedOperation fv op (BUnary v t) = do tt <- getRenameOp False [] [] fv op [v] t
-                                            return $ getRenamedOpUnary tt
-getRenamedOperation fv op (BBinary v1 v2 t) = do tt <- getRenameOp True [] [] fv op [v1,v2] t
-                                                 return $ getRenamedOpBinary tt
-                                                 
--- Función auxiliar.
-getRenamedOpUnary :: (TypeOperands, TTypeOperands, Maybe PositionOp) -> (TypeOperands, TTypeOperands)
-getRenamedOpUnary (Empty t, Empty t', Nothing) =
-  (Unary $ \w -> t, Unary $ \w -> t')
-getRenamedOpUnary (Unary t, Unary t', Nothing) =
-  (Unary t, Unary t')
-getRenamedOpUnary _ = error "error: getRenamedOpBinary, no debería pasar."
-
--- Función auxiliar.
-getRenamedOpBinary :: (TypeOperands, TTypeOperands, Maybe PositionOp) -> (TypeOperands, TTypeOperands)
-getRenamedOpBinary (Unary t, Unary t', Just OpLeft) =
-  (Binary $ \w1 w2 -> t w1, Binary $ \w1 w2 -> t' w1)
-getRenamedOpBinary (Unary t, Unary t', Just OpRight) =
-  (Binary $ \w1 w2 -> t w2, Binary $ \w1 w2 -> t' w2)
-getRenamedOpBinary (Empty t, Empty t', Nothing) =
-  (Binary $ \w1 w2 -> t, Binary $ \w1 w2 -> t')
-getRenamedOpBinary (Binary t, Binary t', Nothing) =
-  (Binary t, Binary t')
-getRenamedOpBinary _ = error "error: getRenamedOpBinary, no debería pasar."
-
--- Es útil para saber a cual de los operandos le corresponde el aujero
--- en su body, cuando la operación es binaria.
-data PositionOp = OpLeft | OpRight
-                deriving (Show, Eq)
-
-getRenameOp :: Bool -> [String] -> [String] -> FTypeContext -> UserOperations -> [Var] -> Type ->
-  Either ProofExceptions (TypeOperands, TTypeOperands, Maybe PositionOp)
-getRenameOp bin rv bv fv _ vs (B x) =
-    case x `elemIndex` bv of
-    Just i -> return (Empty $ B $ rv!!i, Empty $ TBound i, Nothing)
-    Nothing -> case x `elemIndex` vs of
-                    Just j -> return (Unary id, Unary id, getPosOp bin j)
-                    Nothing -> if elem x fv
-                               then return (Empty $ B x, Empty $ TFree x, Nothing)
-                               else throw $ PropNotExists x
-getRenameOp bin rv bv fv op vs (ForAll v t) =
-  do let v' = getRename v fv rv
-     (f,g,pos) <- getRenameOp bin (v':rv) (v:bv) fv op vs t
-     return (simplifyOp1 (\w-> ForAll v w) f, simplifyOp1 (\w -> TForAll w) g, pos)
-getRenameOp bin rv bv fv op vs (Fun t t') =
-  do (f1, g1, pos1) <- getRenameOp bin rv bv fv op vs t
-     (f2, g2, pos2) <- getRenameOp bin rv bv fv op vs t'
-     let (x,y) = simplifyOp2 (\w1 w2 -> Fun w1 w2) (f1,pos1) (f2,pos2)
-         (x',y') = simplifyOp2 (\w1 w2 -> TFun w1 w2) (g1,pos1) (g2,pos2)
-     if y == y'
-       then return (x, x', y)
-       else error "error: getRenameOp, no debería pasar."
-getRenameOp bin rv bv fv op vs (RenameTy s ts) =
-  case find (\(x,_,_,_) -> x == s) defaults_op of
-    Just (_,n,_,_) -> do rs <- sequence $ map (getRenameOp bin rv bv fv op vs) ts
-                         let (xs,ys,zs) = unzip3 rs
-                             (r1,r1') = simplifyOp3 (RenameTy s) (xs,zs)
-                             (r2,r2') = simplifyOp3 (RenameTTy n) (ys,zs)
-                         return (r1, r2, r1')
-    _ -> case findIndex (\(x,_,_) -> x == s) op of
-           Just m -> do rs <- sequence $ map (getRenameOp bin rv bv fv op vs) ts
-                        let (xs,ys,zs) = unzip3 rs
-                            (r1,r1') = simplifyOp3 (RenameTy s) (xs,zs)
-                            (r2,r2') = simplifyOp3 (RenameTTy m) (ys,zs)
-                        return (r1, r2, r1')
-           Nothing -> throw $ OpE s
-
--- Función auxiliar de "getRenameOp". Indica cual de los operandos se
--- utilizo en el "aujereo", si la operación es binaria.
-getPosOp :: Bool -> Int -> Maybe PositionOp
-getPosOp False _ = Nothing
-getPosOp True 0 = Just OpLeft
-getPosOp True 1 = Just OpRight
-getPosOp _ _ = error "error: getPosOp, no debería pasar."
-
--- Operaciones auxiliares para "getRenameOp". Simplifican los operandos.
-simplifyOp1 :: (a -> a) -> Operands a -> Operands a
-simplifyOp1 f (Empty t) = Empty $ f t
-simplifyOp1 f (Unary g) = Unary $ f . g
-simplifyOp1 f (Binary g) = Binary $ \ w1 w2 -> f (g w1 w2)
-
-simplifyOp2 :: (a -> a -> a) -> (Operands a, Maybe PositionOp)
-            -> (Operands a, Maybe PositionOp) -> (Operands a, Maybe PositionOp)
-simplifyOp2 f (Empty t1, Nothing) (Empty t2, Nothing) = (Empty $ f t1 t2, Nothing)
-simplifyOp2 f (Empty t1, Nothing) (Unary t2, p2) = (Unary $ (f t1) . t2, p2)
-simplifyOp2 f (Empty t1, Nothing) (Binary t2, Nothing) =
-  (Binary $ \w1 w2 -> (f t1) (t2 w1 w2), Nothing)
-simplifyOp2 f (Unary t1, p1) (Empty t2, Nothing) = (Unary $ \w -> f (t1 w) t2, p1)
-simplifyOp2 f (Binary t1, Nothing) (Empty t2, Nothing) =
-  (Binary $ \w1 w2 -> f (t1 w1 w2) t2, Nothing)
-simplifyOp2 f (Unary t1, po1) (Unary t2, po2)
-  | po1 == po2 = (Unary $ \w -> f (t1 w) (t2 w), po1)
-  | (po1 == Just OpLeft) && (po2 == Just OpRight) = (Binary $ \w1 w2 -> f (t1 w1) (t2 w2), Nothing)
-  | (po1 == Just OpRight) && (po2 == Just OpLeft) = (Binary $ \w1 w2 -> f (t1 w2) (t2 w1), Nothing)
-simplifyOp2 f (Unary t1, Just po1) (Binary t2, Nothing)
-  | po1 == OpLeft = (Binary $ \w1 w2 -> f (t1 w1) (t2 w1 w2), Nothing)
-  | po1 == OpRight = (Binary $ \w1 w2 -> f (t1 w2) (t2 w1 w2), Nothing)
-simplifyOp2 f (Binary t1, Nothing) (Unary t2, Just po2)
-  | po2 == OpLeft = (Binary $ \w1 w2 -> f (t1 w1 w2) (t2 w1), Nothing)
-  | po2 == OpRight = (Binary $ \w1 w2 -> f (t1 w1 w2) (t2 w2), Nothing)
-simplifyOp2 f (Binary t1, Nothing) (Binary t2, Nothing) =
-  (Binary $ \w1 w2 -> f (t1 w1 w2) (t2 w1 w2), Nothing)
-simplifyOp2  _ _ _ = error "error: simplifyOp2, no debería pasar."
-
-simplifyOp3 :: ([a] -> a) -> ([Operands a],[Maybe PositionOp]) -> (Operands a, Maybe PositionOp)
-simplifyOp3 c ([],[]) = (Empty $ c [], Nothing)
-simplifyOp3 c ([f],[p]) = (simplifyOp1 (\w -> c [w]) f, p)
-simplifyOp3 c ([f,g], [p1,p2]) = simplifyOp2 (\w1 w2 -> c [w1, w2]) (f,p1) (g,p2)
-simplifyOp3 _ _ = error "error: simplifyOp3, no debería pasar."
 
 --------------------------------------------------------------------
 

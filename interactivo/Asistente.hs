@@ -38,8 +38,8 @@ habitar (Elim h) = do x <- getType
                       elimComm i (t,t') (getTypeVar q $ S.index c (n-i-1))
 habitar CLeft = do x <- getType
                    case x of
-                     Just (RenameTy s [t1,t2] , RenameTTy _ [t1',t2']) ->
-                       if s == or_text
+                     Just (RenameTy _ [t1,t2] , RenameTTy n [t1',t2']) ->
+                       if n == or_code
                           then do replaceType (t1,t1')
                                   modifyTerm $ addHT (\x -> ((Free $ Global "intro_or1")
                                                              :!: (t1,t1') :!: (t2,t2'))
@@ -48,8 +48,8 @@ habitar CLeft = do x <- getType
                      _ -> throw CommandInvalid
 habitar CRight = do x <- getType
                     case x of
-                      Just (RenameTy s [t1,t2] , RenameTTy _ [t1',t2']) ->
-                        if s == or_text
+                      Just (RenameTy _ [t1,t2] , RenameTTy n [t1',t2']) ->
+                        if n == or_code
                         then do replaceType (t2,t2')
                                 modifyTerm $ addHT (\x -> ((Free $ Global "intro_or2")
                                                            :!: (t1,t1') :!: (t2,t2'))
@@ -58,8 +58,8 @@ habitar CRight = do x <- getType
                       _ -> throw CommandInvalid
 habitar Split = do x <- getType
                    case x of
-                     Just (RenameTy s [t1,t2], RenameTTy _ [t1',t2']) ->
-                       if s == and_text
+                     Just (RenameTy _ [t1,t2], RenameTTy n [t1',t2']) ->
+                       if n == and_code
                        then do modifySubProofs 2 (\tys -> Just (t1,t1') : Just (t2,t2') : tys)
                                modifyTerm $ addDHT (\x y -> ((Free $ Global "intro_and")
                                                              :!: (t1,t1') :!: (t2,t2'))
@@ -87,27 +87,36 @@ habitar (Exact (Left ty)) = do x <- getType
                                ftc <- getFTypeContext
                                ty' <- eitherToProof $ typeWhitoutName op (ftc,btc) ty
                                modifySubProofs 0 id
-                               modifyTerm $ simplifyTypeInTerm (ty,ty')                                
--- habitar (PState {name=name,
---                  subp=p,
---                  position=n:ns,
---                  typeContext=tc:tcs,
---                  context=c:cs,
---                  tyFromCut = cut,
---                  ty=Nothing:tys,
---                  term=ts}) (Exact x) =
---   return $ PState {name=name,
---                    subp=p-1,
---                    position=ns,
---                    typeContext=tcs,
---                    context=cs,
---                    tyFromCut = cut,
---                    ty=tys,
---                    term= simplifyTypeInTerm (x,x') ts}
---   where x' = typeWithoutName x
--- habitar (PState {ty=Just _ : tys}) (Exact x) = throw ExactE
+                               modifyTerm $ simplifyTypeInTerm (ty,ty')
+                               
+-- TERMINAR (hacer que el nuevo tipo sea renombrado de acuerdo al contexto)
+habitar (Unfold s Nothing) = do x <- getType
+                                case x of
+                                  Just (RenameTy _ ts , RenameTTy n ts') ->
+                                    if n >= 0
+                                    then do op <- getUsrOpers
+                                            let (_, (f,g),_) = op !! n
+                                            replaceType (unfoldOP f ts, unfoldOP g ts')
+                                    else throw UnfoldE1
+                                  _ -> throw UnfoldE1
+habitar (Unfold s (Just h)) = do n <- getTTermVars
+                                 i <- maybeToProof UnfoldE3 $ getHypothesisValue n h
+                                 c <- getTermContext
+                                 let (x,y,tt,tt') = S.index c (n-i-1)
+                                 case (tt,tt') of
+                                   (RenameTy _ ts , RenameTTy m ts') ->
+                                     if m >= 0
+                                     then do op <- getUsrOpers
+                                             let (_, (f,g),_) = op !! m
+                                             updateTermContext (n-i-1) (x, y, unfoldOP f ts, unfoldOP g ts')
+                                     else throw $ UnfoldE2 tt
+                                   _ -> throw $ UnfoldE2 tt
 
-
+unfoldOP :: Operands a -> [a] -> a
+unfoldOP (Empty t) [] = t
+unfoldOP (Unary t) [x] = t x
+unfoldOP (Binary t) [x,y] = t x y
+unfoldOP _ _ = error "error: unfoldOP, no debería pasar."
 
 -- habitar (CExists x) = do y <- getType
 --                          case y of
@@ -836,9 +845,6 @@ inferReplaceType' n (Fun t1 t2, TFun t1' t2') t =
 inferReplaceType' n (RenameTy s ts, RenameTTy op ts') t =
   let (xs, ys) = unzip $ map (\x -> inferReplaceType' n x t) $ zip ts ts'
   in (RenameTy s xs, RenameTTy op ys)
--- inferReplaceType' n (Exists v t1, TExists t1') t = let (tt, tt') = inferReplaceType' (n+1) (t1,t1') t
---                                                    in (Exists v tt, TExists tt')
-
 
 -- Obtiene el tipo de la variable de término, renombrando su tipo sin nombres, de acuerdo
 -- a la profundidad dada por el 1º argumento.
@@ -846,7 +852,7 @@ getTypeVar :: Int -> TermVar -> (Type, TType)
 getTypeVar n (_,m, t, t') = (t, renameTType (n-m) t')
 
 --------------------------------------------------------------------
--- Comando: Definition de nuevos operadores
+-- Definition de nuevos operadores.
 
 getRenamedOperation :: FTypeContext -> UserOperations -> BodyOperation
                     -> Either ProofExceptions (TypeOperands, TTypeOperands)
@@ -952,16 +958,14 @@ simplifyOp2 f (Unary t1, Just po1) (Binary t2, Nothing)
 simplifyOp2 f (Binary t1, Nothing) (Unary t2, Just po2)
   | po2 == OpLeft = (Binary $ \w1 w2 -> f (t1 w1 w2) (t2 w1), Nothing)
   | po2 == OpRight = (Binary $ \w1 w2 -> f (t1 w1 w2) (t2 w2), Nothing)
+simplifyOp2 f (Binary t1, Nothing) (Binary t2, Nothing) =
+  (Binary $ \w1 w2 -> f (t1 w1 w2) (t2 w1 w2), Nothing)
 simplifyOp2  _ _ _ = error "error: simplifyOp2, no debería pasar."
 
--- ARREGLAR:
--- Definition algo x := (x /\  (forall w, w)) -> x.
-
--- Función auxiliar de "getRenameOp".
 simplifyOp3 :: ([a] -> a) -> ([Operands a],[Maybe PositionOp]) -> (Operands a, Maybe PositionOp)
 simplifyOp3 c ([],[]) = (Empty $ c [], Nothing)
 simplifyOp3 c ([f],[p]) = (simplifyOp1 (\w -> c [w]) f, p)
-simplifyOp3 c ([f,g], [p1,p2]) = simplifyOp2 (\w1 w2 -> c [w1, w2]) (f,p1) (f,p2)
+simplifyOp3 c ([f,g], [p1,p2]) = simplifyOp2 (\w1 w2 -> c [w1, w2]) (f,p1) (g,p2)
 simplifyOp3 _ _ = error "error: simplifyOp3, no debería pasar."
 
 --------------------------------------------------------------------

@@ -12,7 +12,7 @@ import Control.Monad.IO.Class
 import Data.Maybe
 import qualified Data.Map as Map
 import qualified Data.Sequence as S
-import Data.List (findIndex, elemIndex)
+import Data.List (find, findIndex, elemIndex)
 
 type ProverInputState a = InputT (StateT ProverState IO) a
 
@@ -24,7 +24,9 @@ initialT' = [ ("intro_and", intro_and),
               ("elim_and", elim_and),
               ("intro_or1", intro_or1),
               ("intro_or2", intro_or2),
-              ("elim_or", elim_or)
+              ("elim_or", elim_or),
+              ("intro_bottom", intro_bottom),
+              ("elim_bottom", elim_bottom)
             ]
 
 initialT = Map.fromList initialT'
@@ -117,12 +119,21 @@ checkCommand (Props ps) = do s <- lift get
                              prover
 
 -- TERMINAR
--- checkCommand (TypeDef (op, flagInfix, t)) = 
+checkCommand (TypeDef (op, body, isInfix)) = do s <- lift get
+                                                let glo = global s
+                                                when (isJust $ find (\(x,_,_)-> x == op) $ opers glo) (throwIO $ DefE op)
+                                                (t,t') <- returnInput $ getRenamedOperation (fTContext glo) (opers glo) body
+                                                lift $ put $ s {global = glo {opers = (op, (t,t'), isInfix) : opers glo}}
+                                                s' <- lift get        -- BORRAR
+                                                outputStrLn $ show $ opers $ global s'
+                                                prover
 
 checkCommand (Ta (Print x)) = do s <- lift get
                                  let ter = teorems $ global s
                                  when (Map.notMember x ter) (throwIO $ PNotExist x)
-                                 outputStrLn $ render $ printTerm (opers $ global s) $ fst $ ter Map.! x
+                                 let t = ter Map.! x
+                                 outputStrLn $ render $ printTerm (opers $ global s) $ fst t
+                                 outputStrLn $ render $ printType (opers $ global s) $ fst $ snd t
                                  prover
 
 checkCommand (Ta (Infer x)) = do s <- lift get
@@ -177,7 +188,7 @@ returnInput (Left exception) = throwIO exception
 returnInput (Right x) = return x
 
 
-errorMessage :: [UserOperation] -> ProofExceptions -> ProverInputState ()
+errorMessage :: UserOperations -> ProofExceptions -> ProverInputState ()
 errorMessage _ SyntaxE = outputStrLn "error de sintaxis."
 errorMessage _ PNotFinished = outputStrLn "error: prueba no terminada."
 errorMessage _ PNotStarted = outputStrLn "error: prueba no comenzada."
@@ -209,7 +220,22 @@ errorMessage _ (InferE1 x) = outputStrLn $ "error: la variable de término \"" +
 errorMessage op (InferE2 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El tipo no unifica con la función."
 errorMessage op (InferE3 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El tipo no es una función."
 errorMessage op (InferE4 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El tipo no es un para todo."
+errorMessage op (DefE s) = outputStrLn $ "error: " ++ s ++ " es un operador que ya existe."
+errorMessage op UnfoldE1 = outputStrLn $ "error: no es posible aplicar unfold sobre el goal."
+errorMessage op (UnfoldE2 ty) = outputStrLn $ "error: no es posible aplicar unfold sobre \"" ++ render (printType op ty) ++ "\". "
+errorMessage op UnfoldE3 = outputStrLn $ "error: comando unfold, la hipótesis no existe."
 
-errorInferPrintTerm :: [UserOperation] -> Type -> String
+
+errorInferPrintTerm :: UserOperations -> Type -> String
 errorInferPrintTerm op ty =
   "error: no se esperaba el tipo \"" ++ render (printType op ty) ++ "\". "
+------------------------------------------------------------
+-- Prueba:
+applyOP :: a -> a -> Operands a -> a
+applyOP _ _ (Empty t) = t
+applyOP x _ (Unary f) = f x
+applyOP x y (Binary f) = f x y
+
+isEmpty :: Operands a -> Bool
+isEmpty (Empty _) = True
+isEmpty _ = False

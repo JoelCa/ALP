@@ -57,10 +57,17 @@ incrementTVars' :: (Int -> Int) -> ProofConstruction -> ProofConstruction
 incrementTVars' f ps@(PConstruction {tvars=n:ns}) = ps {tvars = (f n) : ns}
 
 addTermContext :: TermVar -> Proof ()
-addTermContext x = modify (addTermContext' x)
+addTermContext = modify . addTermContext'
 
 addTermContext' :: TermVar -> ProofConstruction -> ProofConstruction
-addTermContext' x ps@(PConstruction {termContexts=c:cs})= ps {termContexts = (x S.<| c ):cs}
+addTermContext' x ps@(PConstruction {termContexts=c:cs}) = ps {termContexts = (x S.<| c ):cs}
+
+updateTermContext :: Int -> TermVar -> Proof ()
+updateTermContext n x = modify $ updateTermContext' n x
+
+updateTermContext' :: Int -> TermVar -> ProofConstruction -> ProofConstruction
+updateTermContext' n x ps@(PConstruction {termContexts=c:cs}) =
+  ps {termContexts = (S.update n x c):cs} 
 
 addBTypeContext :: BTypeVar -> Proof ()
 addBTypeContext x = modify (addBTypeContext' x)

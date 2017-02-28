@@ -159,13 +159,18 @@ Ignoring spacing
 > symbol                        :: String -> ParserState s String
 > symbol xs                     =  token (string xs)
 
-> validIdent ::  [String] -> ParserState s String
-> validIdent xs = do y <- identifier
->                    when (foldl (\w x ->  (y == x) || w) False xs) failure    
->                    return y
-
-> itemWithoutSpace :: ParserState s String
-> itemWithoutSpace = token $ many $ sat (/= ' ')
+> validSToken :: ParserState s String -> [String] -> ParserState s String
+> validSToken p xs = do y <- p
+>                       when (foldl (\w x ->  (y == x) || w) False xs) failure    
+>                       return y
 >
+> vIdent1 :: [String] -> ParserState s String
+> vIdent1 = validSToken identifier
+>
+> vIdent2 :: [String] -> ParserState s String
+> vIdent2 = validSToken $ token $ many $ sat (\c -> (c /= ' ') && (c /= '.')) -- Al punto lo tomamos como fin de comando.
+>                                                                             -- Por ello, ningún identificador puede contenerlo.
+
+
 
 -- usar: string-insert-rectangle, para insertar ">"

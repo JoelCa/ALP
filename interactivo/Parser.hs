@@ -3,13 +3,22 @@ module Parser where
 import Parsing
 import Common
 import Control.Applicative
+import Control.Monad.State.Lazy (get)
 
 type ProofCommand = Either ProofExceptions Command
 
 type Parser a = ParserState UserOperations a
 
 lambda = [head "\\"]
-reservedWords = ["forall", "exists", "False"]
+reservedSymbols = ["Theorem","Definition","forall", "False",":",".",":="]
+
+-- Identificadores alfa-numéricos, exceptuando las simbolos reservados.
+validIdent1 :: Parser String
+validIdent1 = vIdent1 reservedSymbols
+
+-- Cualquier cadena de simbolos sin espacios, exceptuando las simbolos reservados.
+validIdent2 :: Parser String
+validIdent2 = vIdent2 reservedSymbols
 
 getCommand :: String -> UserOperations -> ProofCommand
 getCommand s op = case parse exprTy s op of
@@ -18,13 +27,13 @@ getCommand s op = case parse exprTy s op of
 
 exprTy :: Parser Command
 exprTy = do symbol "Theorem"
-            name <- validIdent reservedWords
+            name <- validIdent1
             symbol ":"
             t <- exprTy'
             symbol "." -- NO puedo usar '\n' como fin del comando, por que symbol lo come
             return $ Ty name t
          <|> do symbol "Props"
-                ps <- sepBy (validIdent reservedWords) space
+                ps <- sepBy (validIdent1) space
                 char '.'
                 return $ Props ps
          <|> do tac <- termTac
@@ -37,14 +46,15 @@ exprTy' :: Parser Type
 exprTy' = do t <- termTy
              (do symbol "->"
                  e <- exprTy'
-                 return (Fun t e)              
+                 return (Fun t e)
+              <|> do s <- get
+                     infixBinaryOp s t
               <|> return t)
           <|> do symbol "forall"
-                 t <- validIdent reservedWords
+                 t <- validIdent1
                  symbol ","
                  e <- exprTy'
                  return (ForAll t e)
-
 
 termTy :: Parser Type
 termTy = do t <- termTy'
@@ -55,7 +65,6 @@ termTy = do t <- termTy'
                     t' <- termTy
                     return $ RenameTy or_text [t, t']
              <|> return t)
-
   
 termTy' :: Parser Type
 termTy' = do char '('
@@ -65,24 +74,44 @@ termTy' = do char '('
           <|> do char '~'
                  t <- termTy'
                  return $ RenameTy not_text [t]
-          <|> do v <- validIdent reservedWords
+          <|> do s <- get
+                 prefixOps s  -- OJO! El nombre de la operación que se parsea puede ser
+                              -- tomada como una proposición.
+                              -- Por eso, lo ponemos antes del caso (B v)
+          <|> do v <- validIdent1
                  return $ B v
           <|> do symbol "False"
                  return $ RenameTy bottom_text []
 
--- binDefaultsOp :: [(String,Bool)] -> Type -> Parser Type
--- binDefaultsOp = binDefaultsOp' 0
+infixBinaryOp :: UserOperations -> Type -> Parser Type
+infixBinaryOp [] t = empty
+infixBinaryOp ((s,_,True):xs) t =
+  do symbol s
+     t' <- termTy
+     return $ RenameTy s [t, t']
+  <|> infixBinaryOp xs t
+infixBinaryOp ((_,_,False):xs) t =
+  infixBinaryOp xs t
 
--- binDefaultsOp' :: Int -> [(String,Bool)] -> Type -> Parser Type
--- binDefaultsOp' _ [] t = empty
--- binDefaultsOp' n ((s,True):xs) t =
---   do symbol s
---      t' <- termTy
---      return $ RenameTy s [t, t']
---   <|> binDefaultsOp' (n+1) xs t
--- binDefaultsOp' n ((s,False):xs) t =
---   binDefaultsOp' (n+1) xs t
-
+prefixOps :: UserOperations -> Parser Type
+prefixOps [] = empty
+prefixOps ((s,(Empty _,_),False):xs) =
+  do symbol s
+     return $ RenameTy s []
+  <|> prefixOps xs
+prefixOps ((s,(Unary _, _),False):xs) =
+  do symbol s
+     t <- termTy
+     return $ RenameTy s [t]
+  <|> prefixOps xs
+prefixOps ((s,(Binary _, _),False): xs) =
+  do symbol s
+     t <- termTy
+     t' <- termTy
+     return $ RenameTy s [t, t']
+  <|> prefixOps xs
+prefixOps ((_,_,True):xs) =
+  prefixOps xs
 
 -- Parser del lambda término con nombre.
 expLam :: Parser LamTerm
@@ -101,17 +130,17 @@ emptyLam = do symbol "["
            <|> return id
 
 expLam' :: Parser LamTerm
-expLam' = do v <- validIdent reservedWords
+expLam' = do v <- validIdent1
              return $ LVar v
           <|> do symbol lambda
-                 v <- validIdent reservedWords
+                 v <- validIdent1
                  symbol ":"
                  t <- exprTy'
                  symbol "."
                  e <- expLam
                  return $ Abs v t e
           <|> do symbol lambda
-                 v <- validIdent reservedWords
+                 v <- validIdent1
                  symbol "."
                  e <- expLam
                  return $ BAbs v e
@@ -123,9 +152,9 @@ expLam' = do v <- validIdent reservedWords
 -- Parser de definición de tipos.
 typeDef :: Parser (String, BodyOperation, Bool)
 typeDef = do symbol "Definition"
-             op <- validIdent reservedWords
-             (do a <- validIdent reservedWords
-                 (do b <- validIdent reservedWords
+             op <- validIdent2
+             (do a <- validIdent1
+                 (do b <- validIdent1
                      symbol ":="
                      t <- exprTy'
                      inf <- isInfix
@@ -135,12 +164,12 @@ typeDef = do symbol "Definition"
                          t <- exprTy'
                          inf <- isInfix
                          symbol "."
-                         return (op, BUnary a t, inf))
+                         return (op, BUnary a t, False))
               <|> do symbol ":="
                      t <- exprTy'
-                     inf <- isInfix
+                     inf <- isInfix                     
                      symbol "."
-                     return (op, BEmpty t, inf)
+                     return (op, BEmpty t, False)
 
 
 isInfix :: Parser Bool
@@ -164,6 +193,7 @@ termTac = assumptionP
           <|> printP
           <|> exactP
           <|> inferP
+          <|> unfoldP
 
 
 assumptionP :: Parser Tactic
@@ -192,6 +222,16 @@ elimP = tacticIdentArg "elim" Elim
 
 printP :: Parser Tactic
 printP = tacticIdentArg "print" Print
+
+unfoldP :: Parser Tactic
+unfoldP = do symbol "unfold"
+             op <- validIdent2
+             (do symbol "in"
+                 h <- identifier
+                 symbol "."
+                 return $ Unfold op $ Just h
+              <|> do symbol "."
+                     return $ Unfold op Nothing)
 
 -- existsP :: Parser Tactic
 -- existsP = undefined

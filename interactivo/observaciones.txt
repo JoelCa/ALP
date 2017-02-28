@@ -73,3 +73,6 @@ unificación solo para algunos "para todos".
 - Utilizé las estructuras de datos Map y Seq.
 
 - Utilizé el tipo de datos Doc, como pretty printer.
+
+- Casos para probar la definición de tipos:
+Definition c1 x := ~(x /\  (forall w, w)) \/ x.

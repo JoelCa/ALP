@@ -94,10 +94,10 @@ data Command = Ty String Type
              deriving (Show)
 
   -- Tácticas
-  -- Arreglar el Exact para que tome lambda términos
 data Tactic = Assumption | Apply String | Intro | Intros | Split
             | Elim String | CLeft | CRight | Print String 
-            | CExists Type | Cut Type | Exact (Either Type LamTerm) | Infer LamTerm
+            | CExists Type | Cut Type | Exact (Either Type LamTerm)
+            | Infer LamTerm | Unfold String (Maybe String)
             deriving (Show)
 
 
@@ -111,7 +111,8 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String
                      | OpE String | ExactE1 Type | ExactE2 Type
                      | PSE | EmptyType | TermE String
                      | InferE1 String | InferE2 Type | InferE3 Type
-                     | InferE4 Type | DefE1 String
+                     | InferE4 Type | DefE String | UnfoldE1
+                     | UnfoldE2 Type | UnfoldE3
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
@@ -125,6 +126,11 @@ data Operands a = Empty a
                 | Unary (a -> a)
                 | Binary (a -> a -> a)
 
+instance Show (Operands a) where
+  show (Empty _) = "Empty"
+  show (Unary _) = "Unary"
+  show (Binary _) = "Binary"
+  
 type NoBodyOperands = Operands ()
 
   -- Operaciones por default, donde:

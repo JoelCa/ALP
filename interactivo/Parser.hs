@@ -7,7 +7,7 @@ import Control.Monad.State.Lazy (get)
 
 type ProofCommand = Either ProofExceptions Command
 
-type Parser a = ParserState UserOperations a
+type Parser a = ParserState FOperations a
 
 lambda = [head "\\"]
 reservedSymbols = ["Theorem","Definition","forall", "False",":",".",":="]
@@ -20,7 +20,7 @@ validIdent1 = vIdent1 reservedSymbols
 validIdent2 :: Parser String
 validIdent2 = vIdent2 reservedSymbols
 
-getCommand :: String -> UserOperations -> ProofCommand
+getCommand :: String -> FOperations -> ProofCommand
 getCommand s op = case parse exprTy s op of
                     [(x,[],y)] -> return x
                     _ -> throw SyntaxE
@@ -83,7 +83,7 @@ termTy' = do char '('
           <|> do symbol "False"
                  return $ RenameTy bottom_text []
 
-infixBinaryOp :: UserOperations -> Type -> Parser Type
+infixBinaryOp :: FOperations -> Type -> Parser Type
 infixBinaryOp [] t = empty
 infixBinaryOp ((s,_,Binary,True):xs) t =
   do symbol s
@@ -93,7 +93,7 @@ infixBinaryOp ((s,_,Binary,True):xs) t =
 infixBinaryOp ((_,_,_,False):xs) t =
   infixBinaryOp xs t
 
-prefixOps :: UserOperations -> Parser Type
+prefixOps :: FOperations -> Parser Type
 prefixOps [] = empty
 prefixOps ((s,_,Empty,False):xs) =
   do symbol s
@@ -232,12 +232,6 @@ unfoldP = do symbol "unfold"
                  return $ Unfold op $ Just h
               <|> do symbol "."
                      return $ Unfold op Nothing)
-
--- existsP :: Parser Tactic
--- existsP = undefined
-
--- cutP :: Parser Tactic
--- cutP = undefined
 
 exactP :: Parser Tactic
 exactP = do symbol "exact"

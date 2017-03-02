@@ -11,25 +11,22 @@ import Control.Monad (ap, liftM)
 import Control.Monad.State.Lazy
 import Data.Sequence (Seq)
 
-  -- Tipos de los nombres
+  -- Nombres.
 data Name
      =  Global  String
      |  Quote   Int
      deriving (Show, Eq)
-              
-  -- Entornos
-type NameEnv v t = [(Name, (v, t))]
     
 type Var = String
 
-  -- Tipo de los tipos
+  -- Tipos con nombre.
 data Type = B Var
           | Fun Type Type
           | ForAll Var Type
           | RenameTy String [Type]
           deriving (Show, Eq)
   
-  -- Tipo de los tipos localmente sin nombre
+  -- Tipos sin nombre.
 data TType = TBound Int
            | TFree Var
            | TFun TType TType
@@ -37,7 +34,7 @@ data TType = TBound Int
            | RenameTTy Int [TType]
            deriving (Show, Eq)
 
-  -- Términos con nombresd
+  -- Lambda términos con nombres.
 data LamTerm  =  LVar String
               |  Abs String Type LamTerm
               |  App LamTerm LamTerm
@@ -45,7 +42,7 @@ data LamTerm  =  LVar String
               |  BApp LamTerm Type
               deriving (Show, Eq)
 
-  -- Términos sin nombres
+  -- Lambda términos sin nombres.
 data Term  = Bound Int
            | Free Name 
            | Term :@: Term
@@ -54,10 +51,6 @@ data Term  = Bound Int
            | Term :!: (Type,TType)
            deriving (Show, Eq)
 
-  -- Valores
-data Value = VLam (Type,TType) Term
-           | VBVam Var Term
-
   -- Para cada variable de término, tenemos (por posición en la 4-tupla):
   -- 1. Su posición en el contexto, a la hora de imprimirlo.
   -- 2. La profundidad con la que se añadio al contexto,
@@ -65,7 +58,7 @@ data Value = VLam (Type,TType) Term
   -- 3-4. Su tipo con y sin nombres, respectivamente.
 type TermVar = (Int,Int,Type,TType)
 
-  -- Contexto de variables de términos. 
+  -- Secuencia de variables de términos. 
 type TermContext = Seq TermVar
 
   -- Para cada variable de tipo ligada, tenemos (por posición en la tupla):
@@ -73,27 +66,27 @@ type TermContext = Seq TermVar
   -- 2. El nombre.
 type BTypeVar = (Int,String)
 
-  -- Contexto de variables de tipo ligadas.
+  -- Secuencia de variables de tipo ligadas.
 type BTypeContext = Seq BTypeVar
 
-  -- Tabla de teoremas
+  -- Tabla de teoremas.
   -- Clave: Nombre del teorema.
   -- Valor: El lambda término de la prueba, junto con su tipo, con y sin nombres.
 type Teorems = Map String (Term,(Type,TType))
 
 type FTypeVar = String
 
-  -- Contexto de variables de tipo libre.
+  -- Secuencua de variables de tipo libres.
 type FTypeContext = [FTypeVar]
 
-  --Comandos
+  --Comandos.
 data Command = Ty String Type
              | Ta Tactic
              | Props [String]
              | TypeDef (String, Type, Operands, Bool)
              deriving (Show)
 
-  -- Tácticas
+  -- Tácticas.
 data Tactic = Assumption | Apply String | Intro | Intros | Split
             | Elim String | CLeft | CRight | Print String 
             | CExists Type | Cut Type | Exact (Either Type LamTerm)
@@ -101,7 +94,7 @@ data Tactic = Assumption | Apply String | Intro | Intros | Split
             deriving (Show)
 
 
-  -- Excepciones
+  -- Excepciones.
 data ProofExceptions = PNotFinished | PNotStarted | PExist String
                      | PNotExist String | SyntaxE | AssuE
                      | IntroE1 | ApplyE1 Type Type | ApplyE2
@@ -117,62 +110,68 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String
                               
 instance Exception ProofExceptions
 
+  -- Cantidad de operandos de una operación.
 data Operands = Empty
               | Unary
               | Binary
               deriving (Show)
 
-  -- Operaciones por default, donde:
+  -- Operaciones por default, NO "foldeables", donde:
   -- 1. Texto de la operación.
   -- 2. Código que identifica a la operación.
   -- 3. Cantidad de operandos (a lo sumo 2).
-  -- 4. Es True si es un operador foldeable.
-and_ = ("/" ++ [head "\\"], -1, Binary, False)
-or_ = ([head "\\"] ++ "/", -2, Binary, False)
-bottom_ = ("False", -3, Empty, False)
-not_ = ("~", -4, Unary, True)
+and_ = ("/" ++ [head "\\"], -1, Binary)
+or_ = ([head "\\"] ++ "/", -2, Binary)
+bottom_ = ("False", -3, Empty
+          )
+and_text = fst3 and_
+or_text = fst3 or_
+bottom_text = fst3 bottom_
 
-and_text = fst4 and_
-or_text = fst4 or_
-bottom_text = fst4 bottom_
-not_text = fst4 not_
+and_code = snd3 and_
+or_code = snd3 or_
+bottom_code = snd3 bottom_
 
-and_code = snd4 and_
-or_code = snd4 or_
-bottom_code = snd4 bottom_
-not_code = snd4 not_
+  -- Operaciones por default, "foldeables".
+not_text = "~"
+iff_text = "<->"
 
-  -- Conjunto de operaciones no básicas.
-defaults_op :: [(String, Int, Operands, Bool)]
-defaults_op = [and_, or_, bottom_, not_]
+not_code = 0 :: Int
 
-num_defaults_op :: Int
-num_defaults_op = 4
+  -- Conjunto de operaciones NO "foldeables".
+notFoldeableOps :: [(String, Int, Operands)]
+notFoldeableOps = [and_, or_, bottom_]
 
-  -- Operación, definida por el usuario, donde:
+num_notFOps :: Int
+num_notFOps = 3
+
+  -- Operación "foldeable", donde:
   -- 1. El texto que la identifica.
   -- 2. Cuerpo de la operación (a lo sumo 2 operandos).
   -- 3. Es True si es un operador infijo.
   -- Todas las operaciones que define el usuario son foldeables.
-type UOperation = (String, (Type, TType), Operands, Bool)
-type UserOperations = [UOperation]
+type FoldeableOp = (String, (Type, TType), Operands, Bool)
+type FOperations = [FoldeableOp]
 
 
-  -- Estado de la prueba
+  -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState
                        , global :: ProverGlobal
                        }
-                   
-data ProverGlobal = PGlobal { fTContext :: FTypeContext
-                            , teorems :: Teorems                -- Teoremas.
-                            , opers :: UserOperations           -- Operaciones "custom".
-                            }
 
+  -- Definiciones globales.
+data ProverGlobal = PGlobal { fTContext :: FTypeContext
+                            , teorems :: Teorems             -- Teoremas.
+                            , opers :: FOperations           -- Operaciones "foldeables".
+                            }
+                    
+  -- Estado de la prueba que se está construyendo.
 data ProofState = PState { name :: String
                          , types :: (Type,TType)
                          , constr :: ProofConstruction
                          }
 
+  -- Construcción de la prueba.
 data ProofConstruction = PConstruction { termContexts :: [TermContext]
                                        , bTContexts :: [BTypeContext] -- Indica las proposiciones de tipos disponibles.
                                                                       -- por nivel. Útil para el pretty printer.
@@ -186,13 +185,16 @@ data ProofConstruction = PConstruction { termContexts :: [TermContext]
                                        , cglobal :: ProverGlobal  -- Copia del dato global.
                                        }
 
-                         
+
+  -- Lamda términos con aujeros.
 data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) |
                    Term Term | TypeH TypeHole
 
+  -- Tipos con aujeros.
 data TypeHole = HTe ((Type, TType) -> Term) | HTy ((Type, TType) -> TypeHole)
 
 
+  -- Instancias.
 newtype StateExceptions s e a = StateExceptions { runStateExceptions :: s -> Either e (a, s) }
 
 type Proof = StateExceptions ProofConstruction ProofExceptions
@@ -231,8 +233,8 @@ instance MonadException (Either e) e where
                 Left x -> f x
                 Right x -> Right x
 
-fst4 :: (a, b, c, d) -> a
-fst4 (x, _, _, _) = x
+fst3 :: (a, b, c) -> a
+fst3 (x, _, _) = x
 
-snd4 :: (a, b, c, d) -> b
-snd4 (_, x, _, _) = x
+snd3 :: (a, b, c) -> b
+snd3 (_, x, _) = x

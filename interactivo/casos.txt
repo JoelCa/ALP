@@ -50,6 +50,9 @@ Para chequear la definición de operandos.
 - Definition <-> x y := (x -> y) /\ (y -> x) (infix).
   Theorem t20: forall g, forall w, (g <-> w) -> (g -> w).
 Para chequear la definición de operandos.
-
-Definition -- x y := forall w, (w /\ x) /\ y -> w (infix).
-Theorem tt: forall w, forall p, w -> p -> (forall p, p /\ w \/ w) -- (forall w, forall p, w /\ p).
+- Definition -- x y := forall w, (w /\ x) /\ y -> w (infix).
+  Theorem t21: forall w, forall p, w -> p -> (forall p, p /\ w \/ w) -- (forall w, forall p, w /\ p).
+Para chequear el renombre de variables de tipo ligadas en el unfold.
+- Definition ^ x y := forall w, forall v, x /\ y /\ w \/ v -> x /\ y (infix).
+  Theorem t22: forall w, forall v, w -> v -> w ^ (forall v, forall w, v -> w).
+Para chequear el renombre de variables de tipo ligadas en el unfold.

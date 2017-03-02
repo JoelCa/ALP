@@ -16,10 +16,8 @@ import Data.List (find, findIndex, elemIndex)
 
 type ProverInputState a = InputT (StateT ProverState IO) a
 
--- instance MonadState ProverState ProverInputState where
---      get = lift . get
---      put = lift . put
 
+-- Teoremas iniciales.
 initialT' = [ ("intro_and", intro_and),
               ("elim_and", elim_and),
               ("intro_or1", intro_or1),
@@ -31,7 +29,22 @@ initialT' = [ ("intro_and", intro_and),
 
 initialT = Map.fromList initialT'
 
+not_op :: FoldeableOp
+not_op = (not_text,
+          (ForAll "a" $ Fun (B "a") $ RenameTy bottom_text []
+          , TForAll $ TFun (TBound 0) $ RenameTTy bottom_code [])
+         , Unary
+         , False)
 
+iff_op :: FoldeableOp
+iff_op = (iff_text
+         , (ForAll "a" $ ForAll "b" $ RenameTy and_text
+            [Fun (B "a") (B "b"), Fun (B "b") (B "a")]
+           , TForAll $ TForAll $ RenameTTy and_code
+             [TFun (TBound 1) (TBound 0), TFun (TBound 0) (TBound 1)])
+         , Binary
+         , True)
+  
 main :: IO ()
 main = do args <- getArgs
           if args == []
@@ -39,9 +52,13 @@ main = do args <- getArgs
             else do putStrLn "aviso: hay argumentos!" --Tratar
                     evalStateT (runInputT defaultSettings prover) initProverState
 
-
+-- Estado inicial.
 initProverState :: ProverState
-initProverState = PSt {global=PGlobal {teorems=initialT, fTContext=[], opers=[]}, proof=Nothing}
+initProverState = PSt {global = PGlobal {teorems = initialT
+                                        , fTContext = []
+                                        , opers = [ not_op
+                                                  , iff_op]}
+                      , proof = Nothing}
 
 
 prover :: ProverInputState ()
@@ -98,27 +115,26 @@ propRepeated1 (p:ps)
 
 
 checkCommand :: Command -> ProverInputState ()
-checkCommand (Ty name ty) = do s <- lift get
-                               when (isJust $ proof s) (throwIO PNotFinished)
-                               let glo = global s
-                               when (Map.member name (teorems $ glo)) (throwIO $ PExist name)
-                               (tyr,tty) <- returnInput $ rename (fTContext glo) (opers glo) ty
-                               let p = newProof glo name tyr tty
-                               lift $ put $ PSt {global=glo, proof=Just p}
-                               outputStrLn $ renderProof $ constr p
-                               prover
-                               
-checkCommand (Props ps) = do s <- lift get
-                             when (isJust $ proof s) (throwIO PNotFinished)
-                             let gps = fTContext $ global s
-                             let pr1 = propRepeated1 ps
-                             let pr2 = propRepeated2 ps gps
-                             when (isJust pr1) (throwIO $ PropRepeated1 $ fromJust pr1)
-                             when (isJust pr2) (throwIO $ PropRepeated2 $ fromJust pr2)
-                             lift $ put $ s {global = (global s) {teorems=teorems $ global s, fTContext=ps++gps}}
-                             prover
-
--- TERMINAR
+checkCommand (Ty name ty) =
+  do s <- lift get
+     when (isJust $ proof s) (throwIO PNotFinished)
+     let glo = global s
+     when (Map.member name (teorems $ glo)) (throwIO $ PExist name)
+     (tyr,tty) <- returnInput $ rename (fTContext glo) (opers glo) ty
+     let p = newProof glo name tyr tty
+     lift $ put $ PSt {global=glo, proof=Just p}
+     outputStrLn $ renderProof $ constr p
+     prover                          
+checkCommand (Props ps) =
+  do s <- lift get
+     when (isJust $ proof s) (throwIO PNotFinished)
+     let gps = fTContext $ global s
+         pr1 = propRepeated1 ps
+         pr2 = propRepeated2 ps gps
+     when (isJust pr1) (throwIO $ PropRepeated1 $ fromJust pr1)
+     when (isJust pr2) (throwIO $ PropRepeated2 $ fromJust pr2)
+     lift $ put $ s {global = (global s) {teorems=teorems $ global s, fTContext=ps++gps}}
+     prover
 checkCommand (TypeDef (op, body, operands, isInfix)) =
   do s <- lift get
      let glo = global s
@@ -128,37 +144,38 @@ checkCommand (TypeDef (op, body, operands, isInfix)) =
      s' <- lift get        -- BORRAR
      outputStrLn $ show $ opers $ global s'
      prover
+checkCommand (Ta (Print x)) =
+  do s <- lift get
+     let ter = teorems $ global s
+     when (Map.notMember x ter) (throwIO $ PNotExist x)
+     let t = ter Map.! x
+     outputStrLn $ render $ printTerm (opers $ global s) $ fst t
+     outputStrLn $ render $ printType (opers $ global s) $ fst $ snd t
+     prover
+checkCommand (Ta (Infer x)) =
+  do s <- lift get
+     outputStrLn $ show x ++ "\n"         -- Borrar SHOW
+     te <- returnInput $ withoutName (opers $ global s) 0 (fTContext $ global s, S.empty) x
+     outputStrLn $ show te ++ "\n"
+     (ty,ty') <- returnInput $ inferType 0 S.empty (teorems $ global s) te
+     outputStrLn $ render $ printType (opers $ global s) ty
+     outputStrLn $ render $ printTType (opers $ global s) ty'
+     prover                            
+checkCommand (Ta ta) =
+  do s <- lift get
+     when (isNothing $ proof s) (throwIO PNotStarted)
+     let pr = fromJust $ proof s
+     (_ , p) <- returnInput $ runStateExceptions (habitar ta) (constr $ pr)
+     lift $ put $ s {proof = Just $ pr {constr = p}}
+     if (isFinalTerm p)
+       then ((outputStrLn $ "Prueba completa.\n"
+               ++ renderFinalTerm p ++ "\n"
+               ++ renderFinalTermWithoutName p ++ "\n"
+               ++ show (getTermFromProof p) ++ "\n") -- Borrar SHOWs
+             >> reloadProver)
+       else (outputStrLn (renderProof p) >> (outputStrLn $ show $ length $ term p))
+     prover
 
-checkCommand (Ta (Print x)) = do s <- lift get
-                                 let ter = teorems $ global s
-                                 when (Map.notMember x ter) (throwIO $ PNotExist x)
-                                 let t = ter Map.! x
-                                 outputStrLn $ render $ printTerm (opers $ global s) $ fst t
-                                 outputStrLn $ render $ printType (opers $ global s) $ fst $ snd t
-                                 prover
-
-checkCommand (Ta (Infer x)) = do s <- lift get
-                                 outputStrLn $ show x ++ "\n"         -- Borrar SHOW
-                                 te <- returnInput $ withoutName (opers $ global s) 0 (fTContext $ global s, S.empty) x
-                                 outputStrLn $ show te ++ "\n"
-                                 (ty,ty') <- returnInput $ inferType 0 S.empty (teorems $ global s) te
-                                 outputStrLn $ render $ printType (opers $ global s) ty
-                                 outputStrLn $ render $ printTType (opers $ global s) ty'
-                                 prover
-                                 
-checkCommand (Ta ta) = do  s <- lift get
-                           when (isNothing $ proof s) (throwIO PNotStarted)
-                           let pr = fromJust $ proof s
-                           (_ , p) <- returnInput $ runStateExceptions (habitar ta) (constr $ pr)
-                           lift $ put $ s {proof = Just $ pr {constr = p}}
-                           if (isFinalTerm p)
-                             then ((outputStrLn $ "Prueba completa.\n"
-                                     ++ renderFinalTerm p ++ "\n"
-                                     ++ renderFinalTermWithoutName p ++ "\n"
-                                     ++ show (getTermFromProof p) ++ "\n") -- Borrar SHOWs
-                                   >> reloadProver)
-                             else (outputStrLn (renderProof p) >> (outputStrLn $ show $ length $ term p))
-                           prover
 
 resetProof :: ProverInputState ()
 resetProof = do s <- lift get
@@ -175,6 +192,7 @@ reloadProver = do s <- lift get
                                    , proof = Nothing
                                    }
 
+-- Chequea si la prueba a terminado.
 isFinalTerm :: ProofConstruction -> Bool
 isFinalTerm (PConstruction {term=[Term _]}) = True
 isFinalTerm _ = False
@@ -183,13 +201,12 @@ getTermFromProof :: ProofConstruction -> Term
 getTermFromProof (PConstruction {term=[Term t]}) = t
 getTermFromProof _ = error "getTermFromProof: no debería pasar"
 
-
 returnInput :: Either ProofExceptions a -> ProverInputState a
 returnInput (Left exception) = throwIO exception
 returnInput (Right x) = return x
 
-
-errorMessage :: UserOperations -> ProofExceptions -> ProverInputState ()
+-- Mensajes de error.
+errorMessage :: FOperations -> ProofExceptions -> ProverInputState ()
 errorMessage _ SyntaxE = outputStrLn "error de sintaxis."
 errorMessage _ PNotFinished = outputStrLn "error: prueba no terminada."
 errorMessage _ PNotStarted = outputStrLn "error: prueba no comenzada."
@@ -228,6 +245,6 @@ errorMessage op (UnfoldE2 ty) = outputStrLn $ "error: no es posible aplicar unfo
 errorMessage op UnfoldE3 = outputStrLn $ "error: comando unfold, la hipótesis no existe."
 
 
-errorInferPrintTerm :: UserOperations -> Type -> String
+errorInferPrintTerm :: FOperations -> Type -> String
 errorInferPrintTerm op ty =
   "error: no se esperaba el tipo \"" ++ render (printType op ty) ++ "\". "

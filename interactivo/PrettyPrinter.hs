@@ -10,19 +10,19 @@ import qualified Data.Sequence as S
 --- pretty printer
 -----------------------
 
--- lista de posibles nombres para variables
+-- Lista de posibles nombres para variables de términos.
 vars :: [String]
 vars = [ c : n | n <- "" : map show nats, c <- ['x','y','z'] ++ ['p'..'w'] ]
   where nats :: [Integer]
         nats = [1..]
 
---NO se usa
+-- Lista de posibles nombres para variables de tipos.
 typeVars :: [String]
 typeVars = [ c : n | n <- "" : map show nats, c <- ['a' .. 'o']]
   where nats :: [Integer]
         nats = [1..]
 
-
+-- Variables de términos libres del 1º arg.
 fv :: Term -> [String]
 fv (Bound _)         = []
 fv (Free (Global n)) = [n]
@@ -32,7 +32,7 @@ fv (Lam _ u)         = fv u
 fv (t :!: _)         = fv t
 fv (BLam _ t)        = fv t
 
--- variables de tipo libre
+-- Variables de tipo libres del 1º arg.
 ftv :: Term -> [String]
 ftv (Bound _) = []
 ftv (Free _)  = []
@@ -41,24 +41,23 @@ ftv (Lam (_,t) x) = fType t ++ fv x
 ftv (x :!: (_,t)) = ftv x ++ fType t
 ftv (BLam b x)  = ftv x \\ [b]
 
+-- Variables de tipos libres del tipo (sin nombre) dado por el 1º arg.
 fType :: TType -> [String]
 fType (TBound  _) = []
 fType (TFree n) = [n]
 fType (TFun t u) = fType t ++ fType u
 fType (TForAll t) = fType t
 fType (RenameTTy _ ts) = foldr (\x r -> fType x ++ r) [] ts
--- fType (TExists t) = fType t
 
 parenIf :: Bool -> Doc -> Doc
 parenIf False d   = d
 parenIf True d    = PP.parens d
 
-
 -- Pretty-printer de términos, con tipos sin nombres.
-printTermTType :: UserOperations -> Term -> Doc 
+printTermTType :: FOperations -> Term -> Doc 
 printTermTType op t = printTermTType' op 1 [] [] (vars \\ fv t) (typeVars \\ ftv t) t
 
-printTermTType' :: UserOperations -> Int -> [String] -> [String] -> [String] -> [String] -> Term -> Doc
+printTermTType' :: FOperations -> Int -> [String] -> [String] -> [String] -> [String] -> Term -> Doc
 printTermTType' _ _ bs _  _ _ (Bound j)             = text $ bs !! j
 printTermTType' _ _ _  _  _ _ (Free (Global n))     = text n
 printTermTType' _ _ _  _  _ _ (Free (Quote n))      = text "quoted" <> text (show n)
@@ -85,17 +84,17 @@ printTermTType' _ _ _ _ [] _ (Lam _ _)              = error "prinTerm': no hay n
 printTermTType' _ _ _ _ _ [] (BLam _ _)             = error "prinTerm': no hay nombres para elegir"
 
 
-printTypeTermTType :: UserOperations -> [String] -> TType -> Doc
+printTypeTermTType :: FOperations -> [String] -> TType -> Doc
 printTypeTermTType op bs t = printTType' op 2 bs ((typeVars \\ fType t) \\ bs) t
 
 
 -- Pretty-printer de términos, con tipos con nombres.
-printTerm :: UserOperations -> Term -> Doc 
+printTerm :: FOperations -> Term -> Doc 
 printTerm op t = printTerm' op 1 [] (vars \\ fv t)  t
 
 
 --Arreglar paréntesis de :@:
-printTerm' :: UserOperations -> Int -> [String] -> [String] -> Term -> Doc
+printTerm' :: FOperations -> Int -> [String] -> [String] -> Term -> Doc
 printTerm' _ _ bs _  (Bound j)         = text $ bs !! j
 printTerm' _ _ _  _  (Free (Global n)) = text n
 printTerm' _ _ _  _  (Free (Quote n))  = text "quoted" <> text (show n)
@@ -124,11 +123,11 @@ printTerm' _ _ _ [] (Lam _ _)           = error "prinTerm': no hay nombres para 
 
 
 -- Pretty-printer de tipos sin nombres.
-printTType :: UserOperations -> TType -> Doc
+printTType :: FOperations -> TType -> Doc
 printTType op t = printTType' op 1 [] (typeVars \\ fType t) t
 
 -- Chequear si es necesario usar parenIf
-printTType' :: UserOperations -> Int -> [String] -> [String] -> TType -> Doc
+printTType' :: FOperations -> Int -> [String] -> [String] -> TType -> Doc
 printTType' op _ bs _ (TBound n) = text $ bs !! n
 printTType' op _ bs _ (TFree n) = text n
 printTType' op i bs fs (TFun t u) = parenIf (i > 1) $ 
@@ -170,17 +169,17 @@ printTType' op i bs fs (RenameTTy n [])
 printTType' _ _ _ _ (RenameTTy _ _) = error "error: printTType', no debería pasar."
 
 getTextFromDefaultOp :: Int -> String
-getTextFromDefaultOp n = case find (\(_,x,_,_) -> x == n) defaults_op of
-                           Just (a,_,_,_) -> a
+getTextFromDefaultOp n = case find (\(_,x,_) -> x == n) notFoldeableOps of
+                           Just (a,_,_) -> a
                            Nothing -> error "error: getTextFromDefaultOp, no debería pasar."
 
 -- Pretty-printer de tipos con nombres.
 -- Consideramos que las operaciones "custom", son a lo suma binaria.
 -- Además, que las operaciones unaria solo se imprimen de forma prefija.
-printType :: UserOperations -> Type -> Doc
+printType :: FOperations -> Type -> Doc
 printType = printType' False
 
-printType' :: Bool -> UserOperations -> Type -> Doc
+printType' :: Bool -> FOperations -> Type -> Doc
 printType' _ _ (B v)             = text v
 printType' False op (Fun t1 t2)  = printType' True op t1 <+> 
                                    text "->"          <+> 
@@ -218,18 +217,19 @@ printBinOpPrefix s d1 d2 = text s <+>
 printUnaryOpPrefix :: String -> Doc -> Doc
 printUnaryOpPrefix s d = text s <+>
                          d
-                          
-printProof :: Int -> UserOperations -> (FTypeContext, BTypeContext) -> TermContext -> [Maybe (Type, TType)] -> Doc
+
+-- Pretty-printer de la prueba.
+printProof :: Int -> FOperations -> (FTypeContext, BTypeContext) -> TermContext -> [Maybe (Type, TType)] -> Doc
 printProof tp op tc c tys =
   (text $ "Hay " ++ show tp ++ " sub pruebas.\n") $$
   printContext op tc c $$
   printGoals tp op tys
 
 
-printGoals :: Int -> UserOperations -> [Maybe (Type, TType)] -> Doc
+printGoals :: Int -> FOperations -> [Maybe (Type, TType)] -> Doc
 printGoals = printGoals' 1
 
-printGoals' :: Int -> Int -> UserOperations -> [Maybe (Type, TType)] -> Doc
+printGoals' :: Int -> Int -> FOperations -> [Maybe (Type, TType)] -> Doc
 printGoals' _ _ _ [] = empty
 printGoals' i tp op (ty:tys)
   | i <= tp = (text $ "___________________["++(show i)++"/"++(show tp)++"]") $$
@@ -237,12 +237,12 @@ printGoals' i tp op (ty:tys)
               printGoals' (i+1) tp op tys
   | otherwise = empty
 
-printGoal :: UserOperations -> Maybe (Type, TType) -> Doc
+printGoal :: FOperations -> Maybe (Type, TType) -> Doc
 printGoal op (Just (ty,_)) = printType' False op ty
 printGoal op Nothing = text "Prop"
 
 
-printContext :: UserOperations -> (FTypeContext, BTypeContext) -> TermContext -> Doc
+printContext :: FOperations -> (FTypeContext, BTypeContext) -> TermContext -> Doc
 printContext op (ftc,btc) c = printFTypeContext ftc $$
                               printRestContext op btc c
 
@@ -257,7 +257,7 @@ printFTypeVar x = text x <+>
                   text ":" <+>
                   text "Prop"
 
-printRestContext :: UserOperations -> BTypeContext -> TermContext -> Doc
+printRestContext :: FOperations -> BTypeContext -> TermContext -> Doc
 printRestContext op btc c
   | S.null btc = printRestTermC op c
   | S.null c = printRestBTypeC btc
@@ -269,7 +269,7 @@ printRestContext op btc c
                    else printRestContext op btc (S.drop 1 c) $$
                         printTermVar (S.length c) op y
 
-printRestTermC :: UserOperations -> TermContext -> Doc
+printRestTermC :: FOperations -> TermContext -> Doc
 printRestTermC op c
   | S.null c = empty
   | otherwise = printRestTermC op (S.drop 1 c) $$
@@ -281,7 +281,7 @@ printRestBTypeC btc
   | otherwise = printRestBTypeC (S.drop 1 btc) $$
                 printBTypeVar (S.index btc 0)
 
-printTermVar :: Int -> UserOperations -> TermVar -> Doc
+printTermVar :: Int -> FOperations -> TermVar -> Doc
 printTermVar n op (_,_,t,_) = text "H" <>
                               text (show (n-1)) <+> 
                               text ":" <+>
@@ -291,3 +291,6 @@ printBTypeVar :: BTypeVar -> Doc
 printBTypeVar (_,x) = text x <+>
                       text ":" <+>
                       text "Prop"
+
+fst4 :: (a, b, c, d) -> a
+fst4 (x, _, _, _) = x

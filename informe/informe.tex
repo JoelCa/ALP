@@ -173,8 +173,8 @@ El data type \texttt{TypeHole} representa agujeros de tipos en un lambda términ
 
 \section{Lo que falta}
 \begin{itemize}
-  \item Arreglar el parser del lambda calculo, en el caso de la ``aplicación''.
-  \item Incluir la eliminación e introducción de bottom.
+  \item Arreglar el parser del lambda calculo, en el caso de la ``aplicación''. También con los operadores que define el usuario (precedencia y demás).
+  Ver caso: \texttt{Definition x x y := forall w, forall v, x /\ y (infix).}
 \end{itemize}
 
 

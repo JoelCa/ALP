@@ -76,3 +76,13 @@ unificación solo para algunos "para todos".
 
 - Casos para probar la definición de tipos:
 Definition c1 x := ~(x /\  (forall w, w)) \/ x.
+
+- ARREGLAR:
+El siguiente caso no parsea bien el teorema:
+Definition x x y := forall w, forall v, x /\ y (infix).
+Theorem tt2 : forall w, forall y, w x y -> w x y.
+Se arregla con paréntesis:
+Theorem tt2 : forall w, forall y, (w x y) -> w x y.
+
+- Tanto "~" como "<->", están definidos de manera "hardcode".
+

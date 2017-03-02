@@ -89,8 +89,6 @@ habitar (Exact (Left ty)) = do x <- getType
                                ty' <- eitherToProof $ typeWhitoutName op (ftc,btc) ty
                                modifySubProofs 0 id
                                modifyTerm $ simplifyTypeInTerm (ty,ty')
-                               
--- TERMINAR (hacer que el nuevo tipo sea renombrado de acuerdo al contexto)
 habitar (Unfold s Nothing) = do x <- getType
                                 case x of
                                   Just (RenameTy _ ts , RenameTTy n ts') ->
@@ -117,36 +115,6 @@ habitar (Unfold s (Just h)) = do n <- getTTermVars
                                              updateTermContext (n-i-1) (x,y,r,r')
                                      else throw $ UnfoldE2 tt
                                    _ -> throw $ UnfoldE2 tt
-
--- habitar (CExists x) = do y <- getType
---                          case y of
---                            Just (Exists q t, TExists t') ->
---                              do tc <- getTypeContext
---                                 (y,y') <- eitherToProof $ getRenameWhitException tc x
---                                 let (z,z') = replace (t,t') (y,y')
---                                 r <- eitherToProof $ getRenameTypeWhitException tc z
---                                 replaceType (r,z')
---                                 modifyTerm $ addHT (\x -> (Free $ Global "intro_exists") :@: x)
---                            _ -> throw CommandInvalid
-
--- habitar (PState {name=name,
---                  subp=p,
---                  position=n:ns,
---                  typeContext=tc:tcs,
---                  context=c:cs,
---                  tyFromCut = cut,
---                  ty=Just (t, t'):tys,
---                  term=ts}) (Cut x) =
---   return $ PState {name=name,
---                    subp=p+1,
---                    position=n:n:ns,
---                    typeContext=tc:tc:tcs,
---                    context=c:c:cs,
---                    tyFromCut = x:cut,
---                    ty=Just (x,x') : Just (Fun x t,TFun x' t') : tys,
---                    term=addDHT (\x y -> y :@: x) ts}
---   where x' = typeWithoutName x
-
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando INTRO e INTROS
@@ -193,48 +161,6 @@ elimComm i (t,t') (RenameTy s [t1,t2], RenameTTy _ [t1',t2'])
   | otherwise = throw ElimE1
 elimComm _ _ _ = throw ElimE1
 
--- elimComm i (t,t') (Exists v t1, TExists t1') =
---   do tc <- getTypeContext
---      let tt = tyExists tc v t1 t
---      replaceType (tt, TForAll $ TFun t1' t')
---      modifyTerm $ addHT (\x -> (elim_exists (Exists v t1, TExists t1') (tt, TForAll $ TFun t1' t'))
---                                :@: (Bound i) :@: x)
-
--- -- Funciones auxiliares para la función elimComm
-
--- -- Genera el tipo correspondiente a la eliminación del existe.
--- tyExists :: TypeContext -> String -> Type -> Type -> Type
--- tyExists fv v t1 t2 = let v' = getNewVar fv (getBoundsList t1) (getBoundsList t2) v
---                       in ForAll v' $ Fun (replaceBound v v' t1) t2
-
--- -- Reemplaza una variable de tipo por otra, sobre un tipo donde los conjuntos de variables de tipo
--- -- ligadas y libres, son disjuntos.
--- replaceBound :: String -> String -> Type -> Type
--- replaceBound v v' (B n)
---   | n == v = B v'
---   | otherwise = B n
--- replaceBound v v' (Fun t1 t2) = Fun (replaceBound v v' t1) (replaceBound v v' t2)
--- replaceBound v v' (And t1 t2) = And (replaceBound v v' t1) (replaceBound v v' t2)
--- replaceBound v v' (Or t1 t2) = Or (replaceBound v v' t1) (replaceBound v v' t2)
--- replaceBound v v' (ForAll x t) = ForAll x $ replaceBound v v' t
--- replaceBound v v' (Exists x t) = Exists x $ replaceBound v v' t
-
--- -- Retorna una variable de tipo que no está en ninguno de los contextos de tipos, dados
--- -- en los argumentos de la función.
--- -- Sabemos que v no aparece en "bv1", ni en "fv".
--- getNewVar :: TypeContext -> TypeContext -> TypeContext -> String -> String
--- getNewVar fv bv1 bv2 v
---   | elem v bv2 = getNewVar fv bv2 bv1 (newVar v bv2 fv)
---   | otherwise = v
-    
--- getBoundsList :: Type -> TypeContext
--- getBoundsList (ForAll v t) = v : getBoundsList t
--- getBoundsList (Exists v t) = v : getBoundsList t
--- getBoundsList (B _) = []
--- getBoundsList (And t1 t2) = getBoundsList t1 ++ getBoundsList t2
--- getBoundsList (Or t1 t2) = getBoundsList t1 ++ getBoundsList t2
--- getBoundsList (Fun t1 t2) = getBoundsList t1 ++ getBoundsList t2
-
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando APPLY
 
@@ -278,11 +204,6 @@ getTypesFun n (Fun t1 t2, TFun t1' t2')
 getTypesFun 0 _ = []
 getTypesFun _ _ = error $ "error: getTypesFun, no debería pasar 2."
 
--- Retorna el tipo más anidado de una "función", junto con la cantidad de tipos anidados.
--- getNestedTypeFun :: (Type, TType) -> ((Type, TType), Int)
--- getNestedTypeFun (Fun _ y, TFun _ y') = let (f, n) = getNestedTypeFun (y,y')
---                                         in (f, n+1)
--- getNestedTypeFun x = (x, 0)
 
 getNestedTypeForAll :: Bool -> TType -> (TType, Int)
 getNestedTypeForAll flag x
@@ -367,33 +288,32 @@ addTypeTerm (HTy h) x = HTy $ \y -> addTypeTerm (h y) x
 -- 1. Renombra todas las variables de tipo ligadas "escapadas" (sin nombres),
 -- nos referimos a aquellas variables cuyo cuantificador no figura en el tipo
 -- (sin nombre) del 3º arg.
--- 2. Renombra las variables de tipo ligadas (con nombres), de modo tal que no halla
+-- 2. Renombra las variables de tipo ligadas (con nombres) del 3º arg., de modo tal que no halla
 -- dos var. de tipo ligadas con el mismo nombre, una más anidada que la otra.
 -- Argumentos:
 -- 1. Conjunto de variables de tipo de libres.
--- 2. Conjunto de variables de tipo ligadas (con nombres), con las que empieza la sust.
+-- 2. Conjunto de variables de tipo ligadas (con nombres), del contexto.
 -- 3. Cuerpo del tipo (con nombres y sin nombres), sobre el que se realiza la sust.
 -- 4. Tipos T1,..,Tn.
 applyTypes :: FTypeContext -> BTypeContext -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
 applyTypes _ _ t [] = t
 applyTypes fs bs t xs = let l = length xs
-                        in applyTypes' l 0 (fs ++ (foldl (\xs (_,x) -> x : xs )[] bs)) [] [] (getBodyForAll l t) xs
+                        in applyTypes' l 0 fs [] (foldl (\xs (_,x) -> x : xs )[] bs) (getBodyForAll l t) xs
 
 -- Realiza la sust. de tipos.
 -- 1. Cantidad de tipos a reemplazar.
 -- 2. Profundidad ("para todos"), procesados.
 -- 3. Conjunto de variables de tipo libres.
--- 4. Conjunto de variables de tipo ligadas (con nombres), con las que empieza la sust.
--- 5. Conjunto de los renombres de las variables de tipo ligadas (con nombres).
+-- 4. Conjunto de variables de tipo ligadas (con nombres) procesadas.
+-- 5. Conjunto de los renombres de las variables de tipo ligadas (con nombres) del 4º arg.
+--    Incluye además las var. de tipo ligadas del contexto.
 -- 6. Tipo sobre el que se hace la sust. Sin los "para todos" que se van a sustituir.
 -- 7. Tipos que se sustituyen.
-
--- TERMINAR (hay que renombrar Type creo que con fs ++ rs)
 applyTypes' :: Int -> Int -> FTypeContext -> [String] -> [String]
            -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
 applyTypes' l n fs bs rs (B v, TBound m) ts
   | (n <= m) && (m < l) = let (x,y) = ts !! (l - m - 1)
-                          in (x, renameTType n y )
+                          in (renameType fs rs x, renameTType n y )
   | otherwise = case findIndex (\x -> x == v) bs of
                   Just i -> (B $ rs !! i, TBound m)
                   Nothing -> error "error: applyTypes', no debería pasar."
@@ -416,91 +336,29 @@ getBodyForAll 0 t = t
 getBodyForAll n (ForAll _ t, TForAll t') = getBodyForAll (n-1) (t, t')
 getBodyForAll _ _ = error "error: getBodyForAll, no debería pasar."
 
-----------------------------------------------------------------------------------------------------------------------
--- -- Comando EXISTS
+-- Renombra las variables de tipo ligadas de un tipo con nombres válido.
+-- Argumentos:
+-- 1. Conjunto de variables de tipo libres.
+-- 2. Conjunto de variables de tipos ligadas del contexto.
+-- Es decir que tiene los nombres de la variables que no puede aparecer ligadas
+-- en el resultado.
+-- 3. Tipo sobre el que se realiza el renombramiento.
+renameType :: FTypeContext -> [String] -> Type -> Type
+renameType = renameType' []
 
--- -- Funciones auxiliares
+renameType' :: [String] -> FTypeContext -> [String] -> Type -> Type
+renameType' bs fs rs (B v) =
+  case v `elemIndex` bs of
+    Just i -> B $ rs !! i
+    Nothing -> B v
+renameType' bs fs rs (ForAll v t) = let v' = getRename v fs rs
+                                    in ForAll v' $ renameType' (v:bs) fs (v':rs) t
+renameType' bs fs rs (Fun t t') = Fun (renameType' bs fs rs t) (renameType' bs fs rs t')
+renameType' bs fs rs (RenameTy s ts) = RenameTy s $ map (renameType' bs fs rs) ts
 
--- -- Igual a la función getRenameWhitException, solo que no retorna el tipo en
--- -- notación de brujin.
--- getRenameTypeWhitException :: [String] -> Type -> Either ProofExceptions Type
--- getRenameTypeWhitException fv t =
---   case renameType fv t of
---     Left s -> Left $ PropNotExists s
---     Right x -> Right x
-
-
--- renameType :: [String] -> Type -> Either String Type
--- renameType fv = renameType' fv [] []
-
--- renameType' :: [String] -> [String] -> [String] -> Type -> Either String Type
--- renameType' fv rv bv (B v) =
---   case v `elemIndex` bv of
---     Just i -> return $ B $ rv!!i
---     Nothing -> if elem v fv
---                then return $ B v
---                else Left v
--- renameType' fv rv bv (ForAll v t) = do let v' = getRename v fv rv
---                                        x <- renameType' fv (v':rv) (v:bv) t
---                                        return $ ForAll v' x
--- renameType' fv rv bv (Exists v t) = do let v' = getRename v fv rv
---                                        x <- renameType' fv (v':rv) (v:bv) t
---                                        return $ Exists v' x
--- renameType' fv rv bv (Fun t t') = do x <- renameType' fv rv bv t
---                                      x' <- renameType' fv rv bv t'
---                                      return $ Fun x x'
--- renameType' fv rv bv (And t t') = do x <- renameType' fv rv bv t
---                                      x' <- renameType' fv rv bv t'
---                                      return $ And x x'
--- renameType' fv rv bv (Or t t') = do x <- renameType' fv rv bv t
---                                     x' <- renameType' fv rv bv t'
---                                     return $ Or x x'
-
-
--- replace :: (Type,TType) -> (Type,TType) -> (Type,TType)
--- replace = replace' 0
-
--- replace' :: Int -> (Type,TType) -> (Type,TType) -> (Type,TType)
--- replace' n t@(x,TBound v) r
---   | n == v = r
---   | otherwise = t
--- replace' n t@(x,TFree v) _ = t
--- replace' n (Fun t1 t2, TFun t1' t2') r = let (x,x')= replace' n (t1,t1') r
---                                              (y,y')= replace' n (t2,t2') r
---                                          in (Fun x y, TFun x' y')
--- replace' n (Exists v t, TExists t') r = let (x,x') = replace' (n+1) (t,t') r          
---                                         in (Exists v x, TExists x')
--- replace' n (ForAll v t, TForAll t') r = let (x,x') = replace' (n+1) (t,t') r          
---                                         in (ForAll v x, TForAll x')
--- replace' n (And t1 t2, TAnd t1' t2') r = let (x,x')= replace' n (t1,t1') r
---                                              (y,y')= replace' n (t2,t2') r
---                                          in (And x y, TAnd x' y')
--- replace' n (Or t1 t2, TOr t1' t2') r = let (x,x')= replace' n (t1,t1') r
---                                            (y,y')= replace' n (t2,t2') r
---                                        in (Or x y, TOr x' y')
--- replace' _ _ _ = error "error: replace' no debería pasar."
 
 ----------------------------------------------------------------------------------------------------------------------
-
---ARREGLAR
--- intro_exists :: TType -> TType -> (Type, TType) -> Term
--- intro_exists s_a0 s a0 = Lam s_a0 $ BLam $ Lam (TForAll $ TFun s (TBound 1)) $ (Bound 0 :!: a0) :@: (Bound 1)      
-
---ESTA MAL
--- elim_exists :: (Type, TType) -> (Type, TType) -> Term
--- elim_exists (s,s') x@(ForAll _ (Fun _ t), TForAll (TFun _ t'))
---   = Lam (s, s') $ Lam x $ (Bound 1 :!: (t, t')) :@: (Bound 0)
-
--- elim_exists :: TType -> (Type, TType) -> Term
--- elim_exists s (b, b') = Lam (TExists s) $ Lam (TForAll $ TFun s b') $ (Bound 1 :!: (b, b')) :@: (Bound 0)
-
-
--- En el término utilizo TFree "a" en lugar de TBound 0, para que la impresión en
--- patalla quede bien.
--- intro_and :: (Type, TType) -> (Type, TType) -> Term
--- intro_and x@(x1, x2) y@(y1, y2) =
---   Lam x $ Lam y $
---   BLam "a" $ Lam (Fun x1 $ Fun y1 (B "a"), TFun x2 $ TFun y2 (TFree "a")) (((Bound 0) :@: (Bound 2)) :@: (Bound 1))
+-- Reglas de eliminación e introducción del "and","or", y "bottom".
 
 intro_and :: (Term, (Type,TType))
 intro_and =
@@ -528,16 +386,6 @@ elim_and =
       TFun (TFun (TBound 2) (TFun (TBound 1) (TBound 0))) $ TBound 0
     )
   )
-
--- elim_and1 :: Term
--- elim_and1 =
---   BLam "a" $ BLam "b" $ Lam (And (B "a") (B "b"), TAnd (TBound 1) (TBound 0)) $
---   (Bound 0 :!: (B "a", TBound 1)) :@: (Lam (B "a", TBound 1) $ Lam (B "b", TBound 0) $ Bound 1)  
-
--- elim_and2 :: Term
--- elim_and2 =
---   BLam "a" $ BLam "b" $ Lam (And (B "a") (B "b"), TAnd (TBound 1) (TBound 0)) $
---   (Bound 0 :!: (B "b", TBound 0)) :@: (Lam (B "a", TBound 1) $ Lam (B "b", TBound 0) $ Bound 0)  
 
 intro_or1 :: (Term, (Type,TType))
 intro_or1 =
@@ -601,6 +449,7 @@ elim_bottom =
   )
 
 ----------------------------------------------------------------------------------------------------------------------
+-- Funciones que operan sobre los lambda términos con aujeros.
 
 simplifyTypeInTerm :: (Type, TType) -> [SpecialTerm] -> [SpecialTerm]
 simplifyTypeInTerm ty (TypeH (HTe h) : ts) = simplify (h ty) ts
@@ -619,32 +468,8 @@ addDHT :: (Term->Term->Term) -> [SpecialTerm] -> [SpecialTerm]
 addDHT et ((HoleT et'):ts) = (DoubleHoleT $ (\f -> et' . f) . et):ts
 addDHT et ((DoubleHoleT et'):ts) = (DoubleHoleT et):(DoubleHoleT et'):ts
 
-getHypothesisValue :: Int -> String -> Maybe Int
-getHypothesisValue n h
-  | isDefault h = let x = getValue h
-                  in if isValidValue n x
-                     then return x
-                     else Nothing
-  | otherwise = Nothing
-
-isDefault :: String -> Bool
-isDefault ('H':xs) = isNumber xs
-isDefault _ = False
-
-isNumber :: String -> Bool
-isNumber [x] = isDigit x
-isNumber (x:xs) = (isDigit x) && (isNumber xs)
-isNumber [] = False
-
-getValue :: String -> Int
-getValue (x:xs) = read xs :: Int
-getValue _ = undefined
-
-isValidValue :: Int -> Int -> Bool
-isValidValue n value = (value >= 0) && (value < n)
-
---------------------------------------------------------------------
--- Unificación para el comando APPLY.
+----------------------------------------------------------------------------------------------------------------------
+-- Algoritmo de unificación para el comando APPLY.
 
 unification :: Bool -> Int -> TType -> (Type,TType) ->
   Either ProofExceptions (M.Map Int (Type,TType))
@@ -680,7 +505,6 @@ unif pos n sust (RenameTTy x ts) (RenameTy _ tts, RenameTTy y tts')
   | otherwise = throw Unif4                
 unif pos n sust (TForAll t') (ForAll _ tt, TForAll tt') = unif (pos+1) (n+1) sust t' (tt,tt')
 unif _ _ _ _ _ = throw Unif4
--- unif pos n sust (TExists t') (Exists _ tt, TExists tt') = unif (pos+1) (n+1) sust t' (tt,tt')
 
 -- Función auxiliar de unif. Trata el caso en el tipo a unificar sea una operación "custom".
 unifRename :: Int -> Int -> M.Map Int (Type,TType) ->
@@ -713,7 +537,7 @@ substitution' m n (ForAll v t, TForAll t') =
      return (ForAll v x, TForAll x')
 
 ----------------------------------------------------------------------------------------------------------------------
--- Renombramiento
+-- Trasformadores: Se pasa de un tipo con nombre, al equivalente sin nombre.
 
 -- Crea una variable en base al 1º arg. "v", que no está en ninguna de las listas de variables.
 -- Sabemos que "v" ocurre en el 2º arg. "xs".
@@ -732,15 +556,14 @@ getRename v fv rv
                 then newVar v fv rv
                 else v
 
-
 -- Retorna el tipo de su segundo arg. con las siguientes características:
 -- Un tipo equivalente si hay conflicto con las variables ligadas.
 -- En notación de brujin.
 -- El 1º arg. son el conj. de proposiciones válidas, y el 2º las operaciones "custom".
-rename :: FTypeContext -> UserOperations -> Type -> Either ProofExceptions (Type, TType)
+rename :: FTypeContext -> FOperations -> Type -> Either ProofExceptions (Type, TType)
 rename = rename' [] []
 
-rename' :: [String] -> [String] -> FTypeContext -> UserOperations -> Type -> Either ProofExceptions (Type, TType)
+rename' :: [String] -> [String] -> FTypeContext -> FOperations -> Type -> Either ProofExceptions (Type, TType)
 rename' rv bv fv _ (B v) =
   case v `elemIndex` bv of
     Just i -> return (B $ rv!!i, TBound i)
@@ -754,12 +577,12 @@ rename' rv bv fv op (Fun t t') = do (x,y) <- rename' rv bv fv op t
                                     (x',y') <- rename' rv bv fv op t'
                                     return (Fun x x', TFun y y')
 rename' rv bv fv op (RenameTy s ts) =
-    case find (\(x,_,_,_) -> x == s) defaults_op of
-      Just (_,n,to,_) -> if checkOperands to ts
-                         then do rs <- sequence $ map (rename' rv bv fv op) ts
-                                 let (xs,ys) = unzip rs
-                                 return (RenameTy s xs, RenameTTy n ys)
-                         else throw $ OpE1 s
+    case find (\(x,_,_) -> x == s) notFoldeableOps of
+      Just (_,n,to) -> if checkOperands to ts
+                       then do rs <- sequence $ map (rename' rv bv fv op) ts
+                               let (xs,ys) = unzip rs
+                               return (RenameTy s xs, RenameTTy n ys)
+                       else throw $ OpE1 s
       Nothing ->  case getCodeFromOP s op of
                     Just (m, to) -> if checkOperands to ts
                                     then do rs <- sequence $ map (rename' rv bv fv op) ts
@@ -768,10 +591,10 @@ rename' rv bv fv op (RenameTy s ts) =
                                     else throw $ OpE1 s
                     Nothing -> throw $ OpE2 s
                     
-getCodeFromOP :: String -> UserOperations -> Maybe (Int, Operands)
+getCodeFromOP :: String -> FOperations -> Maybe (Int, Operands)
 getCodeFromOP = getCodeFromOP' 0
 
-getCodeFromOP' :: Int -> String -> UserOperations -> Maybe (Int, Operands)
+getCodeFromOP' :: Int -> String -> FOperations -> Maybe (Int, Operands)
 getCodeFromOP' _ _ [] = Nothing
 getCodeFromOP' n x ((y,_,o,_):ys)
   | x == y = return (n,o)
@@ -783,17 +606,18 @@ checkOperands Unary [_] = True
 checkOperands Binary [_,_] = True
 checkOperands _ _ = False
   
---------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------
+-- Trasformadores: Se pasa de un lambda término con nombre, al equivalente sin nombre.
 
 -- Genera el lambda término, sin nombre de término ni de tipo.
 -- Chequea que las variables de tipo sean válidas de acuerdo al contexto de tipos
 -- dado por 3º arg., y que las variables de términos también lo sean, de
 -- acuerdo la longitud del contexto de variables de términos "iniciales", dado por el 2º arg.
 -- El 1º argumento, es la tabla de operaciones "custom".
-withoutName :: UserOperations -> Int -> (FTypeContext, BTypeContext) -> LamTerm -> Either ProofExceptions Term
+withoutName :: FOperations -> Int -> (FTypeContext, BTypeContext) -> LamTerm -> Either ProofExceptions Term
 withoutName = withoutName' []
 
-withoutName' :: [String] -> UserOperations -> Int -> (FTypeContext, BTypeContext) -> LamTerm -> Either ProofExceptions Term
+withoutName' :: [String] -> FOperations -> Int -> (FTypeContext, BTypeContext) -> LamTerm -> Either ProofExceptions Term
 withoutName' teb _ n _ (LVar x)
   | n == 0 = case elemIndex x teb of
                Just m -> return $ Bound m
@@ -817,7 +641,7 @@ withoutName' teb op n tyc (BApp e t) = do e' <- withoutName' teb op n tyc e
                                           return $ e' :!: (t,t')
 
 
-typeWhitoutName :: UserOperations -> (FTypeContext, BTypeContext) -> Type -> Either ProofExceptions TType
+typeWhitoutName :: FOperations -> (FTypeContext, BTypeContext) -> Type -> Either ProofExceptions TType
 typeWhitoutName _ (ftyc,btyc) (B x) = case S.findIndexL (\y-> snd y == x) btyc of
                                         Just n -> return $ TBound n
                                         Nothing -> if elem x ftyc
@@ -829,17 +653,20 @@ typeWhitoutName op tyc (Fun t1 t2) = do r1 <- typeWhitoutName op tyc t1
                                         r2 <- typeWhitoutName op tyc t2
                                         return $ TFun r1 r2
 typeWhitoutName op tyc (RenameTy s ts) =
-  case find (\(x,_,_,_) -> x == s) defaults_op of
-    Just (_,n,to,_) -> if checkOperands to ts
-                       then do rs <- sequence $ map (typeWhitoutName op tyc) ts
-                               return $ RenameTTy n rs
-                       else throw $ OpE1 s
+  case find (\(x,_,_) -> x == s) notFoldeableOps of
+    Just (_,n,to) -> if checkOperands to ts
+                     then do rs <- sequence $ map (typeWhitoutName op tyc) ts
+                             return $ RenameTTy n rs
+                     else throw $ OpE1 s
     Nothing -> case getCodeFromOP s op of
                  Just (m,to) -> if checkOperands to ts
                                 then do rs <- sequence $ map (typeWhitoutName op tyc) ts
                                         return $ RenameTTy m rs
                                 else throw $ OpE1 s
                  Nothing -> throw $ OpE2 s
+                 
+----------------------------------------------------------------------------------------------------------------------
+-- Algoritmo de inferencia de tipos de un lambda término.
 
 -- Infiere el tipo sin nombre de un lambda término, de acuerdo a la
 -- lista de teoremas dada por el 3º arg.
@@ -917,11 +744,36 @@ inferReplaceType' n (RenameTy s ts, RenameTTy op ts') t =
 getTypeVar :: Int -> TermVar -> (Type, TType)
 getTypeVar n (_,m, t, t') = (t, renameTType (n-m) t')
 
---------------------------------------------------------------------
--- Definition de nuevos operadores.
 
+----------------------------------------------------------------------------------------------------------------------
+-- Funciones auxiliares de "habitar".
 
---------------------------------------------------------------------
+-- Obtiene el entero que contiene el 2º argumento.
+-- Además, chequea que el valor sea válidos.
+getHypothesisValue :: Int -> String -> Maybe Int
+getHypothesisValue n h
+  | isDefault h = let x = getValue h
+                  in if isValidValue n x
+                     then return x
+                     else Nothing
+  | otherwise = Nothing
+
+isDefault :: String -> Bool
+isDefault ('H':xs) = isNumber xs
+isDefault _ = False
+
+isNumber :: String -> Bool
+isNumber [x] = isDigit x
+isNumber (x:xs) = (isDigit x) && (isNumber xs)
+isNumber [] = False
+
+getValue :: String -> Int
+getValue (x:xs) = read xs :: Int
+getValue _ = undefined
+
+isValidValue :: Int -> Int -> Bool
+isValidValue n value = (value >= 0) && (value < n)
+
 
 maybeToEither :: e -> Maybe a -> Either e a
 maybeToEither errorval Nothing = throw errorval
@@ -939,23 +791,3 @@ pred :: Int -> Int
 pred n
   | n <= 0 = 0
   | n > 0 = n-1
-
-
--- Evaluador
--- eval :: Term -> Value
--- eval ((Lam ty t) :@: t2)
---   | isValue t2 = replaceTerm t t2
---   | otherwise = (Lam ty t) :@: (eval t2)
--- eval (t1 :@: t2)
---   | isValue t1 = t1 :@: (eval t2)
---   | otherwise = eval t1 :@: t2
--- eval ((BLam v t) :!: ty) = replaceType t ty
--- eval (t1 :!: ty) = eval t1 :!: ty
--- eval (Lam ty t) = VLam ty t
--- eval (BLam v t) = VBLam v t
--- eval _ = error "error: eval, no debería pasar."
-
--- isValue :: Term -> Bool
--- isValue (BLam _ _) = True
--- isValue (Lam _ _) = True
--- isValue _ = False

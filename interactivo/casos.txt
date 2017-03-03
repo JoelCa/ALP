@@ -32,7 +32,7 @@ Para probar la unificación y el pretty printer.
 Para probar el comando apply.
 - Theorem t13: forall o, (forall b, (forall a, a) -> (forall c, forall d, b) -> b) -> (forall a, a) -> (forall w, forall r, (forall t, o /\ t)) -> (forall t, o /\ t).
 Para probar la unificación.
-- Theorem t14: Theorem rr: forall d, (forall a, a -> d)-> forall b, forall c, b -> d.
+- Theorem t14: forall d, (forall a, a -> d)-> forall b, forall c, b -> d.
 Para probar la unificación.
 - Theorem t15: forall b, forall c, (forall a, a -> c) -> b -> c.
 Para probar la unificación.
@@ -56,3 +56,6 @@ Para chequear el renombre de variables de tipo ligadas en el unfold.
 - Definition ^ x y := forall w, forall v, x /\ y /\ w \/ v -> x /\ y (infix).
   Theorem t22: forall w, forall v, w -> v -> w ^ (forall v, forall w, v -> w).
 Para chequear el renombre de variables de tipo ligadas en el unfold.
+
+ARREGLAR:
+Theorem jj4 : forall o, forall t, (forall w,  forall r, o /\ w) -> (o /\ t).

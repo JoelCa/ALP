@@ -9,7 +9,6 @@ type ProofCommand = Either ProofExceptions Command
 
 type Parser a = ParserState FOperations a
 
-lambda = [head "\\"]
 reservedSymbols = ["Theorem","Definition","forall", "False",":",".",":="]
 
 -- Identificadores alfa-numéricos, exceptuando las simbolos reservados.
@@ -132,14 +131,14 @@ emptyLam = do symbol "["
 expLam' :: Parser LamTerm
 expLam' = do v <- validIdent1
              return $ LVar v
-          <|> do symbol lambda
+          <|> do char '\\'
                  v <- validIdent1
                  symbol ":"
                  t <- exprTy'
                  symbol "."
                  e <- expLam
                  return $ Abs v t e
-          <|> do symbol lambda
+          <|> do char '\\'
                  v <- validIdent1
                  symbol "."
                  e <- expLam

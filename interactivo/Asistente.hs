@@ -10,6 +10,7 @@ import Data.Maybe (fromJust, isJust)
 import ProofState
 import Data.Foldable (foldl)
 
+-- Contruye la prueba.
 habitar :: Tactic -> Proof ()
 habitar Assumption = do x <- getType
                         (_,tw) <- maybeToProof EmptyType x 
@@ -90,32 +91,27 @@ habitar (Exact (Left ty)) = do x <- getType
                                modifySubProofs 0 id
                                modifyTerm $ simplifyTypeInTerm (ty,ty')
 habitar (Unfold s Nothing) = do x <- getType
-                                case x of
-                                  Just (RenameTy _ ts , RenameTTy n ts') ->
-                                    if n >= 0
-                                    then do op <- getUsrOpers
-                                            let (_, (t,t'), _, _) = op !! n
-                                            btc <- getBTypeContext
-                                            ftc <- getFTypeContext
-                                            replaceType $ applyTypes ftc btc (t,t') $ zip ts ts'
-                                    else throw UnfoldE1
-                                  _ -> throw UnfoldE1
-habitar (Unfold s (Just h)) = do n <- getTTermVars
-                                 i <- maybeToProof UnfoldE3 $ getHypothesisValue n h
-                                 c <- getTermContext
-                                 let (x,y,tt,tt') = S.index c (n-i-1)
-                                 case (tt,tt') of
-                                   (RenameTy _ ts , RenameTTy m ts') ->
-                                     if m >= 0
-                                     then do op <- getUsrOpers
-                                             let (_, (t,t'),_,_) = op !! m
-                                             btc <- getBTypeContext
-                                             ftc <- getFTypeContext
-                                             let (r,r') = applyTypes ftc btc (t,t') $ zip ts ts'
-                                             updateTermContext (n-i-1) (x,y,r,r')
-                                     else throw $ UnfoldE2 tt
-                                   _ -> throw $ UnfoldE2 tt
-
+                                (t,t') <- maybeToProof EmptyType x
+                                op <- getUsrOpers
+                                case findIndex (\(x,_,_,_) -> x == s) op of
+                                  Just m -> do let (_, (tt,tt'), _, _) = op !! m
+                                               btc <- getBTypeContext
+                                               ftc <- getFTypeContext
+                                               replaceType $ unfoldComm (t,t') (tt,tt') m btc ftc
+                                  Nothing -> throw $ UnfoldE1 s
+habitar (Unfold s (Just h)) = do op <- getUsrOpers
+                                 case findIndex (\(x,_,_,_) -> x == s) op of
+                                   Just m -> do n <- getTTermVars
+                                                i <- maybeToProof UnfoldE2 $ getHypothesisValue n h
+                                                c <- getTermContext
+                                                let (x,y,t,t') = S.index c (n-i-1)
+                                                    (_, (tt,tt'), _, _) = op !! m
+                                                btc <- getBTypeContext
+                                                ftc <- getFTypeContext
+                                                let (r,r') = unfoldComm (t,t') (tt,tt') m btc ftc
+                                                updateTermContext (n-i-1) (x,y,r,r')
+                                   Nothing -> throw $ UnfoldE1 s
+                                   
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando INTRO e INTROS
 
@@ -282,6 +278,28 @@ addTypeTerm (HTy h) x = HTy $ \y -> addTypeTerm (h y) x
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando UNFOLD
+
+-- Argumentos:
+-- 1. Tipo (con y sin nombre) sobre el que se aplica el unfold.
+-- 2. Tipo (con y sin nombre) que tiene el "cuerpo" del operador foldeado.
+-- 3. Código de la operación a "unfoldear".
+-- 4. Conjunto de variables de tipos ligadas.
+-- 5. Conjunto de variables de tipos libres.
+unfoldComm :: (Type, TType) -> (Type, TType) -> Int -> BTypeContext -> FTypeContext -> (Type, TType)
+unfoldComm t@(B _, _) _ _ _ _ = t
+unfoldComm (RenameTy s ts, RenameTTy m ts') r n btc ftc
+  | m == n = applyTypes ftc btc r mapUnfoldComm
+  | otherwise = let (xs, ys) = unzip mapUnfoldComm
+                in (RenameTy s xs, RenameTTy m ys)
+    where mapUnfoldComm = map (\x -> unfoldComm x r n btc ftc) $ zip ts ts'
+unfoldComm (Fun t t', TFun tt tt') r n btc ftc =
+  let (t1,t1') = unfoldComm (t,tt) r n btc ftc
+      (t2,t2') = unfoldComm (t',tt') r n btc ftc
+  in (Fun t1 t2, TFun t1' t2')
+unfoldComm (ForAll v t, TForAll t') r n btc ftc =
+  let (t1, t1') = unfoldComm (t,t') r n btc ftc
+  in (ForAll v t1, TForAll t1')
+
 
 -- Realiza la sustitución de tipos: (((t [T1]) [T2])..) [Tn].
 -- Para ello, hace dos cosas:
@@ -476,7 +494,7 @@ unification :: Bool -> Int -> TType -> (Type,TType) ->
 unification True _ = \ _ _ -> return M.empty
 unification False n = unif 0 n M.empty
 
---TERMINAR
+-- ARREGLAR
 unif :: Int -> Int -> M.Map Int (Type,TType) -> TType -> (Type,TType) ->
   Either ProofExceptions (M.Map Int (Type,TType))
 unif pos n sust t@(TBound i) tt@(tt1,tt2)
@@ -506,7 +524,7 @@ unif pos n sust (RenameTTy x ts) (RenameTy _ tts, RenameTTy y tts')
 unif pos n sust (TForAll t') (ForAll _ tt, TForAll tt') = unif (pos+1) (n+1) sust t' (tt,tt')
 unif _ _ _ _ _ = throw Unif4
 
--- Función auxiliar de unif. Trata el caso en el tipo a unificar sea una operación "custom".
+-- Función auxiliar de unif. Trata el caso en el tipo a unificar sea una operación "foldeable".
 unifRename :: Int -> Int -> M.Map Int (Type,TType) ->
               [TType] -> [Type] -> [TType] -> Either ProofExceptions (M.Map Int (Type,TType))
 unifRename pos n sust [] [] [] = return sust
@@ -559,7 +577,7 @@ getRename v fv rv
 -- Retorna el tipo de su segundo arg. con las siguientes características:
 -- Un tipo equivalente si hay conflicto con las variables ligadas.
 -- En notación de brujin.
--- El 1º arg. son el conj. de proposiciones válidas, y el 2º las operaciones "custom".
+-- El 1º arg. son el conj. de proposiciones válidas, y el 2º las operaciones "unfoldeables".
 rename :: FTypeContext -> FOperations -> Type -> Either ProofExceptions (Type, TType)
 rename = rename' [] []
 
@@ -613,7 +631,7 @@ checkOperands _ _ = False
 -- Chequea que las variables de tipo sean válidas de acuerdo al contexto de tipos
 -- dado por 3º arg., y que las variables de términos también lo sean, de
 -- acuerdo la longitud del contexto de variables de términos "iniciales", dado por el 2º arg.
--- El 1º argumento, es la tabla de operaciones "custom".
+-- El 1º argumento, es la tabla de operaciones "unfoldeables".
 withoutName :: FOperations -> Int -> (FTypeContext, BTypeContext) -> LamTerm -> Either ProofExceptions Term
 withoutName = withoutName' []
 

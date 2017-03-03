@@ -29,6 +29,7 @@ initialT' = [ ("intro_and", intro_and),
 
 initialT = Map.fromList initialT'
 
+-- Operaciones "foldeables" por default.
 not_op :: FoldeableOp
 not_op = (not_text,
           (ForAll "a" $ Fun (B "a") $ RenameTy bottom_text []
@@ -44,13 +45,6 @@ iff_op = (iff_text
              [TFun (TBound 1) (TBound 0), TFun (TBound 0) (TBound 1)])
          , Binary
          , True)
-  
-main :: IO ()
-main = do args <- getArgs
-          if args == []
-            then evalStateT (runInputT defaultSettings prover) initProverState
-            else do putStrLn "aviso: hay argumentos!" --Tratar
-                    evalStateT (runInputT defaultSettings prover) initProverState
 
 -- Estado inicial.
 initProverState :: ProverState
@@ -59,6 +53,14 @@ initProverState = PSt {global = PGlobal {teorems = initialT
                                         , opers = [ not_op
                                                   , iff_op]}
                       , proof = Nothing}
+
+
+main :: IO ()
+main = do args <- getArgs
+          if args == []
+            then evalStateT (runInputT defaultSettings prover) initProverState
+            else do putStrLn "aviso: hay argumentos!" --Tratar
+                    evalStateT (runInputT defaultSettings prover) initProverState
 
 
 prover :: ProverInputState ()
@@ -74,46 +76,8 @@ prover = do s <- lift get
                                   checkCommand command)
                         (\e -> errorMessage (opers $ global s) (e :: ProofExceptions) >> prover)
 
-newProof :: ProverGlobal -> String -> Type -> TType -> ProofState
-newProof pglobal name ty tty =
-  let c = PConstruction { bTContexts = [S.empty]
-                        , termContexts = [S.empty]
-                        , ty=[Just (ty, tty)]
-                        , term=[HoleT id]
-                        , tsubp=1
-                        , lsubp=[1]
-                        , tvars = [length $ fTContext $ pglobal]
-                        , cglobal = pglobal
-                        }
-  in PState { name = name
-            , types = (ty, tty)
-            , constr = c
-            }
 
-renderFinalTerm :: ProofConstruction -> String
-renderFinalTerm p = render $ printTerm (opers $ cglobal p) $ getTermFromProof p
-
---PRUEBA
-renderFinalTermWithoutName :: ProofConstruction -> String
-renderFinalTermWithoutName p = render $ printTermTType (opers $ cglobal p) $ getTermFromProof p
-
-renderProof :: ProofConstruction -> String
-renderProof p = render $ printProof (tsubp p) (opers $ cglobal p) (fTContext $ cglobal p, head $ bTContexts p) (head $ termContexts p) (ty p)
-
-propRepeated2 :: [String] -> [String] -> Maybe String
-propRepeated2 _ [] = Nothing
-propRepeated2 [] _ = Nothing
-propRepeated2 (p:ps) ps'
-  | elem p ps' = return p
-  | otherwise = propRepeated2 ps ps'
-                
-propRepeated1 :: [String] -> Maybe String
-propRepeated1 [] = Nothing
-propRepeated1 (p:ps)
-  | elem p ps = return p
-  | otherwise = propRepeated1 ps
-
-
+-- Aplicación de los comandos.
 checkCommand :: Command -> ProverInputState ()
 checkCommand (Ty name ty) =
   do s <- lift get
@@ -154,12 +118,10 @@ checkCommand (Ta (Print x)) =
      prover
 checkCommand (Ta (Infer x)) =
   do s <- lift get
-     outputStrLn $ show x ++ "\n"         -- Borrar SHOW
      te <- returnInput $ withoutName (opers $ global s) 0 (fTContext $ global s, S.empty) x
-     outputStrLn $ show te ++ "\n"
      (ty,ty') <- returnInput $ inferType 0 S.empty (teorems $ global s) te
      outputStrLn $ render $ printType (opers $ global s) ty
-     outputStrLn $ render $ printTType (opers $ global s) ty'
+     --outputStrLn $ render $ printTType (opers $ global s) ty'
      prover                            
 checkCommand (Ta ta) =
   do s <- lift get
@@ -169,19 +131,61 @@ checkCommand (Ta ta) =
      lift $ put $ s {proof = Just $ pr {constr = p}}
      if (isFinalTerm p)
        then ((outputStrLn $ "Prueba completa.\n"
-               ++ renderFinalTerm p ++ "\n"
-               ++ renderFinalTermWithoutName p ++ "\n"
-               ++ show (getTermFromProof p) ++ "\n") -- Borrar SHOWs
+               ++ renderFinalTerm p ++ "\n")
              >> reloadProver)
        else (outputStrLn (renderProof p) >> (outputStrLn $ show $ length $ term p))
      prover
 
+-- Funciones auxiliares del comando "Props".
+propRepeated2 :: [String] -> [String] -> Maybe String
+propRepeated2 _ [] = Nothing
+propRepeated2 [] _ = Nothing
+propRepeated2 (p:ps) ps'
+  | elem p ps' = return p
+  | otherwise = propRepeated2 ps ps'
+                
+propRepeated1 :: [String] -> Maybe String
+propRepeated1 [] = Nothing
+propRepeated1 (p:ps)
+  | elem p ps = return p
+  | otherwise = propRepeated1 ps
 
+-- Funciones auxiliares:
+-- Chequea si la prueba a terminado.
+isFinalTerm :: ProofConstruction -> Bool
+isFinalTerm (PConstruction {term=[Term _]}) = True
+isFinalTerm _ = False
+
+-- Obtiene el lambda término final de la prueba construida.
+getTermFromProof :: ProofConstruction -> Term
+getTermFromProof (PConstruction {term=[Term t]}) = t
+getTermFromProof _ = error "getTermFromProof: no debería pasar"
+
+
+-- Crea una prueba.
+newProof :: ProverGlobal -> String -> Type -> TType -> ProofState
+newProof pglobal name ty tty =
+  let c = PConstruction { bTContexts = [S.empty]
+                        , termContexts = [S.empty]
+                        , ty=[Just (ty, tty)]
+                        , term=[HoleT id]
+                        , tsubp=1
+                        , lsubp=[1]
+                        , tvars = [length $ fTContext $ pglobal]
+                        , cglobal = pglobal
+                        }
+  in PState { name = name
+            , types = (ty, tty)
+            , constr = c
+            }
+
+-- Aborta la prueba.
 resetProof :: ProverInputState ()
 resetProof = do s <- lift get
                 lift $ put $ PSt {global=global s, proof=Nothing}
                 prover
-
+                
+-- Finaliza la prueba.
 reloadProver :: ProverInputState ()
 reloadProver = do s <- lift get
                   let p = fromJust $ proof s
@@ -192,18 +196,18 @@ reloadProver = do s <- lift get
                                    , proof = Nothing
                                    }
 
--- Chequea si la prueba a terminado.
-isFinalTerm :: ProofConstruction -> Bool
-isFinalTerm (PConstruction {term=[Term _]}) = True
-isFinalTerm _ = False
+-- Impresión del lambda término final.
+renderFinalTerm :: ProofConstruction -> String
+renderFinalTerm p = render $ printTerm (opers $ cglobal p) $ getTermFromProof p
 
-getTermFromProof :: ProofConstruction -> Term
-getTermFromProof (PConstruction {term=[Term t]}) = t
-getTermFromProof _ = error "getTermFromProof: no debería pasar"
+-- Impresión del lambda término final sin nombres (a modo de prueba).
+renderFinalTermWithoutName :: ProofConstruction -> String
+renderFinalTermWithoutName p = render $ printTermTType (opers $ cglobal p) $ getTermFromProof p
 
-returnInput :: Either ProofExceptions a -> ProverInputState a
-returnInput (Left exception) = throwIO exception
-returnInput (Right x) = return x
+-- Impresión de la prueba en construcción
+renderProof :: ProofConstruction -> String
+renderProof p = render $ printProof (tsubp p) (opers $ cglobal p) (fTContext $ cglobal p, head $ bTContexts p) (head $ termContexts p) (ty p)
+
 
 -- Mensajes de error.
 errorMessage :: FOperations -> ProofExceptions -> ProverInputState ()
@@ -240,11 +244,15 @@ errorMessage op (InferE2 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El ti
 errorMessage op (InferE3 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El tipo no es una función."
 errorMessage op (InferE4 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El tipo no es un para todo."
 errorMessage op (DefE s) = outputStrLn $ "error: " ++ s ++ " es un operador que ya existe."
-errorMessage op UnfoldE1 = outputStrLn $ "error: no es posible aplicar unfold sobre el goal."
-errorMessage op (UnfoldE2 ty) = outputStrLn $ "error: no es posible aplicar unfold sobre \"" ++ render (printType op ty) ++ "\". "
-errorMessage op UnfoldE3 = outputStrLn $ "error: comando unfold, la hipótesis no existe."
+errorMessage _ (UnfoldE1 s) = outputStrLn $ "error: " ++ s ++ " no es un operador foldeable."
+errorMessage _ UnfoldE2 = outputStrLn $ "error: comando unfold, la hipótesis no existe."
 
 
 errorInferPrintTerm :: FOperations -> Type -> String
 errorInferPrintTerm op ty =
   "error: no se esperaba el tipo \"" ++ render (printType op ty) ++ "\". "
+
+
+returnInput :: Either ProofExceptions a -> ProverInputState a
+returnInput (Left exception) = throwIO exception
+returnInput (Right x) = return x

@@ -104,8 +104,8 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String
                      | OpE1 String | OpE2 String | ExactE1 Type
                      | ExactE2 Type | PSE | EmptyType | TermE String
                      | InferE1 String | InferE2 Type | InferE3 Type
-                     | InferE4 Type | DefE String | UnfoldE1
-                     | UnfoldE2 Type | UnfoldE3
+                     | InferE4 Type | DefE String | UnfoldE1 String
+                     | UnfoldE2
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
@@ -120,8 +120,8 @@ data Operands = Empty
   -- 1. Texto de la operación.
   -- 2. Código que identifica a la operación.
   -- 3. Cantidad de operandos (a lo sumo 2).
-and_ = ("/" ++ [head "\\"], -1, Binary)
-or_ = ([head "\\"] ++ "/", -2, Binary)
+and_ = (['/','\\'] , -1, Binary)
+or_ = (['\\','/'], -2, Binary)
 bottom_ = ("False", -3, Empty
           )
 and_text = fst3 and_
@@ -152,8 +152,6 @@ num_notFOps = 3
   -- Todas las operaciones que define el usuario son foldeables.
 type FoldeableOp = (String, (Type, TType), Operands, Bool)
 type FOperations = [FoldeableOp]
-
-
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState
                        , global :: ProverGlobal

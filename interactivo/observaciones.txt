@@ -6,11 +6,11 @@ cabal install exceptions
 
 Observaciones
 
-- Para parsear la string "\", hice el truco: [head "\\"].
-CUIDADO!. Si se quiere probar el parser por el interprete usar [head "\\"] en lugar de "\".
-Ej: getCommand ("Theorem a : a /" ++ [head "\\"]++ "a.")
+- El caracter "\", se identifica con el char '\\'.
+CUIDADO!. Si se quiere probar el parser por el interprete hacer "\\" en lugar de "\".
+Ej: getCommand ("Theorem a : a /\\ a.") []
 
-- (PROBAR) Emplee unificación de solo un nivel, por ejemplo esto no se puede probar:
+- (YA NO VALE, arreglado) Emplee unificación de solo un nivel, por ejemplo esto no se puede probar:
   Theorem qqq: p->(forall p, forall p, p) -> forall p, p.
 
 - Problema dado por Mauro en agda: ~(A <-> ~A)

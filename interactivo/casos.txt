@@ -2,12 +2,15 @@ Casos probados:
 
 Props p q.
 
+Casos con existenciales:
 - Theorem t1 : (forall x, x -> x) -> (exists x, x -> x) -> (exists x, x -> x).
 Para chequear que el para todo unifica con el existe.
 - Theorem t2 : p -> (exists x, p -> x) -> (exists y, y).
 Para chequear eliminación de existe. ARREGLAR pretty printer del término. (VER)
 - Theorem t3: (exists y, forall x, x -> y) -> (forall x, exists y, x -> y).
 Para chequear eliminación de existe. NO chequee el lambda termino.
+
+Cason sin existenciales:
 - Theorem t4: (forall x, forall y, forall z, y -> y) -> (p -> p).
 Para ver que los tipos "vacios" se instancian correctamente.
 - Theorem t5: (forall a, (forall c, a)  -> (forall c, a)) -> (forall c, p) -> (forall c, p).
@@ -56,6 +59,5 @@ Para chequear el renombre de variables de tipo ligadas en el unfold.
 - Definition ^ x y := forall w, forall v, x /\ y /\ w \/ v -> x /\ y (infix).
   Theorem t22: forall w, forall v, w -> v -> w ^ (forall v, forall w, v -> w).
 Para chequear el renombre de variables de tipo ligadas en el unfold.
-
-ARREGLAR:
-Theorem jj4 : forall o, forall t, (forall w,  forall r, o /\ w) -> (o /\ t).
+-- Theorem t23 : forall o, forall t, (forall w,  forall r, o /\ w) -> (o /\ t).
+Para chequear la unificación (este caso no unificaba y lo arregle).

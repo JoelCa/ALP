@@ -494,7 +494,14 @@ unification :: Bool -> Int -> TType -> (Type,TType) ->
 unification True _ = \ _ _ -> return M.empty
 unification False n = unif 0 n M.empty
 
--- ARREGLAR
+-- Se obtiene el conjunto de sustituciones que hacen que los tipos unifiquen.
+-- Argumentos:
+-- 1. Cantidad de "para todos" analizados.
+-- 2. Cantidad de instancias a generar.
+-- 3. Sustituciones encontradas. La clave indica la posición de la sustitucición (el valor), desde la izquierda.
+-- Osea, si c1 < c2 => [t1/v1]..[t2/v2] (donde v1 y v2, son las variables con nombres de las variables sin nombres).
+-- 4. El tipo sin nombre al que se le halla la unificación (sin los "para todos" externos).
+-- 5. El tipo con y sin nombre, con el debe unificar el tipo dado en el 4º arg.
 unif :: Int -> Int -> M.Map Int (Type,TType) -> TType -> (Type,TType) ->
   Either ProofExceptions (M.Map Int (Type,TType))
 unif pos n sust t@(TBound i) tt@(tt1,tt2)
@@ -509,7 +516,7 @@ unif pos n sust t@(TBound i) tt@(tt1,tt2)
   | i < pos = if t == tt2
               then return $ sust
               else throw Unif2
-  | otherwise = if TBound (i-1) == tt2
+  | otherwise = if TBound (i-n) == tt2
                 then return $ sust
                 else throw Unif2
 unif _ _ sust (TFree x) (B _, TFree y)

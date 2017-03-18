@@ -158,7 +158,7 @@ data ProverState = PSt { proof :: Maybe ProofState
                        }
 
   -- Definiciones globales.
-data ProverGlobal = PGlobal { fTContext :: FTypeContext
+data ProverGlobal = PGlobal { fTypeContext :: FTypeContext
                             , teorems :: Teorems             -- Teoremas.
                             , opers :: FOperations           -- Operaciones "foldeables".
                             }
@@ -170,18 +170,21 @@ data ProofState = PState { name :: String
                          }
 
   -- Construcción de la prueba.
-data ProofConstruction = PConstruction { termContexts :: [TermContext]
-                                       , bTContexts :: [BTypeContext] -- Indica las proposiciones de tipos disponibles.
-                                                                      -- por nivel. Útil para el pretty printer.
-                                       , ty :: [Maybe (Type, TType)]
-                                       , term :: [SpecialTerm]
-                                       , tsubp :: Int           -- Cantidad de subpruebas activas en total.
-                                       , lsubp :: [Int]         -- Indica la cantidad de subpruebas que están activas
-                                                                -- por nivel.
-                                       , tvars :: [Int]         -- La cantidad total de variables de tipo y términos disponibles.
-                                                                -- Útil para el pretty printer.
-                                       , cglobal :: ProverGlobal  -- Copia del dato global.
+data ProofConstruction = PConstruction { tsubp :: Int              -- Cantidad total de subpruebas activas.
+                                       , subps :: [SubProof]       -- Datos de las subpruebas, ordenas por nivel.
+                                       , cglobal :: ProverGlobal   -- Copia de los datos globales.
+                                       , term :: [SpecialTerm]     -- Lambda termino.
                                        }
+
+  -- Datos de una subprueba.
+data SubProof = SP { termContext :: TermContext    -- Vars. de término.
+                   , bTypeContext :: BTypeContext  -- Vars. de tipo ligadas.
+                                                   -- Útil para el pretty printer.
+                   , lsubp :: Int                  -- Cantidad de subpruebas activas.
+                   , tvars :: Int                  -- Cantidad total de variables de tipo y
+                                                   -- términos disponibles. Útil para el pretty printer.
+                   , ty :: [Maybe (Type, TType)]   -- Tipo objetivo, de cada subprueba hija.
+                   }
 
 
   -- Lamda términos con aujeros.

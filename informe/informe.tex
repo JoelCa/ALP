@@ -167,14 +167,17 @@ El data type \texttt{TypeHole} representa agujeros de tipos en un lambda términ
   \item Aunque halla un lambda término con variables de tipo que tengan el mismo nombre que las variables de términos, su semántica de tipos está
   bien determinada.
   
+  \item Al hacer el parser del lambda cálculo, asumí que la aplicación de tipos tiene más precedencia que la aplicación de términos, ¿está bien?.
+  Ejemplo: $x \; y \; [A] = x \; (y \; [A]).$
 
 \end{itemize}
 
-
 \section{Lo que falta}
 \begin{itemize}
-  \item Arreglar el parser del lambda calculo, en el caso de la ``aplicación''. También con los operadores que define el usuario (precedencia y demás).
-  Ver caso: \texttt{Definition x x y := forall w, forall v, x /\ y (infix).}
+  \item Arreglar el parser, respecto a los operadores que define el usuario (precedencia y demás).
+  Ver caso: \texttt{Definition x x y := forall w, forall v, x and y}.
+  \item Hacer que el lambda término devuelto en la construcción de una prueba, puede ser inferido por el comando \texttt{infer}.
+  Ver caso: \texttt{Theorem: p -> q -> (((p and q) and (p and p)) and q) and p}.
 \end{itemize}
 
 

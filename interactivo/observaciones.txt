@@ -76,13 +76,17 @@ unificación solo para algunos "para todos".
 
 - Casos para probar la definición de tipos:
 Definition c1 x := ~(x /\  (forall w, w)) \/ x.
-
-- ARREGLAR:
-El siguiente caso no parsea bien el teorema:
-Definition x x y := forall w, forall v, x /\ y (infix).
-Theorem tt2 : forall w, forall y, w x y -> w x y.
-Se arregla con paréntesis:
-Theorem tt2 : forall w, forall y, (w x y) -> w x y.
+(Hacer un teorema).
 
 - Tanto "~" como "<->", están definidos de manera "hardcode".
+
+- Los operadores pueden identificarse de dos formas:
+1. Alfanuméricamente. Es este caso el operador por default es prefix.
+Se usa `id` para que sea prefix.
+2. Simbólicamente. Por default es prefix. Se usar (id), para que sea prefix.
+Gramática de símbolos:
+symbol  ->  ascSymbol | uniSymbol<special | _ | : | " | '>
+ascSymbol ->  ! | # | $ | % | & | * | + | . | / | < | = | > | ? | @
+  |   \ | ^ | | | - | ~
+uniSymbol ->  any Unicode symbol or punctuation 
 

@@ -219,28 +219,35 @@ printUnaryOpPrefix s d = text s <+>
                          d
 
 -- Pretty-printer de la prueba.
-printProof :: Int -> FOperations -> (FTypeContext, BTypeContext) -> TermContext -> [Maybe (Type, TType)] -> Doc
-printProof tp op tc c tys =
+printProof :: Int -> FOperations -> FTypeContext -> [SubProof] -> Doc
+printProof tp op ftc sb =
   (text $ "Hay " ++ show tp ++ " sub pruebas.\n") $$
-  printContext op tc c $$
-  printGoals tp op tys
+  printContext op (ftc, bTypeContext s) (termContext s) $$
+  printGoals tp op sb
+  where s = head sb
 
-
-printGoals :: Int -> FOperations -> [Maybe (Type, TType)] -> Doc
+-- Imprime el tipo objetivo de cada subprueba.
+printGoals :: Int -> FOperations -> [SubProof] -> Doc
 printGoals = printGoals' 1
 
-printGoals' :: Int -> Int -> FOperations -> [Maybe (Type, TType)] -> Doc
+printGoals' :: Int -> Int -> FOperations -> [SubProof] -> Doc
 printGoals' _ _ _ [] = empty
-printGoals' i tp op (ty:tys)
-  | i <= tp = (text $ "___________________["++(show i)++"/"++(show tp)++"]") $$
-              printGoal op ty $$
-              printGoals' (i+1) tp op tys
-  | otherwise = empty
+printGoals' i tp op (s:sb) =
+  printLevelGoals i tp op (ty s) $$
+  printGoals' (i+(lsubp s)) tp op sb
+
+-- Imprime los tipos objetivos de cada nivel.
+printLevelGoals :: Int -> Int -> FOperations -> [Maybe (Type, TType)] -> Doc
+printLevelGoals _ _ _ [] =
+  empty
+printLevelGoals i tp op (t:ts) =
+  (text $ "___________________["++(show i)++"/"++(show tp)++"]") $$
+  printGoal op t $$
+  printLevelGoals (i+1) tp op ts
 
 printGoal :: FOperations -> Maybe (Type, TType) -> Doc
 printGoal op (Just (ty,_)) = printType' False op ty
 printGoal op Nothing = text "Prop"
-
 
 printContext :: FOperations -> (FTypeContext, BTypeContext) -> TermContext -> Doc
 printContext op (ftc,btc) c = printFTypeContext ftc $$

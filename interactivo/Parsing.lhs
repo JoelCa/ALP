@@ -167,9 +167,18 @@ Ignoring spacing
 > vIdent1 :: [String] -> ParserState s String
 > vIdent1 = validSToken identifier
 >
-> vIdent2 :: [String] -> ParserState s String
-> vIdent2 = validSToken $ token $ many $ sat (\c -> (c /= ' ') && (c /= '.')) -- Al punto lo tomamos como fin de comando.
->                                                                             -- Por ello, ningún identificador puede contenerlo.
+> vIdent2 :: [Char] -> [String] -> ParserState s String
+> vIdent2 syms = validSToken $ token $ many $ sat (\x -> (x /= ' ') && (not $ elem x syms))
+>
+> -- Símbolos, NO alfanuméricos.
+> vSymbol :: [Char] -> ParserState s String
+> vSymbol syms = token $ many $ sat (\x -> (not $ isAlphaNum x) && (x /= ' ') && (not $ elem x syms))
+>
+> parens :: ParserState s a -> ParserState s a
+> parens p = do char '('
+>               x <- p
+>               char ')'
+>               return x
 
 
 

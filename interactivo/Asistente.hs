@@ -19,7 +19,7 @@ habitar Assumption = do x <- getType
                         i <- maybeToProof AssuE (S.findIndexL
                                                   (\(_,p,_,t) -> renameTType (q - p) t == tw)
                                                   c)
-                        modifySubProofs 0 id
+                        endSubProof
                         modifyTerm $ simplify (Bound i)
 habitar Intro = do x <- getType
                    introComm x
@@ -62,7 +62,7 @@ habitar Split = do x <- getType
                    case x of
                      Just (RenameTy _ [t1,t2], RenameTTy n [t1',t2']) ->
                        if n == and_code
-                       then do modifySubProofs 2 (\tys -> Just (t1,t1') : Just (t2,t2') : tys)
+                       then do newSubProofs 2 [Just (t1,t1'), Just (t2,t2')]
                                modifyTerm $ addDHT (\x y -> ((Free $ Global "intro_and")
                                                              :!: (t1,t1') :!: (t2,t2'))
                                                             :@: x :@: y)
@@ -80,7 +80,7 @@ habitar (Exact (Right te)) = do op <- getUsrOpers
                                 x <- getType
                                 (tt,tt') <- maybeToProof EmptyType x
                                 unless (t' == tt') $ throw $ ExactE1 tt
-                                modifySubProofs 0 id
+                                endSubProof
                                 modifyTerm $ simplify te'
 habitar (Exact (Left ty)) = do x <- getType
                                when (isJust x) $ throw $ ExactE2 $ fst $ fromJust x
@@ -88,7 +88,7 @@ habitar (Exact (Left ty)) = do x <- getType
                                btc <- getBTypeContext
                                ftc <- getFTypeContext
                                ty' <- eitherToProof $ typeWhitoutName op (ftc,btc) ty
-                               modifySubProofs 0 id
+                               endSubProof
                                modifyTerm $ simplifyTypeInTerm (ty,ty')
 habitar (Unfold s Nothing) = do x <- getType
                                 (t,t') <- maybeToProof EmptyType x
@@ -117,14 +117,14 @@ habitar (Unfold s (Just h)) = do op <- getUsrOpers
 
 introComm :: Maybe (Type, TType) -> Proof ()
 introComm (Just (Fun t1 t2, TFun t1' t2')) =
-  do incrementTVars (+1)
+  do modifyTVars (+1)
      q <- getTBTypeVars
      tv <- getTVars
      addTermContext (tv,q,t1,t1')
      replaceType (t2, t2')
      modifyTerm $ addHT (\x -> Lam (t1,t1') x)
 introComm (Just (ForAll v t, TForAll t')) =
-  do incrementTVars (+1)
+  do modifyTVars (+1)
      tv <- getTVars
      addBTypeContext (tv, v)
      replaceType (t, t')
@@ -149,8 +149,8 @@ elimComm i (t,t') (RenameTy s [t1,t2], RenameTTy _ [t1',t2'])
                        modifyTerm $ addHT (\x -> ((Free $ Global "elim_and")
                                                    :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
                                                  :@: (Bound i) :@: x)
-  | s == or_text = do modifySubProofs 2 (\tys -> Just (Fun t1 t, TFun t1' t') :
-                                          Just (Fun t2 t, TFun t2' t') : tys)
+  | s == or_text = do newSubProofs 2 [ Just (Fun t1 t, TFun t1' t')
+                                         , Just (Fun t2 t, TFun t2' t') ]
                       modifyTerm $ addDHT (\x y -> ((Free $ Global "elim_or")
                                                      :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
                                                    :@: (Bound i) :@: x :@: y)
@@ -163,17 +163,17 @@ elimComm _ _ _ = throw ElimE1
 applyComm :: Int -> (Type, TType) -> (Type, TType) -> Proof ()
 applyComm i x ht@(Fun _ _, TFun _ _) = 
   do n <- compareTypes ht x
-     modifySubProofs n (\tys -> getTypesFun n ht ++ tys)
+     evaluateSubProof n $ getTypesFun n ht
      modifyTerm $ getApplyTermFun n i
 applyComm i x ht@(ForAll _ _, TForAll _) =
   do let equal = snd ht == snd x
      let (ft, n) = getNestedTypeForAll equal (snd ht)
      r <- eitherToProof $ unification equal n ft x
      let m = n - M.size r
-     modifySubProofs m (\tys -> getTypesForAll m tys)
+     evaluateSubProof m $ getTypesForAll m
      modifyTerm $ getApplyTermForAll n r (Bound i)
 applyComm i (t1, t1') (t, t')
-  | t' == t1' = do modifySubProofs 0 id
+  | t' == t1' = do evaluateSubProof 0 []
                    modifyTerm $ simplify (Bound i)
   | otherwise = throw $ ApplyE1 t t1
   
@@ -208,7 +208,7 @@ getNestedTypeForAll flag x
 
 getNestedTypeForAll' :: TType -> (TType, Int)
 getNestedTypeForAll' (TForAll x) = let (f, n) = getNestedTypeForAll' x
-                                  in (f, n+1)
+                                   in (f, n+1)
 getNestedTypeForAll' x = (x,0)
 
 getApplyTermFun :: Int -> Int -> [SpecialTerm] -> [SpecialTerm]
@@ -218,15 +218,14 @@ getApplyTermFun 2 i ts = addDHT (\x y -> ((Bound i) :@: x) :@: y) ts
 getApplyTermFun n i ts = getApplyTermFun (n-1) i $ addDHT (\x y -> x :@: y) ts
 
 
-repeatElem :: Int -> a -> [a] -> [a]
-repeatElem n x xs
-  | n == 0 = xs
-  | n > 0 = x : repeatElem (n-1) x xs
+repeatElem :: Int -> a -> [a]
+repeatElem n x
+  | n == 0 = []
+  | n > 0 = x : repeatElem (n-1) x
   | otherwise = error "error: repeatElem, no debería pasar."
 
-getTypesForAll :: Int -> [Maybe (Type, TType)] -> [Maybe (Type, TType)]
-getTypesForAll m tys = repeatElem m Nothing tys
-                 
+getTypesForAll :: Int -> [Maybe (Type, TType)]
+getTypesForAll m = repeatElem m Nothing
 
 getApplyTermForAll :: Int -> M.Map Int (Type, TType) -> Term -> [SpecialTerm] -> [SpecialTerm]
 getApplyTermForAll n sust t ts = case termForAll n t sust of

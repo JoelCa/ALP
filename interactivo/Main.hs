@@ -48,11 +48,11 @@ iff_op = (iff_text
 
 -- Estado inicial.
 initProverState :: ProverState
-initProverState = PSt {global = PGlobal {teorems = initialT
-                                        , fTContext = []
-                                        , opers = [ not_op
-                                                  , iff_op]}
-                      , proof = Nothing}
+initProverState = PSt { global = PGlobal { teorems = initialT
+                                         , fTypeContext = []
+                                         , opers = [ not_op
+                                                   , iff_op] }
+                      , proof = Nothing }
 
 
 main :: IO ()
@@ -84,7 +84,7 @@ checkCommand (Ty name ty) =
      when (isJust $ proof s) (throwIO PNotFinished)
      let glo = global s
      when (Map.member name (teorems $ glo)) (throwIO $ PExist name)
-     (tyr,tty) <- returnInput $ rename (fTContext glo) (opers glo) ty
+     (tyr,tty) <- returnInput $ rename (fTypeContext glo) (opers glo) ty
      let p = newProof glo name tyr tty
      lift $ put $ PSt {global=glo, proof=Just p}
      outputStrLn $ renderProof $ constr p
@@ -92,18 +92,18 @@ checkCommand (Ty name ty) =
 checkCommand (Props ps) =
   do s <- lift get
      when (isJust $ proof s) (throwIO PNotFinished)
-     let gps = fTContext $ global s
+     let gps = fTypeContext $ global s
          pr1 = propRepeated1 ps
          pr2 = propRepeated2 ps gps
      when (isJust pr1) (throwIO $ PropRepeated1 $ fromJust pr1)
      when (isJust pr2) (throwIO $ PropRepeated2 $ fromJust pr2)
-     lift $ put $ s {global = (global s) {teorems=teorems $ global s, fTContext=ps++gps}}
+     lift $ put $ s {global = (global s) {teorems=teorems $ global s, fTypeContext=ps++gps}}
      prover
 checkCommand (TypeDef (op, body, operands, isInfix)) =
   do s <- lift get
      let glo = global s
      when (isJust $ find (\(x,_,_,_)-> x == op) $ opers glo) (throwIO $ DefE op)
-     (t,t') <- returnInput $ rename (fTContext glo) (opers glo) body
+     (t,t') <- returnInput $ rename (fTypeContext glo) (opers glo) body
      lift $ put $ s {global = glo {opers = (op, (t,t'), operands, isInfix) : opers glo}}
      s' <- lift get        -- BORRAR
      outputStrLn $ show $ opers $ global s'
@@ -118,7 +118,7 @@ checkCommand (Ta (Print x)) =
      prover
 checkCommand (Ta (Infer x)) =
   do s <- lift get
-     te <- returnInput $ withoutName (opers $ global s) 0 (fTContext $ global s, S.empty) x
+     te <- returnInput $ withoutName (opers $ global s) 0 (fTypeContext $ global s, S.empty) x
      (ty,ty') <- returnInput $ inferType 0 S.empty (teorems $ global s) te
      outputStrLn $ render $ printType (opers $ global s) ty
      --outputStrLn $ render $ printTType (opers $ global s) ty'
@@ -165,14 +165,16 @@ getTermFromProof _ = error "getTermFromProof: no debería pasar"
 -- Crea una prueba.
 newProof :: ProverGlobal -> String -> Type -> TType -> ProofState
 newProof pglobal name ty tty =
-  let c = PConstruction { bTContexts = [S.empty]
-                        , termContexts = [S.empty]
-                        , ty=[Just (ty, tty)]
-                        , term=[HoleT id]
-                        , tsubp=1
-                        , lsubp=[1]
-                        , tvars = [length $ fTContext $ pglobal]
+  let s = SP { termContext = S.empty
+             , bTypeContext = S.empty
+             , lsubp = 1
+             , tvars = length $ fTypeContext $ pglobal
+             , ty = [Just (ty, tty)]
+             }
+      c = PConstruction { tsubp = 1
+                        , subps = [s]
                         , cglobal = pglobal
+                        , term = [HoleT id]
                         }
   in PState { name = name
             , types = (ty, tty)
@@ -206,7 +208,7 @@ renderFinalTermWithoutName p = render $ printTermTType (opers $ cglobal p) $ get
 
 -- Impresión de la prueba en construcción
 renderProof :: ProofConstruction -> String
-renderProof p = render $ printProof (tsubp p) (opers $ cglobal p) (fTContext $ cglobal p, head $ bTContexts p) (head $ termContexts p) (ty p)
+renderProof p = render $ printProof (tsubp p) (opers $ cglobal p) (fTypeContext $ cglobal p) (subps p)
 
 
 -- Mensajes de error.

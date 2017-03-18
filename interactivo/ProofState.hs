@@ -4,28 +4,25 @@ import Common
 import Control.Monad.State.Lazy (get, modify)
 import qualified Data.Sequence as S
 
-getAttribute :: (ProofConstruction -> [a]) -> Proof a
+-- Operaciones que modifican el estado de la monada Proof.
+-- Es decir que, estas operaciones cambian la prueba.
+
+getAttribute :: (SubProof -> a) -> Proof a
 getAttribute f = do ps <- get
-                    let x = f ps
+                    let x = subps ps
                     if null x
                       then throw PSE
-                      else return $ head x
+                      else return $ f $ head x
 
 getType :: Proof (Maybe (Type, TType))
-getType = getAttribute ty
+getType = do t <- getAttribute ty
+             return $ head t
 
 getTermContext :: Proof TermContext
-getTermContext = getAttribute termContexts
+getTermContext = getAttribute termContext
 
 getBTypeContext :: Proof BTypeContext
-getBTypeContext = getAttribute bTContexts
-
-getLevelSubp :: (Int -> Maybe Int) -> Proof (Maybe Int)
-getLevelSubp f = do ps <- get
-                    let x = lsubp ps
-                    if null x
-                      then return $ Nothing
-                      else return $ f (head x)
+getBTypeContext = getAttribute bTypeContext
 
 getUsrOpers :: Proof FOperations
 getUsrOpers = do ps <- get
@@ -37,111 +34,128 @@ getTeorems = do ps <- get
 
 getFTypeContext :: Proof FTypeContext
 getFTypeContext = do ps <- get
-                     return $ fTContext $ cglobal $ ps
+                     return $ fTypeContext $ cglobal $ ps
 
 getTVars :: Proof Int
 getTVars = getAttribute tvars
 
 getTTermVars :: Proof Int
-getTTermVars = do c <- getAttribute termContexts
+getTTermVars = do c <- getAttribute termContext
                   return $ S.length c
 
 getTBTypeVars :: Proof Int
-getTBTypeVars = do tc <- getAttribute bTContexts
+getTBTypeVars = do tc <- getAttribute bTypeContext
                    return $ S.length tc
 
-incrementTVars :: (Int -> Int) -> Proof ()
-incrementTVars f = modify $ incrementTVars' f
-  
-incrementTVars' :: (Int -> Int) -> ProofConstruction -> ProofConstruction
-incrementTVars' f ps@(PConstruction {tvars=n:ns}) = ps {tvars = (f n) : ns}
+getSubProofLevel :: Proof (Maybe SubProof)
+getSubProofLevel = do ps <- get
+                      case tail $ subps ps of
+                        [] -> return Nothing
+                        tsb -> return $ return $ head tsb
 
+modifyTVars :: (Int -> Int) -> Proof ()
+modifyTVars = modify . modifyTVars'
+
+modifyTVars' :: (Int -> Int) -> ProofConstruction -> ProofConstruction
+modifyTVars' f ps@(PConstruction {subps=sp:sps}) =
+  ps {subps = sp {tvars = f $ tvars sp} : sps}
+  
 addTermContext :: TermVar -> Proof ()
 addTermContext = modify . addTermContext'
 
 addTermContext' :: TermVar -> ProofConstruction -> ProofConstruction
-addTermContext' x ps@(PConstruction {termContexts=c:cs}) = ps {termContexts = (x S.<| c ):cs}
+addTermContext' x ps@(PConstruction {subps=sp:sps}) =
+  ps {subps = sp {termContext = x S.<| termContext sp} : sps}
 
 updateTermContext :: Int -> TermVar -> Proof ()
 updateTermContext n x = modify $ updateTermContext' n x
 
 updateTermContext' :: Int -> TermVar -> ProofConstruction -> ProofConstruction
-updateTermContext' n x ps@(PConstruction {termContexts=c:cs}) =
-  ps {termContexts = (S.update n x c):cs} 
+updateTermContext' n x ps@(PConstruction {subps=sp:sps}) =
+  ps {subps = sp {termContext = S.update n x $ termContext sp} : sps}
 
 addBTypeContext :: BTypeVar -> Proof ()
-addBTypeContext x = modify (addBTypeContext' x)
+addBTypeContext = modify . addBTypeContext'
 
 addBTypeContext' :: BTypeVar -> ProofConstruction -> ProofConstruction
-addBTypeContext' x ps@(PConstruction {bTContexts=tc:tcs})= ps {bTContexts = (x S.<| tc):tcs}
+addBTypeContext' x ps@(PConstruction {subps=sp:sps})=
+  ps {subps = sp {bTypeContext = x S.<| (bTypeContext sp)} : sps}
 
-replaceType :: (Type, TType) -> Proof ()
-replaceType x = modifyType (\tys -> Just x : tail tys)
+modifyLevelSubp :: (Int -> Int) -> Proof ()
+modifyLevelSubp = modify . modifyLevelSubp'
+
+modifyLevelSubp' :: (Int -> Int) -> ProofConstruction -> ProofConstruction
+modifyLevelSubp' f ps@(PConstruction {subps=sp:sps})=
+  ps {subps = sp {lsubp = f $ lsubp sp} : sps}
 
 modifyTotalSubp :: (Int -> Int) -> Proof ()
 modifyTotalSubp f = modify (\ps -> ps {tsubp = f $ tsubp ps})
 
-modifyTVars :: ([Int] -> [Int]) -> Proof ()
-modifyTVars f = modify (\ps -> ps {tvars = f $ tvars ps})
+replaceLevelSubp :: Int -> Proof ()
+replaceLevelSubp n = modifyLevelSubp (\_ -> n)
 
-modifyBTypeCont :: ([BTypeContext] -> [BTypeContext]) -> Proof ()
-modifyBTypeCont f = modify (\ps -> ps {bTContexts = f $ bTContexts ps})
+modifyType :: ([Maybe (Type, TType)] -> [Maybe (Type, TType)]) -> Proof ()
+modifyType = modify . modifyType'
 
-modifyTermContext :: ([TermContext] -> [TermContext]) -> Proof ()
-modifyTermContext f = modify (\ps -> ps {termContexts = f $ termContexts ps})
+modifyType' :: ([Maybe (Type, TType)] -> [Maybe (Type, TType)])
+           -> ProofConstruction -> ProofConstruction
+modifyType' f ps@(PConstruction {subps=sp:sps})=
+  ps {subps = sp {ty = f $ ty sp} : sps}
+
+replaceMaybeTypes :: [Maybe (Type, TType)] -> Proof ()
+replaceMaybeTypes ts = modifyType (\_ -> ts)
+
+replaceType :: (Type, TType) -> Proof ()
+replaceType t = modifyType (\_ -> [Just t])
+
+removeFirstType :: Proof ()
+removeFirstType = modifyType tail
 
 modifyTerm :: ([SpecialTerm] -> [SpecialTerm]) -> Proof ()
 modifyTerm f = modify (\ps -> ps {term = f $ term ps})
 
-modifyType :: ([Maybe (Type, TType)] -> [Maybe (Type, TType)]) -> Proof ()
-modifyType f = modify (\ps -> ps {ty = f $ ty ps})
-
-modifyLevelSubp :: Int -> Proof ()
-modifyLevelSubp n
-  | (n > 1) || (n == 0) = modify $ modifyLevelSubp' n
-  | n == 1 = error "error: modifySubPLevel."
-
-modifyLevelSubp' :: Int -> ProofConstruction -> ProofConstruction
-modifyLevelSubp' 0 ps@(PConstruction {lsubp=s:spl})
-  | s > 1 = ps {lsubp = (s-1) : spl}
-  | s == 1 = case spl of
-               [] -> ps {lsubp = []}
-               x:xs -> ps {lsubp = (x-1):xs}
-modifyLevelSubp' 1 _ = error "error: modifySubPLevel'."
-modifyLevelSubp' x ps@(PConstruction {lsubp=s:spl})
-  | s > 1 = ps {lsubp = x : s : spl}
-  | s == 1 = ps {lsubp = x :  spl}
+modifySubps :: ([SubProof] -> [SubProof]) -> Proof ()
+modifySubps f = modify (\ps -> ps {subps = f $ subps ps})
 
 ------------------------------------------------------------------------------
+-- Crea una subprueba para el tipo objetivo dado por el 1º arg.
+-- Lo agrega a la lista de subpruebas del 2º arg.
+newSubProof :: Maybe (Type, TType) -> [SubProof] -> [SubProof]
+newSubProof t sp =  SP { termContext = x
+                       , bTypeContext = y
+                       , tvars = z
+                       , lsubp = 1
+                       , ty =  [t] } : sp
+  where s = head sp
+        x = termContext s
+        y = bTypeContext s
+        z = tvars s
 
-repeatHead :: Int -> [a] -> [a]
-repeatHead _ [] = error "error: repeatHead 1."
-repeatHead n xs
-  | n == 0 = xs
-  | n > 0 = head xs : (repeatHead (n-1) xs )
-  | n < 0 = error "error: repeatHead 2."
+-- Representa la creación de las subpruebas para cada tipo
+-- objetivo dado por el 2º arg.
+newSubProofs :: Int -> [Maybe (Type, TType)] -> Proof ()
+newSubProofs n ts
+  | n > 1 = do replaceMaybeTypes $ tail ts
+               replaceLevelSubp (n-1)
+               modifyTotalSubp (+ (n-1))
+               modifySubps $ newSubProof $ head ts
+  | otherwise = error "error: newSubProofs, no debería pasar."
 
-modifySubProofs :: Int -> ([Maybe (Type, TType)] -> [Maybe (Type, TType)]) -> Proof ()
-modifySubProofs n f
-  | n > 1 =
-      do modifyTotalSubp (+ (n-1))
-         modifyLevelSubp n
-         modifyTVars $ repeatHead 1
-         modifyBTypeCont $ repeatHead 1
-         modifyTermContext $ repeatHead 1
-         modifyType (\tys -> f $ tail tys)
-  | n == 0 =
-      do modifyTotalSubp (+ (n-1))
-         modifyLevelSubp n
-         modifyType (\tys -> f $ tail tys)
-         w <- getLevelSubp (\x -> if x == 1 then Nothing else Just x)
-         case w of
-           Nothing ->
-             do modifyTVars tail
-                modifyBTypeCont tail
-                modifyTermContext tail
-           Just _ -> 
-             do modifyTVars $ repeatHead 1 . tail
-                modifyBTypeCont $ repeatHead 1 . tail
-                modifyTermContext $ repeatHead 1 . tail
-  | n == 1 = modifyType (\tys -> f $ tail tys)
+-- De acuerdo al 1º argumento, mantiene, crea o termina una subprueba.
+evaluateSubProof :: Int -> [Maybe (Type, TType)] -> Proof ()
+evaluateSubProof n ts
+  | n == 1 = replaceMaybeTypes ts
+  | n == 0 = endSubProof
+  | n > 1 = newSubProofs n ts
+
+endSubProof :: Proof ()
+endSubProof = do level <- getSubProofLevel
+                 modifySubps tail
+                 modifyTotalSubp (+ (-1))
+                 case level of
+                   Just l -> if lsubp l == 1
+                             then return ()
+                             else do modifyType tail
+                                     modifyLevelSubp (+ (-1))
+                                     modifySubps $ newSubProof $ head $ ty l
+                   Nothing -> return ()

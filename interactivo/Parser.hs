@@ -9,15 +9,21 @@ type ProofCommand = Either ProofExceptions Command
 
 type Parser a = ParserState FOperations a
 
-reservedSymbols = ["Theorem","Definition","forall", "False",":",".",":="]
+reservedWords = ["Theorem", "Definition", "forall", "False"]
+reservedSymbols = [':', '.', '\\', '[', ']']
 
--- Identificadores alfa-numéricos, exceptuando las simbolos reservados.
+-- Identificadores alfa-numéricos, exceptuando las palabras reservados.
 validIdent1 :: Parser String
-validIdent1 = vIdent1 reservedSymbols
+validIdent1 = vIdent1 reservedWords
 
--- Cualquier cadena de simbolos sin espacios, exceptuando las simbolos reservados.
+-- Cualquier cadena de simbolos sin espacios ni simbolos reservados.
+-- Tampoco puede ser una palabra reservada.
 validIdent2 :: Parser String
-validIdent2 = vIdent2 reservedSymbols
+validIdent2 = vIdent2 reservedSymbols reservedWords
+
+-- Cualquier cadena de simbolos sin espacios ni simbolos reservados.
+validSymbol :: Parser String
+validSymbol = vSymbol reservedSymbols
 
 getCommand :: String -> FOperations -> ProofCommand
 getCommand s op = case parse exprTy s op of
@@ -113,70 +119,93 @@ prefixOps ((_,_,Binary,True):xs) =
   prefixOps xs
 
 -- Parser del lambda término con nombre.
-expLam :: Parser LamTerm
-expLam = do e <- expLam'
-            f <- emptyLam
-            return $ f e
+lambTerm :: Parser LamTerm
+lambTerm = abstraction
+           <|> do t <- lterm
+                  (do a <- abstraction
+                      return $ App t a
+                   <|> return t)
 
-emptyLam :: Parser (LamTerm -> LamTerm)
-emptyLam = do symbol "["
-              t <- exprTy'
-              symbol "]"
-              f <- emptyLam
-              return $ \x -> f $ BApp x t
-           <|> do e <- expLam
-                  return $ \x -> App x e
-           <|> return id
+lterm :: Parser LamTerm
+lterm = do x <- unitTerm
+           f <- lterm'
+           return $ f x
 
-expLam' :: Parser LamTerm
-expLam' = do v <- validIdent1
-             return $ LVar v
-          <|> do char '\\'
+lterm' :: Parser (LamTerm -> LamTerm)
+lterm' = do  x <- unitTerm
+             f <- lterm'
+             return $ \a -> f $ App a x
+         <|> return id
+
+unitTerm :: Parser LamTerm
+unitTerm = do x <- unitT
+              f <- unitTerm'
+              return $ f x
+
+unitTerm' :: Parser (LamTerm -> LamTerm)
+unitTerm' = do symbol "["
+               t <- exprTy'
+               symbol "]"
+               f <- unitTerm'
+               return $ \a -> f $ BApp a t
+            <|> return id
+
+unitT :: Parser LamTerm
+unitT = parens (applyT <|> abstraction)
+        <|> do x <- validIdent1
+               return $ LVar x
+
+applyT :: Parser LamTerm
+applyT = do x <- unitTerm
+            y <- unitTerm
+            f <- applyT'
+            return $ f $ App x y
+
+applyT' :: Parser (LamTerm -> LamTerm)
+applyT' = do x <- unitTerm
+             f <- applyT'
+             return $ \a -> f $ App a x
+          <|> return id
+
+abstraction :: Parser LamTerm
+abstraction = do char '\\'
                  v <- validIdent1
                  symbol ":"
                  t <- exprTy'
                  symbol "."
-                 e <- expLam
+                 e <- lambTerm
                  return $ Abs v t e
-          <|> do char '\\'
-                 v <- validIdent1
-                 symbol "."
-                 e <- expLam
-                 return $ BAbs v e
-          <|> do symbol "("
-                 e <- expLam
-                 symbol ")"
-                 return e
+              <|> do char '\\'
+                     v <- validIdent1
+                     symbol "."
+                     e <- lambTerm
+                     return $ BAbs v e
 
 -- Parser de definición de tipos.
 typeDef :: Parser (String, Type, Operands, Bool)
 typeDef = do symbol "Definition"
-             op <- validIdent2
-             (do a <- validIdent1
-                 (do b <- validIdent1
-                     symbol ":="
-                     t <- exprTy'
-                     inf <- isInfix
-                     symbol "."
-                     return (op, ForAll a $ ForAll b t, Binary, inf))
+             (do op <- validIdent2
+                 (do a <- validIdent1
+                     (do b <- validIdent1
+                         symbol ":="
+                         t <- exprTy'
+                         symbol "."
+                         return (op, ForAll a $ ForAll b t, Binary, False))
+                      <|> do symbol ":="
+                             t <- exprTy'
+                             symbol "."
+                             return (op, ForAll a t, Unary, False))
                   <|> do symbol ":="
                          t <- exprTy'
-                         inf <- isInfix
                          symbol "."
-                         return (op, ForAll a t, Unary, False))
-              <|> do symbol ":="
-                     t <- exprTy'
-                     inf <- isInfix                     
-                     symbol "."
-                     return (op, t, Empty, False)
-
-
-isInfix :: Parser Bool
-isInfix = do symbol "("
-             symbol "infix"
-             symbol ")"
-             return True
-          <|> return False
+                         return (op, t, Empty, False))
+               <|> do a <- validIdent1
+                      op <- validSymbol
+                      b <- validIdent1
+                      symbol ":="
+                      t <- exprTy'
+                      symbol "."
+                      return (op, ForAll a $ ForAll b t, Binary, True)
 
 
 -- Parser de las tácticas.
@@ -237,7 +266,7 @@ exactP = do symbol "exact"
             (do ty <- exprTy'
                 char '.'
                 return $ Exact $ Left ty
-             <|> do te <- expLam
+             <|> do te <- lambTerm
                     char '.'
                     return $ Exact $ Right te)
 
@@ -254,6 +283,6 @@ tacticIdentArg s tac = do symbol s
 
 inferP :: Parser Tactic
 inferP = do symbol "infer"
-            l <- expLam
+            l <- lambTerm
             char '.'
             return $ Infer l

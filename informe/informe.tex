@@ -10,7 +10,8 @@
 \usepackage{subcaption}
 \usepackage{amssymb}
 \usepackage{tikz}
-\usetikzlibrary{positioning, babel}
+\usepackage{prooftree}
+\usetikzlibrary{positioning, babel,shapes,snakes}
 \newdimen\nodeDist
 \nodeDist=35mm
 
@@ -129,40 +130,155 @@ El data type \texttt{TypeHole} representa agujeros de tipos en un lambda términ
   \item Cuando el tipo $\alpha$ no contiene \textbf{para todos} ni \textbf{existes}, la representación de $\alpha$ mediante el AST \texttt{Type} es 
   prácticamente la misma que \texttt{TType}, solo varían en el nombre de los constructores.
   
-  \item Cuando creamos sub-pruebas es necesario mantener una copia de los siguientes atributos de la prueba actual.
-  \begin{itemize}
-    \item position.
-    \item context.
-    \item typeContext.
-  \end{itemize}
-   Una vez que termina una prueba, la siguiente puede continuar a partir del estado de los atributos copiados.
-   La idea del algoritmo que implementamos es la siguiente. Cuando un usuario crea $n$ pruebas en un estado $s_{0}$, donde $n > 1$, hacemos en total $n-1$ copias 
-   de $s_{0}$, una copia cada vez que termina una sub-prueba. Consideramos a un estado como una instancia de los tres atributos dados anteriormente.
-   Sean $s$ una lista de estados, $s_{i}$ un elemento de $s$, y tanto $spt$, como $spl$, listas de enteros. Donde, $spt$ y $spl$ se corresponden a los campos 
-   \texttt{subp} y \texttt{subplevel} del registro \texttt{ProofState}.
-   Podemos ver en la Figura \ref{Estados}, como se aplica el algoritmo para un caso específico. 
-   
-  \begin{figure} 
-  \begin{tikzpicture}[node distance=2cm] 
-  \path 
-    (0,0) node(A)[align=center,   below] {$n = 0$ \\ $s = [ x_{0} ]$ \\ $spt = 1$ \\ $spl = [1]$}
-    (3,0) node(B)[align=center, below] {$n = 2$ \\ $s = [ x_{0}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [2]$}
-    (6,0) node(C)[align=center,  below] {$n = 0$ \\ $s = [ x_{1}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [2]$}
-    (9,0) node(D)[align=center,  below] {$n = 2$ \\ $s = [ x_{1}, x_{1}, x_{0} ]$ \\ $spt = 3$ \\ $spl = [2,2]$}
-    (12,0) node(E)[align=center,  below] {$n = 0$ \\ $s = [ x_{2}, x_{1}, x_{0} ]$ \\ $spt = 3$ \\ $spl = [2,2]$}
-    (15,0) node(F)[align=center,  below] {$n = -1$ \\ $s = [ x_{1}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [1,2]$}
-    (15,-3) node(G)[align=center,  below] {$n = 0$ \\ $s = [ x_{3}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [1,2]$}
-    (12,-3) node(H)[align=center,  below] {$n = -1$ \\ $s = [ x_{0} ]$ \\ $spt = 1$ \\ $spl = [1]$}
-    (9,-3) node(I)[align=center,  below] {$n = 0$ \\ $s = [ x_{4} ]$ \\ $spt = 1$ \\ $spl = [1]$}
-    (6,-3) node(J)[align=center,  below] {$n = -1$ \\ $s = [ \; ]$ \\ $spt = 0$ \\ $spl = [ \; ]$};
+  \item Una subprueba se corresponde a un nodo en el árbol de derivación de la fórmula. Las tácticas que ingresa el usuario construyen dicho árbol,
+  así se obtiene el lambda término que lo representa. La demostración de una fórmula puede requerir la prueba de otras fórmulas. Por ejemplo.
   
-  \draw[->]
-    (A) edge (B) (B) edge (C) (C) edge (D) (D) edge (E)  (E) edge (F) (F) edge (G)
-    (G) edge (H) (H) edge (I) (I) edge (J);
- 
+  \begin{prooftree}
+  \[
+  \[
+  p
+  \using
+  {ass}
+  \justifies
+  p
+  \]
+  \using
+  {i_{\rightarrow}}
+  \justifies
+  p \rightarrow p
+  \]
+  \[
+  \[
+  q
+  \using
+  {ass}
+  \justifies
+  q
+  \]
+  \using
+  {i_{\rightarrow}}
+  \justifies
+  q \rightarrow q
+  \]
+  \using
+  {i_{\wedge}}
+  \justifies
+  (p \rightarrow p) \wedge (q \rightarrow q)
+  \end{prooftree}
+  
+  Aplicar la introducción del and, genera dos nuevas subpruebas. En el asistente tendríamos la siguiente situación:
+  
+  \begin{verbatim}
+  > Theorem t1: (p -> p) /\ (q -> q).
+  Hay 1 sub pruebas.
+
+  p : Prop
+  q : Prop
+  ___________________[1/1]
+  (p -> p) /\ (q -> q)
+  > split.
+  Hay 2 sub pruebas.
+
+  p : Prop
+  q : Prop
+  ___________________[1/2]
+  p -> p
+  ___________________[2/2]
+  q -> q
+  \end{verbatim}
+  
+  Cuando se demuestra una fórmula, decimos que la subprueba termina.
+  
+  Podemos ver en la Figura \ref{Estados}, como se aplica el algoritmo de control de las subpruebas, para un caso específico:
+  $p, q \vee  (p \rightarrow t) \rightarrow  r, t, p \wedge t \rightarrow r \rightarrow q \vee t \rightarrow w \vdash w$.
+  Consideramos $C = H0 : p, H1 : q \vee  (p \rightarrow t) \rightarrow  r, H2 : t, H3: p \wedge t \rightarrow r \rightarrow q \vee t \rightarrow w$.
+  Utilizamos la siguiente notación:
+  
+  \tikz \node[rectangle,draw,label=below:
+  Estado de $subps$]{Conjunto de pruebas};
+  
+  Donde se transiciona de un estado a otro mediante un comando.
+
+  \begin{figure}  
+  \begin{tikzpicture}[->, node distance=2cm, auto, thick,main node/.style={rectangle,draw}]
+
+  \node[main node, label={[align=left]below:$subps = [s_{0}]$\\$\wedge \; ty \; s_{0} = [w]$}] (1) {$C \vdash  w$};
+  \node[main node, label={[align=left]below:$subps = [s_{1},s_{0}]$ \\ $\wedge \; ty \; s_{1} = [p \wedge q]$ \\ $\wedge \; ty \; s_{0} = [r,t]$}] 
+  (2) [right=of 1] {$C \vdash  p \wedge t$, $C \vdash r$, $C \vdash q \vee t$};
+  \node[main node, label={[align=left]below:$subps = [s_{2},s_{1},s_{0}]$\\$\wedge \; ty \; s_{2} = [p]$
+  \\$\wedge \; ty \; s_{1} = [t]$ \\ $\wedge \; ty \; s_{0} = [r,q \vee t]$}] 
+  (3) [right=of 2] {$C \vdash  p , C \vdash t$, $C \vdash r$, $C \vdash q \vee t$};
+  \begin{scope}[node distance=1.6cm]
+  \coordinate [right=of 3] (4) {};
+  \end{scope}
+  \begin{scope}[node distance=2.8cm]
+  \node[main node, label={[align=left]below:$subps = [s_{1},s_{0}]$ \\$\wedge \; ty \; s_{1} = [t]$ \\ $\wedge \; ty \; s_{0} = [r,q \vee t]$}] 
+  (5) [below=of 4] {$C \vdash t$, $C \vdash r$, $C \vdash q \vee t$};
+  \end{scope}
+  \begin{scope}[node distance=2.3cm]
+  \node[main node, label={[align=left]below:$subps = [s_{3},s_{0}]$ \\$\wedge \; ty \; s_{3} = [r]$ \\ $\wedge \; ty \; s_{0} = [q \vee t]$}] 
+  (6) [left=of 5] {$C \vdash r$, $C \vdash q \vee t$};
+  \end{scope}
+  \node[main node, label={[align=left]below:$subps = [s_{3},s_{0}]$ \\$\wedge \; ty \; s_{3} = [q \vee  (p \rightarrow t)]$ \\ $\wedge \; ty \; s_{0} = [t]$}] 
+  (7) [left=of 6] {$C \vdash q \vee  (p \rightarrow t)$, $C \vdash t$};
+  \coordinate [left=of 7] (8) {};
+  \begin{scope}[node distance=2.8cm]
+  \node[main node, label={[align=left]below:$subps = [s_{3},s_{0}]$ \\$\wedge \; ty \; s_{3} = [p \rightarrow t]$ \\ $\wedge \; ty \; s_{0} = [t]$}] 
+  (9) [below=of 8] {$C \vdash p \rightarrow t$, $C \vdash t$};
+  \node[main node, label={[align=left]below:$subps = [s_{3},s_{0}]$ \\$\wedge \; ty \; s_{3} = [t]$ \\ $\wedge \; ty \; s_{0} = [t]$}] 
+  (10) [right=of 9] {$\{C, H4: p \}\vdash t$, $C \vdash t$};
+  \node[main node, label={[align=left]below:$subps = [s_{0}]$ \\ $\wedge \; ty \; s_{0} = [t]$}] 
+  (11) [right=of 10] {$C \vdash t$};
+  \node[main node, label={[align=left]below:$subps = [\;]$}] 
+  (12) [right=of 11] {$\emptyset$};
+  \end{scope}
+  \path[draw] (1) edge [above] node {\texttt{apply H0}} (2) (2) edge [above] node {\texttt{split}} (3)
+  (3) -- (4) (4) edge node [left] {\texttt{assumption}} (5) (5) edge node [above] {\texttt{assumption}} (6) 
+  (6) edge node [above] {\texttt{apply H1}} (7) (7) -- (8) (8) -- node [right] {\texttt{right}} (9)
+  (9) edge node [above] {\texttt{intro}} (10) (10) edge node [above] {\texttt{assumption}} (11)
+  (11) edge node [above] {\texttt{assumption}} (12);
   \end{tikzpicture}
   \caption{Diagrama de estados.} \label{Estados}
   \end{figure}
+  
+
+
+%   A la hora de crear una sub-prueba es necesario duplicar ciertos atributos de la prueba.
+%   \begin{itemize}
+%     \item position.
+%     \item context.
+%     \item typeContext.
+%   \end{itemize}
+%    Una vez que termina una prueba, la siguiente puede continuar a partir del estado de los atributos copiados.
+%    La idea del algoritmo que implementamos es la siguiente. Cuando un usuario crea $n$ pruebas en un estado $s_{0}$, donde $n > 1$, hacemos en total $n-1$ copias 
+%    de $s_{0}$, una copia cada vez que termina una sub-prueba. Consideramos a un estado como una instancia de los tres atributos dados anteriormente.
+%    Sean $s$ una lista de estados, $s_{i}$ un elemento de $s$, y tanto $spt$, como $spl$, listas de enteros. Donde, $spt$ y $spl$ se corresponden a los campos 
+%    \texttt{subp} y \texttt{subplevel} del registro \texttt{ProofState}.
+%    Podemos ver en la Figura \ref{Estados}, como se aplica el algoritmo para un caso específico. 
+%    
+%   \begin{figure} 
+%   \begin{tikzpicture}[node distance=2cm] 
+%   \path 
+%     (0,0) node(A)[align=center, below] {$n = 0$ \\ $s = [ x_{0} ]$ \\ $spt = 1$ \\ $spl = [1]$}
+%     (3,0) node(B)[align=center, below] {$n = 2$ \\ $s = [ x_{0}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [2]$}
+%     (6,0) node(C)[align=center, below] {$n = 0$ \\ $s = [ x_{1}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [2]$}
+%     (9,0) node(D)[align=center, below] {$n = 2$ \\ $s = [ x_{1}, x_{1}, x_{0} ]$ \\ $spt = 3$ \\ $spl = [2,2]$}
+%     (12,0) node(E)[align=center, below] {$n = 0$ \\ $s = [ x_{2}, x_{1}, x_{0} ]$ \\ $spt = 3$ \\ $spl = [2,2]$}
+%     (15,0) node(F)[align=center, below] {$n = -1$ \\ $s = [ x_{1}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [1,2]$}
+%     (15,-3) node(G)[align=center, below] {$n = 0$ \\ $s = [ x_{3}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [1,2]$}
+%     (12,-3) node(H)[align=center, below] {$n = -1$ \\ $s = [ x_{0} ]$ \\ $spt = 1$ \\ $spl = [1]$}
+%     (9,-3) node(I)[align=center, below] {$n = 0$ \\ $s = [ x_{4} ]$ \\ $spt = 1$ \\ $spl = [1]$}
+%     (6,-3) node(J)[align=center, below] {$n = -1$ \\ $s = [ \; ]$ \\ $spt = 0$ \\ $spl = [ \; ]$};
+%   
+%   \draw[->]
+%     (A) edge (B) (B) edge (C) (C) edge (D) (D) edge (E)  (E) edge (F) (F) edge (G)
+%     (G) edge (H) (H) edge (I) (I) edge (J);
+%  
+%   \end{tikzpicture}
+%   \caption{Diagrama de estados.} \label{Estados}
+%   \end{figure}
+  
+  
   
   \item Aunque halla un lambda término con variables de tipo que tengan el mismo nombre que las variables de términos, su semántica de tipos está
   bien determinada.

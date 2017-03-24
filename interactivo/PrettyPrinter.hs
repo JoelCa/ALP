@@ -61,6 +61,12 @@ printTermTType' :: FOperations -> Int -> [String] -> [String] -> [String] -> [St
 printTermTType' _ _ bs _  _ _ (Bound j)             = text $ bs !! j
 printTermTType' _ _ _  _  _ _ (Free (Global n))     = text n
 printTermTType' _ _ _  _  _ _ (Free (Quote n))      = text "quoted" <> text (show n)
+printTermTType' op i bs bts fs fts (t :@: u@(Lam _ _)) = parenIf (i < 1) $ 
+                                                         printTermTType' op 2 bs bts fs fts t <+> 
+                                                         printTermTType' op (if i == 2 then 2 else 0) bs bts fs fts u
+printTermTType' op i bs bts fs fts (t :@: u@(BLam _ _)) = parenIf (i < 1) $ 
+                                                          printTermTType' op 2 bs bts fs fts t <+> 
+                                                          printTermTType' op (if i == 2 then 2 else 0) bs bts fs fts u
 printTermTType' op i bs bts fs fts (t :@: u)         = parenIf (i < 1) $ 
                                                        printTermTType' op 2 bs bts fs fts t <+> 
                                                        printTermTType' op 0 bs bts fs fts u
@@ -71,12 +77,12 @@ printTermTType' op i bs bts (f:fs) fts (Lam (_,t) u) = parenIf (i > 1) $
                                                        printTypeTermTType op bts t <>
                                                        text "." <> 
                                                        printTermTType' op 1 (f:bs) bts fs fts u
-printTermTType' op i bs bts fs (f':fts) (BLam _ u)   = parenIf (i > 1) $  -- Chequear "parenIf"
+printTermTType' op i bs bts fs (f':fts) (BLam _ u)   = parenIf (i > 1) $
                                                        text "\\" <> 
                                                        text f' <> 
                                                        text "." <> 
                                                        printTermTType' op 1 bs (f':bts) fs fts u
-printTermTType' op i bs bts fs fts (u :!: (_,t))     = printTermTType' op 2 bs bts fs fts u <+> -- Chequear valores de "i"
+printTermTType' op i bs bts fs fts (u :!: (_,t))     = printTermTType' op 0 bs bts fs fts u <+>
                                                        text "[" <>
                                                        printTypeTermTType op bts t <>
                                                        text "]"
@@ -85,7 +91,7 @@ printTermTType' _ _ _ _ _ [] (BLam _ _)             = error "prinTerm': no hay n
 
 
 printTypeTermTType :: FOperations -> [String] -> TType -> Doc
-printTypeTermTType op bs t = printTType' op 2 bs ((typeVars \\ fType t) \\ bs) t
+printTypeTermTType op bs t = printTType' op 1 bs ((typeVars \\ fType t) \\ bs) t
 
 
 -- Pretty-printer de términos, con tipos con nombres.
@@ -98,6 +104,12 @@ printTerm' :: FOperations -> Int -> [String] -> [String] -> Term -> Doc
 printTerm' _ _ bs _  (Bound j)         = text $ bs !! j
 printTerm' _ _ _  _  (Free (Global n)) = text n
 printTerm' _ _ _  _  (Free (Quote n))  = text "quoted" <> text (show n)
+printTerm' op i bs fs (t :@: u@(Lam _ _)) = parenIf (i < 1) $ 
+                                            printTerm' op 2 bs fs t <+> 
+                                            printTerm' op (if i == 2 then 2 else 0) bs fs u
+printTerm' op i bs fs (t :@: u@(BLam _ _)) = parenIf (i < 1) $ 
+                                            printTerm' op 2 bs fs t <+> 
+                                            printTerm' op (if i == 2 then 2 else 0) bs fs u                                            
 printTerm' op i bs fs (t :@: u)         = parenIf (i < 1) $ 
                                           printTerm' op 2 bs fs t <+> 
                                           printTerm' op 0 bs fs u
@@ -108,15 +120,14 @@ printTerm' op i bs (f:fs) (Lam (t,_) u) = parenIf (i > 1) $
                                           parenIf False (printType op t) <>
                                           text "." <>
                                           printTerm' op 1 (f:bs) fs u
-printTerm' op i bs fs (BLam x u)        = parenIf (i > 1) $  -- Chequear "parenIf"
+printTerm' op i bs fs (BLam x u)        = parenIf (i > 1) $
                                           text "\\" <> 
                                           text x <> 
-                                          text "." <> 
+                                          text "." <>
                                           printTerm' op 1 bs fs u
-printTerm' op i bs fs (t :!: (ty,_))    = parenIf (i < 1) $
-                                          printTerm' op 2 bs fs t <+> -- Chequear valores de "i"
+printTerm' op i bs fs (t :!: (ty,_))    = printTerm' op 0 bs fs t <+>
                                           text "[" <>
-                                          printType op ty <>  -- Arreglar
+                                          printType op ty <>
                                           text "]"
 printTerm' _ _ _ [] (Lam _ _)           = error "prinTerm': no hay nombres para elegir"
 

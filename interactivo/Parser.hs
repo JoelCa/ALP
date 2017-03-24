@@ -153,19 +153,7 @@ unitTerm' = do symbol "["
 unitT :: Parser LamTerm
 unitT = do x <- validIdent1
            return $ LVar x
-        <|> parens (applyT <|> abstraction)
-
-
-applyT = do x <- unitTerm
-            y <- unitTerm
-            f <- applyT'
-            return $ f $ App x y
-
-applyT' :: Parser (LamTerm -> LamTerm)
-applyT' = do x <- unitTerm
-             f <- applyT'
-             return $ \a -> f $ App a x
-          <|> return id
+        <|> parens lambTerm
 
 abstraction :: Parser LamTerm
 abstraction = do char '\\'

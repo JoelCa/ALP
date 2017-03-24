@@ -105,7 +105,7 @@ printTerm' op i bs (f:fs) (Lam (t,_) u) = parenIf (i > 1) $
                                           text "\\" <> 
                                           text f <> 
                                           text ":" <> 
-                                          parenIf True (printType op t) <>
+                                          parenIf False (printType op t) <>
                                           text "." <>
                                           printTerm' op 1 (f:bs) fs u
 printTerm' op i bs fs (BLam x u)        = parenIf (i > 1) $  -- Chequear "parenIf"

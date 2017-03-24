@@ -175,9 +175,9 @@ Ignoring spacing
 > vSymbol syms = token $ many $ sat (\x -> (not $ isAlphaNum x) && (x /= ' ') && (not $ elem x syms))
 >
 > parens :: ParserState s a -> ParserState s a
-> parens p = do char '('
+> parens p = do symbol "("
 >               x <- p
->               char ')'
+>               symbol ")"
 >               return x
 
 

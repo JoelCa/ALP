@@ -147,11 +147,13 @@ num_notFOps = 3
 
   -- Operación "foldeable", donde:
   -- 1. El texto que la identifica.
-  -- 2. Cuerpo de la operación (a lo sumo 2 operandos).
-  -- 3. Es True si es un operador infijo.
+  -- 2. Cuerpo de la operación.
+  -- 3. Indica la cantidad de operandos.
+  -- 4. Es True sii es un operador infijo.
   -- Todas las operaciones que define el usuario son foldeables.
 type FoldeableOp = (String, (Type, TType), Operands, Bool)
 type FOperations = [FoldeableOp]
+
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState
                        , global :: ProverGlobal
@@ -176,14 +178,14 @@ data ProofConstruction = PConstruction { tsubp :: Int              -- Cantidad t
                                        , term :: [SpecialTerm]     -- Lambda termino.
                                        }
 
-  -- Datos de una subprueba.
+  -- Conjunto de subpruebas.
 data SubProof = SP { termContext :: TermContext    -- Vars. de término.
                    , bTypeContext :: BTypeContext  -- Vars. de tipo ligadas.
                                                    -- Útil para el pretty printer.
-                   , lsubp :: Int                  -- Cantidad de subpruebas activas.
+                   , lsubp :: Int                  -- Cantidad de subpruebas activas contenidas.
                    , tvars :: Int                  -- Cantidad total de variables de tipo y
                                                    -- términos disponibles. Útil para el pretty printer.
-                   , ty :: [Maybe (Type, TType)]   -- Tipo objetivo, de cada subprueba hija.
+                   , ty :: [Maybe (Type, TType)]   -- Tipo objetivo, de cada subprueba contenida.
                    }
 
 

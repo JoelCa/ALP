@@ -90,3 +90,16 @@ ascSymbol ->  ! | # | $ | % | & | * | + | . | / | < | = | > | ? | @
   |   \ | ^ | | | - | ~
 uniSymbol ->  any Unicode symbol or punctuation 
 
+- Funcionamiento del algoritmo que controla la eliminación y creación de subpruebas.
+Cuando se crean n subpruebas, con n > 1, que le corresponden los tipos t_1, .., t_n.
+A la cabeza de la lista de subpruebas (subps), p_h, se le asignan los tipos t_2, ..., t_n.
+Además, se añade una nueva prueba p_1 con el tipo t_1.
+
+Cuando la prueba que se encuentra a la cabeza de la lista subps, p_1, termina, puede suceder
+dos cosas. Consideramos a p_t como la cola de subps.
+1. Si p_t = [], no hay más subpruebas.
+2. Si no p_t = p_h : p_t'.Luego, se extrae p_1 de subps, y pueden suceder dos cosas:
+ 1. Si p_h tiene asignado un solo tipo, no se hace nada.
+ 2. Si p_h tiene los tipos t_1, .. t_2, se quita t_1 de los tipos asignados a p_h, 
+y se añade una nueva prueba p_2 con el tipo t1.
+

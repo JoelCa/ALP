@@ -11,7 +11,7 @@
 \usepackage{amssymb}
 \usepackage{tikz}
 \usepackage{prooftree}
-\usetikzlibrary{positioning, babel,shapes,snakes}
+\usetikzlibrary{positioning, babel,shapes}
 \newdimen\nodeDist
 \nodeDist=35mm
 
@@ -33,30 +33,81 @@
 \section{Data types}
 
 \begin{verbatim}
-data ProofState = PState { position :: [Int]
-                         , context :: [Context]
-                         , typeContext :: [TypeContext]
-                         , ty :: [Maybe (Type, TType)]
-                         , term :: [SpecialTerm]
-                         , subp :: Int
-                         , name :: String
-                         , tyFromCut :: [Type]
-                         , subplevel :: [Int]
+data ProverState = PSt { proof :: Maybe ProofState
+                       , global :: ProverGlobal
+                       }
+\end{verbatim}
+
+Estado general del asistente.
+\begin{itemize}
+  \item \texttt{proof}: representa a la prueba que construye el usuario, si existe.
+  \item \texttt{global}: datos globales.
+\end{itemize}
+
+\begin{verbatim}
+data ProverGlobal = PGlobal { fTypeContext :: FTypeContext
+                            , teorems :: Teorems
+                            , opers :: FOperations
+                            }
+\end{verbatim}
+
+Este registro contiene los datos globales del asistente.
+\begin{itemize}
+  \item \texttt{fTypeContext}: variables de tipo libres.
+  \item \texttt{teorems}: teoremas ya probados.
+  \item \texttt{opers}: representa a las operaciones que pueden desplegarse.
+\end{itemize}
+
+\begin{verbatim}
+data ProofState = PState { name :: String
+                         , types :: (Type,TType)
+                         , constr :: ProofConstruction
                          }
 \end{verbatim}
 
+Estado general de la prueba que realiza el usuario.
 \begin{itemize}
-  \item position: cantidad de variables de términos ligadas, para cada prueba.
-  \item context: contexto de variables de términos, para cada prueba.
-  \item typeContext: contexto de variables de tipo, para cada prueba.
-  \item ty: tipos objetivos de las pruebas no concluidas.
-  \item term: representa al lambda término, el cual se va construyendo por partes.
-  \item subp: cantidad total de pruebas no terminadas, o activas.
-  \item name: ?.
-  \item tyFromCut: ?.
-  \item subplevel : Indica la cantidad de sub-pruebas que están activas por nivel.
+  \item \texttt{name}: nombre de la prueba.
+  \item \texttt{types}: tipo, con y sin nombres, que se quiere habitar. Se corresponde a fórmula que quiere probar el usuario.
+  \item \texttt{constr}: construcción de la prueba.
 \end{itemize}
 
+\begin{verbatim}
+data ProofConstruction = PConstruction { tsubp :: Int
+                                       , subps :: [SubProof]
+                                       , cglobal :: ProverGlobal
+                                       , term :: [SpecialTerm]
+                                       }
+\end{verbatim}
+
+Prueba que realiza el usuario.
+\begin{itemize}
+  \item \texttt{tsubp}: cantidad total de subpruebas activas.
+  \item \texttt{subps}: mantiene a todas las subpruebas activas.
+  \item \texttt{cglobal}: datos globales vigentes durante la construcción de la prueba.
+  \item \texttt{term}: representa al lambda término que va formando el usuario.
+\end{itemize}
+
+\begin{verbatim}
+data SubProof = SP { termContext :: TermContext
+                   , bTypeContext :: BTypeContext
+                   , lsubp :: Int
+                   , tvars :: Int
+                   , ty :: [Maybe (Type, TType)]
+                   }
+\end{verbatim}
+
+Representa a un conjunto de subpruebas.
+Consideramos que todas ellas tienen el mismo contexto, comparten tanto los campos \texttt{termContext} como \texttt{bTypeContext}.
+\begin{itemize}
+  \item \texttt{termContext}: contexto de las variables de término.
+  \item \texttt{bTypeContext}: contexto de las variables de tipo ligadas. Nos referimos a las variables que corresponden a una cuantificación.
+  \item \texttt{lsubp}: indica la cantidad de subpruebas que contiene.
+  \item \texttt{tvars}: cantidad total de variables de tipo ligadas, y variables de términos.
+  \item \texttt{ty}: tipos objetivos de cada subprueba.
+\end{itemize}
+
+A continuación, explicamos el data type utilizado para representar al lambda término que construye el usuario.
 
 \begin{verbatim}
 data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) |
@@ -119,7 +170,7 @@ El data type \texttt{TypeHole} representa agujeros de tipos en un lambda términ
              | BLam Var Term
              | Term :!: (Type,TType)
   \end{verbatim}
-
+  
   Donde, \texttt{Type} es el AST de los tipos, y \texttt{TType} es el AST de los tipos sin nombres, es decir que estos emplean la notación De Bruijn.
   \texttt{Type} nos es útil a la hora de imprimir en pantalla el tipo del lambda término, de modo tal que tenga el tipo ingresado por el usuario.
   Mientras que, \texttt{TType} lo usamos en todas las operatorias sobre los tipos de los lambda términos, por ejemplo, en la unificación de tipos, que
@@ -131,7 +182,8 @@ El data type \texttt{TypeHole} representa agujeros de tipos en un lambda términ
   prácticamente la misma que \texttt{TType}, solo varían en el nombre de los constructores.
   
   \item Una subprueba se corresponde a un nodo en el árbol de derivación de la fórmula. Las tácticas que ingresa el usuario construyen dicho árbol,
-  así se obtiene el lambda término que lo representa. La demostración de una fórmula puede requerir la prueba de otras fórmulas. Por ejemplo.
+  así se obtiene el lambda término que lo representa. La demostración de una fórmula puede requerir la prueba de otras fórmulas. Por ejemplo,
+  en la demostración $\vdash (p \rightarrow p) \wedge (q \rightarrow q)$, al aplicar la introducción del and, se genera dos nuevas subpruebas.
   
   \begin{prooftree}
   \[
@@ -166,7 +218,7 @@ El data type \texttt{TypeHole} representa agujeros de tipos en un lambda términ
   (p \rightarrow p) \wedge (q \rightarrow q)
   \end{prooftree}
   
-  Aplicar la introducción del and, genera dos nuevas subpruebas. En el asistente tendríamos la siguiente situación:
+  En el asistente tendríamos lo siguiente:
   
   \begin{verbatim}
   > Theorem t1: (p -> p) /\ (q -> q).
@@ -188,16 +240,16 @@ El data type \texttt{TypeHole} representa agujeros de tipos en un lambda términ
   \end{verbatim}
   
   Cuando se demuestra una fórmula, decimos que la subprueba termina.
-  
-  Podemos ver en la Figura \ref{Estados}, como se aplica el algoritmo de control de las subpruebas, para un caso específico:
+
+  Podemos ver en la Figura \ref{Estados}, la aplicación del algoritmo de control de las subpruebas, al resolver el teorema:
   $p, q \vee  (p \rightarrow t) \rightarrow  r, t, p \wedge t \rightarrow r \rightarrow q \vee t \rightarrow w \vdash w$.
-  Consideramos $C = H0 : p, H1 : q \vee  (p \rightarrow t) \rightarrow  r, H2 : t, H3: p \wedge t \rightarrow r \rightarrow q \vee t \rightarrow w$.
-  Utilizamos la siguiente notación:
+  En dicho diagrama consideramos a $C = H0 : p, H1 : q \vee  (p \rightarrow t) \rightarrow  r, H2 : t, H3: p \wedge t \rightarrow r \rightarrow q \vee t \rightarrow w$.
+  Empleamos la siguiente notación:
   
   \tikz \node[rectangle,draw,label=below:
   Estado de $subps$]{Conjunto de pruebas};
   
-  Donde se transiciona de un estado a otro mediante un comando.
+  Donde la transición de un estado a otro se realiza a partir de un comando.
 
   \begin{figure}  
   \begin{tikzpicture}[->, node distance=2cm, auto, thick,main node/.style={rectangle,draw}]
@@ -205,10 +257,12 @@ El data type \texttt{TypeHole} representa agujeros de tipos en un lambda términ
   \node[main node, label={[align=left]below:$subps = [s_{0}]$\\$\wedge \; ty \; s_{0} = [w]$}] (1) {$C \vdash  w$};
   \node[main node, label={[align=left]below:$subps = [s_{1},s_{0}]$ \\ $\wedge \; ty \; s_{1} = [p \wedge q]$ \\ $\wedge \; ty \; s_{0} = [r,t]$}] 
   (2) [right=of 1] {$C \vdash  p \wedge t$, $C \vdash r$, $C \vdash q \vee t$};
+  \begin{scope}[node distance=1.4cm]
   \node[main node, label={[align=left]below:$subps = [s_{2},s_{1},s_{0}]$\\$\wedge \; ty \; s_{2} = [p]$
-  \\$\wedge \; ty \; s_{1} = [t]$ \\ $\wedge \; ty \; s_{0} = [r,q \vee t]$}] 
+  \\$\wedge \; ty \; s_{1} = [t]$ \\ $\wedge \; ty \; s_{0} = [r,q \vee t]$}]
   (3) [right=of 2] {$C \vdash  p , C \vdash t$, $C \vdash r$, $C \vdash q \vee t$};
-  \begin{scope}[node distance=1.6cm]
+  \end{scope}
+  \begin{scope}[node distance=1cm]
   \coordinate [right=of 3] (4) {};
   \end{scope}
   \begin{scope}[node distance=2.8cm]
@@ -225,8 +279,12 @@ El data type \texttt{TypeHole} representa agujeros de tipos en un lambda términ
   \begin{scope}[node distance=2.8cm]
   \node[main node, label={[align=left]below:$subps = [s_{3},s_{0}]$ \\$\wedge \; ty \; s_{3} = [p \rightarrow t]$ \\ $\wedge \; ty \; s_{0} = [t]$}] 
   (9) [below=of 8] {$C \vdash p \rightarrow t$, $C \vdash t$};
+  \end{scope}
+  \begin{scope}[node distance=1.5cm]
   \node[main node, label={[align=left]below:$subps = [s_{3},s_{0}]$ \\$\wedge \; ty \; s_{3} = [t]$ \\ $\wedge \; ty \; s_{0} = [t]$}] 
   (10) [right=of 9] {$\{C, H4: p \}\vdash t$, $C \vdash t$};
+  \end{scope}
+  \begin{scope}[node distance=2.8cm]
   \node[main node, label={[align=left]below:$subps = [s_{0}]$ \\ $\wedge \; ty \; s_{0} = [t]$}] 
   (11) [right=of 10] {$C \vdash t$};
   \node[main node, label={[align=left]below:$subps = [\;]$}] 
@@ -240,44 +298,6 @@ El data type \texttt{TypeHole} representa agujeros de tipos en un lambda términ
   \end{tikzpicture}
   \caption{Diagrama de estados.} \label{Estados}
   \end{figure}
-  
-
-
-%   A la hora de crear una sub-prueba es necesario duplicar ciertos atributos de la prueba.
-%   \begin{itemize}
-%     \item position.
-%     \item context.
-%     \item typeContext.
-%   \end{itemize}
-%    Una vez que termina una prueba, la siguiente puede continuar a partir del estado de los atributos copiados.
-%    La idea del algoritmo que implementamos es la siguiente. Cuando un usuario crea $n$ pruebas en un estado $s_{0}$, donde $n > 1$, hacemos en total $n-1$ copias 
-%    de $s_{0}$, una copia cada vez que termina una sub-prueba. Consideramos a un estado como una instancia de los tres atributos dados anteriormente.
-%    Sean $s$ una lista de estados, $s_{i}$ un elemento de $s$, y tanto $spt$, como $spl$, listas de enteros. Donde, $spt$ y $spl$ se corresponden a los campos 
-%    \texttt{subp} y \texttt{subplevel} del registro \texttt{ProofState}.
-%    Podemos ver en la Figura \ref{Estados}, como se aplica el algoritmo para un caso específico. 
-%    
-%   \begin{figure} 
-%   \begin{tikzpicture}[node distance=2cm] 
-%   \path 
-%     (0,0) node(A)[align=center, below] {$n = 0$ \\ $s = [ x_{0} ]$ \\ $spt = 1$ \\ $spl = [1]$}
-%     (3,0) node(B)[align=center, below] {$n = 2$ \\ $s = [ x_{0}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [2]$}
-%     (6,0) node(C)[align=center, below] {$n = 0$ \\ $s = [ x_{1}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [2]$}
-%     (9,0) node(D)[align=center, below] {$n = 2$ \\ $s = [ x_{1}, x_{1}, x_{0} ]$ \\ $spt = 3$ \\ $spl = [2,2]$}
-%     (12,0) node(E)[align=center, below] {$n = 0$ \\ $s = [ x_{2}, x_{1}, x_{0} ]$ \\ $spt = 3$ \\ $spl = [2,2]$}
-%     (15,0) node(F)[align=center, below] {$n = -1$ \\ $s = [ x_{1}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [1,2]$}
-%     (15,-3) node(G)[align=center, below] {$n = 0$ \\ $s = [ x_{3}, x_{0} ]$ \\ $spt = 2$ \\ $spl = [1,2]$}
-%     (12,-3) node(H)[align=center, below] {$n = -1$ \\ $s = [ x_{0} ]$ \\ $spt = 1$ \\ $spl = [1]$}
-%     (9,-3) node(I)[align=center, below] {$n = 0$ \\ $s = [ x_{4} ]$ \\ $spt = 1$ \\ $spl = [1]$}
-%     (6,-3) node(J)[align=center, below] {$n = -1$ \\ $s = [ \; ]$ \\ $spt = 0$ \\ $spl = [ \; ]$};
-%   
-%   \draw[->]
-%     (A) edge (B) (B) edge (C) (C) edge (D) (D) edge (E)  (E) edge (F) (F) edge (G)
-%     (G) edge (H) (H) edge (I) (I) edge (J);
-%  
-%   \end{tikzpicture}
-%   \caption{Diagrama de estados.} \label{Estados}
-%   \end{figure}
-  
   
   
   \item Aunque halla un lambda término con variables de tipo que tengan el mismo nombre que las variables de términos, su semántica de tipos está
@@ -294,6 +314,7 @@ El data type \texttt{TypeHole} representa agujeros de tipos en un lambda términ
   Ver caso: \texttt{Definition x x y := forall w, forall v, x and y}.
   \item Hacer que el lambda término devuelto en la construcción de una prueba, puede ser inferido por el comando \texttt{infer}.
   Ver caso: \texttt{Theorem: p -> q -> (((p and q) and (p and p)) and q) and p}.
+  \item Simplicar el data type \texttt{SubProof}.
 \end{itemize}
 
 

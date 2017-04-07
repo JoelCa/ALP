@@ -5,6 +5,7 @@ import Text.PrettyPrint.HughesPJ hiding (parens)
 import qualified Text.PrettyPrint.HughesPJ as PP 
 import Data.List
 import qualified Data.Sequence as S
+import qualified Data.Vector as V
 
 -----------------------
 --- pretty printer
@@ -91,7 +92,7 @@ printTermTType' _ _ _ _ _ [] (BLam _ _)             = error "prinTerm': no hay n
 
 
 printTypeTermTType :: FOperations -> [String] -> TType -> Doc
-printTypeTermTType op bs t = printTType' op 1 bs ((typeVars \\ fType t) \\ bs) t
+printTypeTermTType op bs t = printTType' op (7,7,False) bs ((typeVars \\ fType t) \\ bs) t
 
 
 -- Pretty-printer de términos, con tipos con nombres.
@@ -135,49 +136,41 @@ printTerm' _ _ _ [] (Lam _ _)           = error "prinTerm': no hay nombres para 
 
 -- Pretty-printer de tipos sin nombres.
 printTType :: FOperations -> TType -> Doc
-printTType op t = printTType' op 1 [] (typeVars \\ fType t) t
+printTType op t = printTType' op (7,7,False) [] (typeVars \\ fType t) t
 
 -- Chequear si es necesario usar parenIf
-printTType' :: FOperations -> Int -> [String] -> [String] -> TType -> Doc
+printTType' :: FOperations -> (Int, Int, Bool) -> [String] -> [String] -> TType -> Doc
 printTType' op _ bs _ (TBound n) = text $ bs !! n
 printTType' op _ bs _ (TFree n) = text n
-printTType' op i bs fs (TFun t u) = parenIf (i > 1) $ 
-                                    printTType' op 2 bs fs t <+>
-                                    text "->" <+>
-                                    printTType' op 0 bs fs u
-printTType' op i bs (f:fs) (TForAll t) =  parenIf (i > 1) $ 
-                                          text "forall" <+> 
-                                          text f <> 
-                                          text "," <+> 
-                                          printTType' op 1 (f:bs) fs t
-printTType' op i bs fs (RenameTTy n [t1,t2])
-  | n < 0 = parenIf (i > 1) $
-            printBinOpInfix (getTextFromDefaultOp n)
-            (printTType' op 2 bs fs t1)
-            (printTType' op 0 bs fs t2)
-  | otherwise = let (s,_,_,inf) = op !! n
+printTType' op prec bs fs (TFun t1 t2) =
+  printBinInfix (\x t -> printTType' op x bs fs t) "->" prec 5 t1 t2
+printTType' op (i,j,k) bs (f:fs) (TForAll t) =
+  parenIf (i < 7) $ 
+  text "forall" <+> 
+  text f <> 
+  text "," <+> 
+  printTType' op (7,j,k) (f:bs) fs t
+printTType' op prec@(i,j,k) bs fs (RenameTTy n [t1,t2])
+  | n == and_code = printBinInfix (\x t -> printTType' op x bs fs t)
+                    (getTextFromDefaultOp n) prec 3 t1 t2
+  | n == or_code = printBinInfix (\x t -> printTType' op x bs fs t)
+                   (getTextFromDefaultOp n) prec 4 t1 t2
+  | n == iff_code = printBinInfix (\x t -> printTType' op x bs fs t)
+                    (fst4 $ op V.! n) prec 6 t1 t2
+  | otherwise = let (s,_,_,inf) = op V.! n
                 in if inf
-                   then parenIf (i > 1) $
-                        printBinOpInfix s
-                        (printTType' op 2 bs fs t1)
-                        (printTType' op 0 bs fs t2)
-                   else parenIf (i > 1) $
-                        printBinOpPrefix s
-                        (printTType' op 2 bs fs t1)
-                        (printTType' op 0 bs fs t2)
-printTType' op i bs fs (RenameTTy n [t])
-  | n < 0 = parenIf (i > 1) $
-            printUnaryOpPrefix (getTextFromDefaultOp n)
-            (printTType' op 2 bs fs t)
-  | otherwise = let (s,_,_,_) = op !! n
-                in parenIf (i > 1) $
-                   printUnaryOpPrefix s
-                   (printTType' op 2 bs fs t)
+                   then parenIf ( i < 2 || ( i == 2 && ( j < n || ( j == n && k )))) $
+                        printTType' op (2, n, True) bs fs t1 <+>
+                        text s <+> 
+                        printTType' op (2, n, False) bs fs t2
+                   else printBinPrefix (\x t -> printTType' op x bs fs t) s prec t1 t2
+printTType' op prec bs fs (RenameTTy n [t]) =
+  printUnaryPrefix (\x t -> printTType' op x bs fs t) (fst4 $ op V.! n) prec t
 printTType' op i bs fs (RenameTTy n [])
-  | n < 0 = text $ getTextFromDefaultOp n
-  | otherwise = let (s,_,_,_) = op !! n
-                in text s
-printTType' _ _ _ _ (RenameTTy _ _) = error "error: printTType', no debería pasar."
+  | n == bottom_code = text $ bottom_text
+  | otherwise = text (fst4 $ op V.! n)
+printTType' _ _ _ _ (RenameTTy _ _) =
+  error "error: printTType', no debería pasar."
 
 getTextFromDefaultOp :: Int -> String
 getTextFromDefaultOp n = case find (\(_,x,_) -> x == n) notFoldeableOps of
@@ -187,47 +180,67 @@ getTextFromDefaultOp n = case find (\(_,x,_) -> x == n) notFoldeableOps of
 -- Pretty-printer de tipos con nombres.
 -- Consideramos que las operaciones "custom", son a lo suma binaria.
 -- Además, que las operaciones unaria solo se imprimen de forma prefija.
+-- Obs: Basta con que la primera componente de la tripleta, que se pasa como argumento a
+-- printType', sea mayor o igual a 7, para asegurar que no aparescan paréntesis "externos".
 printType :: FOperations -> Type -> Doc
-printType = printType' False
+printType = printType' (7,7,False)
 
-printType' :: Bool -> FOperations -> Type -> Doc
-printType' _ _ (B v)             = text v
-printType' False op (Fun t1 t2)  = printType' True op t1 <+> 
-                                   text "->"          <+> 
-                                   printType' False op t2
-printType' False op (ForAll v t) = text "forall" <+>
-                                   text v <>
-                                   text "," <+>
-                                   printType' False op t
-printType' False op (RenameTy s [t1, t2]) =
-  case find (\(x,_,_,_) -> x == s) op of
-    Just (_,_,_,False) -> printBinOpPrefix s
-                        (printType' True op t1)
-                        (printType' False op t2)
-    _ -> printBinOpInfix s
-         (printType' True op t1)
-         (printType' False op t2)                  
-printType' False op (RenameTy s [t]) = 
-  printUnaryOpPrefix s
-  (printType' True op t)
-printType' False op (RenameTy s []) = text s
-printType' False op (RenameTy _ _) = error "error: printType' no debería pasar."
-printType' True op t               = PP.parens $ printType' False op t
+printType' :: (Int, Int, Bool) -> FOperations -> Type -> Doc
+printType' _ _ (B v) =
+  text v
+printType' prec op (Fun t1 t2) =
+  printBinInfix (\x t -> printType' x op t) "->" prec 5 t1 t2
+printType' (i,j,k) op (ForAll v t) =
+  parenIf (i < 7) $
+  text "forall" <+>
+  text v <>
+  text "," <+>
+  printType' (7,j,k) op t
+printType' prec@(i,j,k) op (RenameTy s [t1, t2])
+  | s == and_text = printBinInfix (\x t -> printType' x op t) s prec 3 t1 t2
+  | s == or_text = printBinInfix (\x t -> printType' x op t) s prec 4 t1 t2
+  | s == iff_text = printBinInfix (\x t -> printType' x op t) s prec 6 t1 t2
+  | otherwise = case getElemIndex (\(x,_,_,_) -> x == s) op of
+          Just (_, (_,_,_,False)) ->
+            printBinPrefix (\x t -> printType' x op t) s prec t1 t2
+          Just (n, (_,_,_,True)) ->
+            parenIf ( i < 2 || ( i == 2 && ( j < n || ( j == n && k )))) $
+            printType' (2, n, True) op t1 <+>
+            text s <+> 
+            printType' (2, n, False) op t2
+          _ -> error "error: printType' no debería pasar."
+printType' prec op (RenameTy s [t]) =
+  printUnaryPrefix (\x t -> printType' x op t) s prec t
+printType' _ _ (RenameTy s []) =
+  text s
+printType' _ _ (RenameTy _ _) =
+  error "error: printType' no debería pasar."
 
+printBinPrefix :: ((Int, Int, Bool) -> a -> Doc) -> String
+               -> (Int, Int, Bool) -> a -> a -> Doc
+printBinPrefix f s (i, j, k) t1 t2 =
+  parenIf (i == 0) $
+  text s <+>
+  f (0, j, k) t1 <+>
+  f (0, j, k) t2
 
-printBinOpInfix :: String -> Doc -> Doc -> Doc
-printBinOpInfix s d1 d2 = d1 <+> 
-                          text s <+>
-                          d2
+printUnaryPrefix :: ((Int, Int, Bool) -> a -> Doc) -> String
+                 -> (Int, Int, Bool) -> a -> Doc
+printUnaryPrefix f s (i, j, k) t
+  | s == not_text = parenIf (i < 1) $
+                    text s <+>
+                    f (1, j, k) t
+  | otherwise = parenIf (i == 0) $
+                text s <+>
+                f (0, j, k) t
 
-printBinOpPrefix :: String -> Doc -> Doc -> Doc
-printBinOpPrefix s d1 d2 = text s <+>
-                           d1 <+>
-                           d2
-
-printUnaryOpPrefix :: String -> Doc -> Doc
-printUnaryOpPrefix s d = text s <+>
-                         d
+printBinInfix :: ((Int, Int, Bool) -> a -> Doc) -> String
+              -> (Int, Int, Bool) -> Int -> a -> a -> Doc              
+printBinInfix f s (i,j,k) n t1 t2 =
+  parenIf (i < n || ( (i == n) && k)) $
+  f (n, j, True) t1 <+>
+  text s <+> 
+  f (n, j, False) t2
 
 -- Pretty-printer de la prueba.
 printProof :: Int -> FOperations -> FTypeContext -> [SubProof] -> Doc
@@ -257,7 +270,7 @@ printLevelGoals i tp op (t:ts) =
   printLevelGoals (i+1) tp op ts
 
 printGoal :: FOperations -> Maybe (Type, TType) -> Doc
-printGoal op (Just (ty,_)) = printType' False op ty
+printGoal op (Just (ty,_)) = printType op ty
 printGoal op Nothing = text "Prop"
 
 printContext :: FOperations -> (FTypeContext, BTypeContext) -> TermContext -> Doc

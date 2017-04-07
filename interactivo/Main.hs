@@ -13,9 +13,9 @@ import Data.Maybe
 import qualified Data.Map as Map
 import qualified Data.Sequence as S
 import Data.List (find, findIndex, elemIndex)
+import qualified Data.Vector as V
 
 type ProverInputState a = InputT (StateT ProverState IO) a
-
 
 -- Teoremas iniciales.
 initialT' = [ ("intro_and", intro_and),
@@ -50,10 +50,16 @@ iff_op = (iff_text
 initProverState :: ProverState
 initProverState = PSt { global = PGlobal { teorems = initialT
                                          , fTypeContext = []
-                                         , opers = [ not_op
-                                                   , iff_op] }
-                      , proof = Nothing }
-
+                                         , opers = V.fromList [ not_op
+                                                              , iff_op
+                                                              ]
+                                         , parsers = [ P emptyParser
+                                                     , P emptyParser
+                                                     , P basicInfixParser
+                                                     ]
+                                         }
+                      , proof = Nothing
+                      }
 
 main :: IO ()
 main = do args <- getArgs
@@ -72,7 +78,7 @@ prover = do s <- lift get
                                  return ()
               Just "-r" -> resetProof
               Just "" -> prover
-              Just x -> catch (do command <- returnInput $ getCommand x (opers $ global s)
+              Just x -> catch (do command <- returnInput $ getCommand x (parsers $ global s)
                                   checkCommand command)
                         (\e -> errorMessage (opers $ global s) (e :: ProofExceptions) >> prover)
 
@@ -102,11 +108,25 @@ checkCommand (Props ps) =
 checkCommand (TypeDef (op, body, operands, isInfix)) =
   do s <- lift get
      let glo = global s
-     when (isJust $ find (\(x,_,_,_)-> x == op) $ opers glo) (throwIO $ DefE op)
-     (t,t') <- returnInput $ rename (fTypeContext glo) (opers glo) body
-     lift $ put $ s {global = glo {opers = (op, (t,t'), operands, isInfix) : opers glo}}
+     when (isJust $ V.find (\(x,_,_,_)-> x == op) $ opers glo) (throwIO $ DefE op)
+     t <- returnInput $ rename (fTypeContext glo) (opers glo) body
+     let [p1,p2,p3] = parsers glo
+     case (operands, isInfix) of
+       (Empty, False) ->
+         lift $ put $ s {global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix)
+                                      , parsers = [P $ getConstParser op $ runParser p1, p2, p3] }}
+       (Unary, False) ->
+         lift $ put $ s {global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix)
+                                      , parsers = [p1, P $ getUnaryPrefixParser op $ runParser p2, p3] }}
+       (Binary, False) ->
+         lift $ put $ s {global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix)
+                                      , parsers = [p1, P $ getBinaryPrefixParser op $ runParser p2, p3] }}
+       (Binary, True) ->
+         lift $ put $ s {global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix)
+                                      , parsers = [p1, p2, P $ getInfixParser op $ runParser p3] }}
+       _ -> error "error: checkCommand, no debería pasar."
      s' <- lift get        -- BORRAR
-     outputStrLn $ show $ opers $ global s'
+     outputStrLn $ show $ opers $ global s'       
      prover
 checkCommand (Ta (Print x)) =
   do s <- lift get
@@ -133,7 +153,7 @@ checkCommand (Ta ta) =
      lift $ put $ s {proof = Just $ pr {constr = p}}
      if (isFinalTerm p)
        then ((outputStrLn $ "Prueba completa.\n"
-               ++ renderFinalTerm p ++ "\n")
+              ++ renderFinalTerm p ++ "\n")
              >> reloadProver)
        else (outputStrLn (renderProof p) >> (outputStrLn $ show $ length $ term p))
      prover

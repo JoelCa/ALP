@@ -9,6 +9,7 @@ import qualified Data.Sequence as S
 import Data.Maybe (fromJust, isJust)
 import ProofState
 import Data.Foldable (foldl)
+import qualified Data.Vector as V
 
 -- Contruye la prueba.
 habitar :: Tactic -> Proof ()
@@ -93,25 +94,21 @@ habitar (Exact (Left ty)) = do x <- getType
 habitar (Unfold s Nothing) = do x <- getType
                                 (t,t') <- maybeToProof EmptyType x
                                 op <- getUsrOpers
-                                case findIndex (\(x,_,_,_) -> x == s) op of
-                                  Just m -> do let (_, (tt,tt'), _, _) = op !! m
-                                               btc <- getBTypeContext
-                                               ftc <- getFTypeContext
-                                               replaceType $ unfoldComm (t,t') (tt,tt') m btc ftc
-                                  Nothing -> throw $ UnfoldE1 s
+                                (m, (_, (tt,tt'), _, _)) <- maybeToProof (UnfoldE1 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
+                                btc <- getBTypeContext
+                                ftc <- getFTypeContext
+                                replaceType $ unfoldComm (t,t') (tt,tt') m btc ftc
 habitar (Unfold s (Just h)) = do op <- getUsrOpers
-                                 case findIndex (\(x,_,_,_) -> x == s) op of
-                                   Just m -> do n <- getTTermVars
-                                                i <- maybeToProof UnfoldE2 $ getHypothesisValue n h
-                                                c <- getTermContext
-                                                let (x,y,t,t') = S.index c (n-i-1)
-                                                    (_, (tt,tt'), _, _) = op !! m
-                                                btc <- getBTypeContext
-                                                ftc <- getFTypeContext
-                                                let (r,r') = unfoldComm (t,t') (tt,tt') m btc ftc
-                                                updateTermContext (n-i-1) (x,y,r,r')
-                                   Nothing -> throw $ UnfoldE1 s
-                                   
+                                 (m, (_, (tt,tt'), _, _)) <- maybeToProof (UnfoldE1 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
+                                 n <- getTTermVars
+                                 i <- maybeToProof UnfoldE2 $ getHypothesisValue n h
+                                 c <- getTermContext
+                                 let (x,y,t,t') = S.index c (n-i-1)
+                                 btc <- getBTypeContext
+                                 ftc <- getFTypeContext
+                                 let (r,r') = unfoldComm (t,t') (tt,tt') m btc ftc
+                                 updateTermContext (n-i-1) (x,y,r,r')
+
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando INTRO e INTROS
 
@@ -607,22 +604,12 @@ rename' rv bv fv op (RenameTy s ts) =
                                let (xs,ys) = unzip rs
                                return (RenameTy s xs, RenameTTy n ys)
                        else throw $ OpE1 s
-      Nothing ->  case getCodeFromOP s op of
-                    Just (m, to) -> if checkOperands to ts
-                                    then do rs <- sequence $ map (rename' rv bv fv op) ts
-                                            let (xs,ys) = unzip rs
-                                            return (RenameTy s xs, RenameTTy m ys)
-                                    else throw $ OpE1 s
-                    Nothing -> throw $ OpE2 s
-                    
-getCodeFromOP :: String -> FOperations -> Maybe (Int, Operands)
-getCodeFromOP = getCodeFromOP' 0
-
-getCodeFromOP' :: Int -> String -> FOperations -> Maybe (Int, Operands)
-getCodeFromOP' _ _ [] = Nothing
-getCodeFromOP' n x ((y,_,o,_):ys)
-  | x == y = return (n,o)
-  | otherwise = getCodeFromOP' (n+1) x ys
+      Nothing -> do (m, (_,_,to,_)) <- maybeToEither (OpE2 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
+                    if checkOperands to ts
+                      then do rs <- sequence $ map (rename' rv bv fv op) ts
+                              let (xs,ys) = unzip rs
+                              return (RenameTy s xs, RenameTTy m ys)
+                      else throw $ OpE1 s
 
 checkOperands :: Operands -> [a] -> Bool
 checkOperands Empty [] = True
@@ -682,12 +669,11 @@ typeWhitoutName op tyc (RenameTy s ts) =
                      then do rs <- sequence $ map (typeWhitoutName op tyc) ts
                              return $ RenameTTy n rs
                      else throw $ OpE1 s
-    Nothing -> case getCodeFromOP s op of
-                 Just (m,to) -> if checkOperands to ts
-                                then do rs <- sequence $ map (typeWhitoutName op tyc) ts
-                                        return $ RenameTTy m rs
-                                else throw $ OpE1 s
-                 Nothing -> throw $ OpE2 s
+    Nothing -> do (m, (_,_,to,_)) <- maybeToEither (OpE2 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
+                  if checkOperands to ts
+                    then do rs <- sequence $ map (typeWhitoutName op tyc) ts
+                            return $ RenameTTy m rs
+                    else throw $ OpE1 s
                  
 ----------------------------------------------------------------------------------------------------------------------
 -- Algoritmo de inferencia de tipos de un lambda término.

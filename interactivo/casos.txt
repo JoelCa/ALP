@@ -65,4 +65,12 @@ Para chequear el pretty pinter de la prueba.
   Theorem t25 : forall w, forall y, x w y -> x w y.
 Para probar el parseo (antes no se parseaba bien).
 - Theorem t26: forall w, forall y,  w /\ y -> w \/ y.
-Para probar que puede inferirse el tipo del lambda término asociado.
+Para probar que puede inferirse el tipo del lambda término asociado
+- Theorem t27: p -> p <-> p -> p.
+Para probar el pretty printer (precedencias).
+- Definition fun1 w := forall x, w -> x -> w.
+  Definition fun2 w := forall x, w -> x -> x -> w.
+  Theorem t28:fun1 (fun2 p).
+Para probar el pretty printer (precedencias).
+- Theorem t29: p -> p \/ p /\ p \/ q.
+Para probar el pretty printer (precedencias).

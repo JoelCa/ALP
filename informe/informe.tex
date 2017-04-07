@@ -121,6 +121,55 @@ exclusiva, es decir solo puede tener un solo tipo de agujero.
 
 El data type \texttt{TypeHole} representa agujeros de tipos en un lambda término.
 
+\section{Gramáticas}
+ Gramática del lambda calculo.
+
+\begin{tabbing}
+$\langle lamterm \rangle$ \= $::=$ $\langle abs \rangle$ | $\langle term \rangle$ ( $\langle abs \rangle$ | $\varepsilon$ ) \\
+
+$\langle term \rangle$ \> $::=$ $\langle term \rangle$ ($\langle unitterm \rangle$ | $\varepsilon$) \\
+
+$\langle unitterm \rangle$ \> $::=$ \texttt{'('} $\langle lambterm \rangle$ \texttt{')'} |
+$\langle var \rangle$ | $\langle unitterm \rangle$ \texttt{'['} $\langle typeterm \rangle$ \texttt{']'}\\
+
+$\langle abs \rangle$ \> $::=$ \texttt{'$\lambda$'} $\langle var \rangle$ \texttt{'.'} $\langle lamterm \rangle$ \\
+\end{tabbing}
+
+Consideramos a $\langle var \rangle$, como la gramática de palabras alfanuméricas, incluido el guión bajo, exceptuando
+las palabras reservadas: $Theorem$, $Definition$, $forall$, $False$.
+
+Gramática del lambda calculo, sin recursión a izquierda.
+
+\begin{tabbing}
+$\langle lamterm \rangle$ \= $::=$ $\langle abs \rangle$ | $\langle term \rangle$ ( $\langle abs \rangle$ | $\varepsilon$ ) \\
+
+$\langle term \rangle$ \> $::=$ $\langle unitterm \rangle$ $\langle term' \rangle$ \\
+
+$\langle term' \rangle$ \> $::=$  $\langle unitterm \rangle$  $\langle term' \rangle$ | $\varepsilon$ \\
+
+$\langle unitterm \rangle$ \> $::=$ $\langle unit \rangle$ $\langle unitterm' \rangle$ \\
+
+$\langle unitterm' \rangle$ \> $::=$ \texttt{'['} $\langle typeterm \rangle$ \texttt{']'} $\langle unitterm' \rangle$ | $\varepsilon$ \\
+
+$\langle unit \rangle$ \> $::=$ \texttt{'('} $\langle lambterm \rangle$ \texttt{')'} | $\langle var \rangle$ \\
+
+$\langle abs \rangle$ \> $::=$ \texttt{'$\lambda$'} $\langle var \rangle$ \texttt{'.'} $\langle lamterm \rangle$
+\end{tabbing}
+
+Gramática de tipos.
+
+\begin{tabbing}
+$\langle typeterm \rangle$ \= $::=$ $\langle unit_{1} \rangle$ ( \texttt{'->'} $\langle typeterm \rangle$ | $\varepsilon$ ) |
+\texttt{'forall'} $\langle var \rangle$ \texttt{'.'} $\langle typeterm \rangle$\\
+$\langle unit_{1} \rangle$ \= $::=$ $\langle unit_{2} \rangle$ ( \texttt{'$\vee$'} $\langle unit_{1} \rangle$ | $\varepsilon$ ) \\
+$\langle unit_{2} \rangle$ \= $::=$ $\langle unit_{3} \rangle$ ( \texttt{'$\wedge$'} $\langle unit_{2} \rangle$ | $\varepsilon$ ) \\
+$\langle unit_{3} \rangle$ \= $::=$ \texttt{'('} $\langle typeterm \rangle$ \texttt{')'} | \texttt{'\textasciitilde'} $\langle unit_{3} \rangle$ | 
+$\langle var \rangle$ | $\langle const \rangle$ | $\langle unaryOps \rangle$
+\end{tabbing}
+
+Consideramos a $\langle const \rangle$ y $\langle unaryOps \rangle$, como las gramáticas de los operadores vacíos y unarios, respectivamente,
+definidos por el usuario.
+
 
 \section{Observaciones}
 \begin{itemize}
@@ -305,6 +354,12 @@ El data type \texttt{TypeHole} representa agujeros de tipos en un lambda términ
   
   \item Al hacer el parser del lambda cálculo, asumí que la aplicación de tipos tiene más precedencia que la aplicación de términos, ¿está bien?.
   Ejemplo: $x \; y \; [A] = x \; (y \; [A]).$
+  
+  \item El pretty printer de los tipos o fórmulas, no utiliza la menor cantidad de paréntesis, cuando hay un \texttt{para todo} y \texttt{<->}.
+  Por ejemplo \texttt{forall x, x <-> forall y, y}; se imprime así: \texttt{forall x, x <-> (forall y, y)}.
+  
+  \item Coq permite iniciar una nueva prueba de un teorema cuando la actual prueba no ha concluido.
+  Sin embargo, solo se puede ``usar'' un teorema cuando ha sido probado mediante \textit{Proof}, y \textit{Qed}.
   
 
 \end{itemize}

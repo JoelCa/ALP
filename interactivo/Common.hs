@@ -10,6 +10,14 @@ import Data.Map (Map)
 import Control.Monad (ap, liftM)
 import Control.Monad.State.Lazy
 import Data.Sequence (Seq)
+import Parsing
+import qualified Data.Vector as V (Vector, ifoldl)
+
+type Parser a = ParserState UsrOpsParsers a
+
+type UsrOpsParsers = [ParserParser Type]
+
+newtype ParserParser a = P { runParser :: Parser a}
 
   -- Nombres.
 data Name
@@ -136,14 +144,15 @@ bottom_code = snd3 bottom_
 not_text = "~"
 iff_text = "<->"
 
+iff_code = 1 :: Int
 not_code = 0 :: Int
 
   -- Conjunto de operaciones NO "foldeables".
 notFoldeableOps :: [(String, Int, Operands)]
 notFoldeableOps = [and_, or_, bottom_]
 
-num_notFOps :: Int
-num_notFOps = 3
+-- num_notFOps :: Int
+-- num_notFOps = 3
 
   -- Operación "foldeable", donde:
   -- 1. El texto que la identifica.
@@ -152,7 +161,7 @@ num_notFOps = 3
   -- 4. Es True sii es un operador infijo.
   -- Todas las operaciones que define el usuario son foldeables.
 type FoldeableOp = (String, (Type, TType), Operands, Bool)
-type FOperations = [FoldeableOp]
+type FOperations = V.Vector FoldeableOp
 
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState
@@ -163,6 +172,7 @@ data ProverState = PSt { proof :: Maybe ProofState
 data ProverGlobal = PGlobal { fTypeContext :: FTypeContext
                             , teorems :: Teorems             -- Teoremas.
                             , opers :: FOperations           -- Operaciones "foldeables".
+                            , parsers :: UsrOpsParsers
                             }
                     
   -- Estado de la prueba que se está construyendo.
@@ -241,3 +251,7 @@ fst3 (x, _, _) = x
 
 snd3 :: (a, b, c) -> b
 snd3 (_, x, _) = x
+
+getElemIndex :: (a -> Bool) -> V.Vector a -> Maybe (Int, a)
+getElemIndex f v = V.ifoldl (\r i x -> if f x then Just (i, x) else r) Nothing v
+

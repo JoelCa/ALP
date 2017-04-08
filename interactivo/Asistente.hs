@@ -724,7 +724,6 @@ renameTType' _ _ t@(TFree x) = t
 renameTType' n r (TForAll t) = TForAll $ renameTType' (n+1) r t
 renameTType' n r (TFun t1 t2) = TFun (renameTType' n r t1) (renameTType' n r t2)
 renameTType' n r (RenameTTy op ts) = RenameTTy op $ map (renameTType' n r) ts
--- renameTType' n r (TExists t) = TExists $ renameTType' (n+1) r t
 
 -- Consideramos que el 1º argumento corresponde al cuerpo de un "para todo".
 -- Se reemplaza la variable ligada más "externa" por el 2º argumento.

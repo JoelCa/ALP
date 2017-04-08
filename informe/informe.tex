@@ -156,19 +156,23 @@ $\langle unit \rangle$ \> $::=$ \texttt{'('} $\langle lambterm \rangle$ \texttt{
 $\langle abs \rangle$ \> $::=$ \texttt{'$\lambda$'} $\langle var \rangle$ \texttt{'.'} $\langle lamterm \rangle$
 \end{tabbing}
 
-Gramática de tipos.
+Gramática de fórmulas o tipos.
 
 \begin{tabbing}
-$\langle typeterm \rangle$ \= $::=$ $\langle unit_{1} \rangle$ ( \texttt{'->'} $\langle typeterm \rangle$ | $\varepsilon$ ) |
+$\langle typeterm \rangle$ \= $::=$ $\langle unit_{1} \rangle$ ( \texttt{'<->'} $\langle typeterm \rangle$ | $\varepsilon$ ) |
 \texttt{'forall'} $\langle var \rangle$ \texttt{'.'} $\langle typeterm \rangle$\\
-$\langle unit_{1} \rangle$ \= $::=$ $\langle unit_{2} \rangle$ ( \texttt{'$\vee$'} $\langle unit_{1} \rangle$ | $\varepsilon$ ) \\
-$\langle unit_{2} \rangle$ \= $::=$ $\langle unit_{3} \rangle$ ( \texttt{'$\wedge$'} $\langle unit_{2} \rangle$ | $\varepsilon$ ) \\
-$\langle unit_{3} \rangle$ \= $::=$ \texttt{'('} $\langle typeterm \rangle$ \texttt{')'} | \texttt{'\textasciitilde'} $\langle unit_{3} \rangle$ | 
-$\langle var \rangle$ | $\langle const \rangle$ | $\langle unaryOps \rangle$
+$\langle unit_{1} \rangle$ \= $::=$ $\langle unit_{2} \rangle$ ( \texttt{'->'} $\langle unit_{1} \rangle$ | $\varepsilon$ ) \\
+$\langle unit_{2} \rangle$ \= $::=$ $\langle unit_{3} \rangle$ ( \texttt{'$\vee$'} $\langle unit_{2} \rangle$ | $\varepsilon$ ) \\
+$\langle unit_{3} \rangle$ \= $::=$ $\langle infixOps \rangle$ ( \texttt{'$\wedge$'} $\langle unit_{3} \rangle$ | $\varepsilon$ ) \\
+$\langle unit_{4} \rangle$ \= $::=$ $\langle unit_{5} \rangle$ | \texttt{'$\sim$'} $\langle unit_{4} \rangle$ |
+$\langle prefixOps_{1} \rangle$ | $\langle prefixOps_{2} \rangle$ \\
+$\langle unit_{5} \rangle$ \= $::=$ \texttt{'('} $\langle typeterm \rangle$ \texttt{')'} | $\langle var \rangle$ | 
+$\langle prefixOps_{0} \rangle$
+
 \end{tabbing}
 
-Consideramos a $\langle const \rangle$ y $\langle unaryOps \rangle$, como las gramáticas de los operadores vacíos y unarios, respectivamente,
-definidos por el usuario.
+Consideramos a $\langle prefixOps_{i} \rangle$, con $0 \leq i \leq 2$, como las gramáticas de los operadores prefijos definidos por el usuario.
+Mientras que $\langle infixOps \rangle$ es la gramática de los operadores binarios infijos, el cual debe hacer referencia a $\langle unit_{4} \rangle$.
 
 
 \section{Observaciones}
@@ -361,16 +365,17 @@ definidos por el usuario.
   \item Coq permite iniciar una nueva prueba de un teorema cuando la actual prueba no ha concluido.
   Sin embargo, solo se puede ``usar'' un teorema cuando ha sido probado mediante \textit{Proof}, y \textit{Qed}.
   
+  \item Coq en algunos casos nos devuelve, mediante el comando \texttt{Print}, un lambda término ``incompleto'', al cual no es posible encontrarle
+  un tipo mediante el comando \texttt{Check}. Ver \textit{Theorem k12}, en \texttt{plantilla\_p2.v}.
+  
 
 \end{itemize}
 
 \section{Lo que falta}
 \begin{itemize}
-  \item Arreglar el parser, respecto a los operadores que define el usuario (precedencia y demás).
-  Ver caso: \texttt{Definition x x y := forall w, forall v, x and y}.
-  \item Hacer que el lambda término devuelto en la construcción de una prueba, puede ser inferido por el comando \texttt{infer}.
-  Ver caso: \texttt{Theorem: p -> q -> (((p and q) and (p and p)) and q) and p}.
-  \item Simplicar el data type \texttt{SubProof}.
+  \item Hacer el comando \texttt{infer} completo. Es decir, que funcione cuando en el lambda término aparecen operaciones foldeables.
+  Ver \texttt{Theorem t34}, \texttt{Theorem t35}, en \texttt{casos.txt}.
+  \item Incluir tácticas sobre $\bot$.
 \end{itemize}
 
 

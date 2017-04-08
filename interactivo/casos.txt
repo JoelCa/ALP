@@ -51,16 +51,16 @@ Para chequear si podemos instanciar el tipo "vacio", mediante "exact".
   Theorem t19: forall x, forall y, x /\ y -> x <--> y.
   Theorem t20: forall g, forall w, (g <--> w) -> (g -> w).
 Para chequear la definición de operandos.
-- Definition -- x y := forall w, (w /\ x) /\ y -> w (infix).
+- Definition x -- y := forall w, (w /\ x) /\ y -> w.
   Theorem t21: forall w, forall p, w -> p -> (forall p, p /\ w \/ w) -- (forall w, forall p, w /\ p).
 Para chequear el renombre de variables de tipo ligadas en el unfold.
-- Definition ^ x y := forall w, forall v, x /\ y /\ w \/ v -> x /\ y (infix).
+- Definition x ^ y := forall w, forall v, x /\ y /\ w \/ v -> x /\ y.
   Theorem t22: forall w, forall v, w -> v -> w ^ (forall v, forall w, v -> w).
 Para chequear el renombre de variables de tipo ligadas en el unfold.
 - Theorem t23: forall o, forall t, (forall w,  forall r, o /\ w) -> (o /\ t).
 Para chequear la unificación (este caso no unificaba y lo arregle).
 - Theorem t24: p -> q -> (((p /\ q) /\ (p /\ p)) /\ q) /\ p.
-Para chequear el pretty pinter de la prueba.
+Para chequear el pretty printer de la prueba, y el inferidor sobre el lambda término de la prueba.
 - Definition x x y := forall w, forall v, x /\ y.
   Theorem t25 : forall w, forall y, x w y -> x w y.
 Para probar el parseo (antes no se parseaba bien).
@@ -73,4 +73,23 @@ Para probar el pretty printer (precedencias).
   Theorem t28:fun1 (fun2 p).
 Para probar el pretty printer (precedencias).
 - Theorem t29: p -> p \/ p /\ p \/ q.
+Para probar el pretty printer (precedencias).
+- Theorem t30: p -- q ^ q -- p.
+Para probar el pretty printer (precedencias).
+- Definition q ++ k := forall x, x -> q -> q.
+  Theorem t31: p -- q ^ q -- p ++ q.
+Para probar el pretty printer (precedencias).
+- Theorem t32: (p -- q ^ q -- p) ^ (q ++ q) ^ p.
+Para probar el pretty printer (precedencias).
+- Theorem t33: ~p \/ fun1 p.
+Para probar el pretty printer (precedencias).
+NO funciona el inferidor sobre el lambda término que se obtiene de la prueba.
+- Theorem t34: forall x, x -> x /\ (x <-> x).
+NO funciona el inferidor sobre el lambda término que se obtiene de la prueba.
+- Theorem t35: False -> ~p.
+NO se infiere "False -> ~p".
+- Definition fun3 w y := forall x, w -> x -> y -> w.
+  Theorem t36: fun3 p q -> fun2 q.
+Para probar el pretty printer (precedencias).
+- Theorem k37: fun1 p /\ (p -> p).
 Para probar el pretty printer (precedencias).

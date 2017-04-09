@@ -8,107 +8,135 @@ import qualified Data.Map as M (Map, lookup, insert, empty, size)
 import qualified Data.Sequence as S
 import Data.Maybe (fromJust, isJust)
 import ProofState
-import Data.Foldable (foldl)
+import Data.Foldable (foldl, toList) -- BORRAR toList
 import qualified Data.Vector as V
 
 -- Contruye la prueba.
 habitar :: Tactic -> Proof ()
-habitar Assumption = do x <- getType
-                        (_,tw) <- maybeToProof EmptyType x 
-                        c <- getTermContext
-                        q <- getTBTypeVars
-                        i <- maybeToProof AssuE (S.findIndexL
-                                                  (\(_,p,_,t) -> renameTType (q - p) t == tw)
-                                                  c)
-                        endSubProof
-                        modifyTerm $ simplify (Bound i)
-habitar Intro = do x <- getType
-                   introComm x
-habitar Intros = introsComm
-habitar (Apply h) = do x <- getType
-                       (t,t') <- maybeToProof EmptyType x
-                       n <- getTTermVars
-                       i <- maybeToProof ApplyE2 $ getHypothesisValue n h
-                       c <- getTermContext
-                       q <- getTBTypeVars
-                       applyComm (n-i-1) (t,t') (getTypeVar q $ S.index c (n-i-1))
-habitar (Elim h) = do x <- getType
-                      (t,t') <- maybeToProof EmptyType x
-                      n <- getTTermVars
-                      i <- maybeToProof ApplyE2 $ getHypothesisValue n h
-                      c <- getTermContext
-                      q <- getTBTypeVars
-                      elimComm (n-i-1) (t,t') (getTypeVar q $ S.index c (n-i-1))
-habitar CLeft = do x <- getType
-                   case x of
-                     Just (RenameTy _ [t1,t2] , RenameTTy n [t1',t2']) ->
-                       if n == or_code
-                          then do replaceType (t1,t1')
-                                  modifyTerm $ addHT (\x -> ((Free $ Global "intro_or1")
-                                                             :!: (t1,t1') :!: (t2,t2'))
-                                                            :@: x)
-                       else throw CommandInvalid
-                     _ -> throw CommandInvalid
-habitar CRight = do x <- getType
-                    case x of
-                      Just (RenameTy _ [t1,t2] , RenameTTy n [t1',t2']) ->
-                        if n == or_code
-                        then do replaceType (t2,t2')
-                                modifyTerm $ addHT (\x -> ((Free $ Global "intro_or2")
-                                                           :!: (t1,t1') :!: (t2,t2'))
-                                                          :@: x)
-                        else throw CommandInvalid
-                      _ -> throw CommandInvalid
-habitar Split = do x <- getType
-                   case x of
-                     Just (RenameTy _ [t1,t2], RenameTTy n [t1',t2']) ->
-                       if n == and_code
-                       then do newSubProofs 2 [Just (t1,t1'), Just (t2,t2')]
-                               modifyTerm $ addDHT (\x y -> ((Free $ Global "intro_and")
-                                                             :!: (t1,t1') :!: (t2,t2'))
-                                                            :@: x :@: y)
-                       else throw CommandInvalid
-                     _ -> throw CommandInvalid
-habitar (Exact (Right te)) = do op <- getUsrOpers
-                                n <- getTTermVars
-                                btc <- getBTypeContext
-                                ftc <- getFTypeContext
-                                te' <- eitherToProof $ withoutName op n (ftc,btc) te
-                                c <- getTermContext
-                                teo <- getTeorems
-                                q <- getTBTypeVars
-                                (_,t') <- eitherToProof $ inferType q c teo te'
-                                x <- getType
-                                (tt,tt') <- maybeToProof EmptyType x
-                                unless (t' == tt') $ throw $ ExactE1 tt
-                                endSubProof
-                                modifyTerm $ simplify te'
-habitar (Exact (Left ty)) = do x <- getType
-                               when (isJust x) $ throw $ ExactE2 $ fst $ fromJust x
-                               op <- getUsrOpers
-                               btc <- getBTypeContext
-                               ftc <- getFTypeContext
-                               ty' <- eitherToProof $ typeWhitoutName op (ftc,btc) ty
-                               endSubProof
-                               modifyTerm $ simplifyTypeInTerm (ty,ty')
-habitar (Unfold s Nothing) = do x <- getType
-                                (t,t') <- maybeToProof EmptyType x
-                                op <- getUsrOpers
-                                (m, (_, (tt,tt'), _, _)) <- maybeToProof (UnfoldE1 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
-                                btc <- getBTypeContext
-                                ftc <- getFTypeContext
-                                replaceType $ unfoldComm (t,t') (tt,tt') m btc ftc
-habitar (Unfold s (Just h)) = do op <- getUsrOpers
-                                 (m, (_, (tt,tt'), _, _)) <- maybeToProof (UnfoldE1 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
-                                 n <- getTTermVars
-                                 i <- maybeToProof UnfoldE2 $ getHypothesisValue n h
-                                 c <- getTermContext
-                                 let (x,y,t,t') = S.index c (n-i-1)
-                                 btc <- getBTypeContext
-                                 ftc <- getFTypeContext
-                                 let (r,r') = unfoldComm (t,t') (tt,tt') m btc ftc
-                                 updateTermContext (n-i-1) (x,y,r,r')
-
+habitar Assumption =
+  do x <- getType
+     (_,tw) <- maybeToProof EmptyType x 
+     c <- getTermContext
+     q <- getTBTypeVars
+     i <- maybeToProof AssuE (S.findIndexL
+                              (\(_,p,_,t) -> renameTType (q - p) t == tw)
+                               c)
+     endSubProof
+     modifyTerm $ simplify (Bound i)
+habitar Intro =
+  do x <- getType
+     introComm x
+habitar Intros =
+  introsComm
+habitar (Apply h) =
+  do x <- getType
+     (t,t') <- maybeToProof EmptyType x
+     n <- getTTermVars
+     i <- maybeToProof (HypoE h) $ getHypothesisValue n h
+     c <- getTermContext
+     q <- getTBTypeVars
+     applyComm (n-i-1) (t,t') (getTypeVar q $ S.index c (n-i-1))
+habitar (Elim h) =
+  do x <- getType
+     (t,t') <- maybeToProof EmptyType x
+     n <- getTTermVars
+     i <- maybeToProof (HypoE h) $ getHypothesisValue n h
+     c <- getTermContext
+     q <- getTBTypeVars
+     elimComm (n-i-1) (t,t') (getTypeVar q $ S.index c (n-i-1))
+habitar CLeft =
+  do x <- getType
+     case x of
+       Just (RenameTy _ [t1,t2] , RenameTTy n [t1',t2']) ->
+         if n == or_code
+         then do replaceType (t1,t1')
+                 modifyTerm $ addHT (\x -> ((Free $ Global "intro_or1")
+                                             :!: (t1,t1') :!: (t2,t2'))
+                                           :@: x)
+         else throw CommandInvalid
+       _ -> throw CommandInvalid
+habitar CRight =
+  do x <- getType
+     case x of
+       Just (RenameTy _ [t1,t2] , RenameTTy n [t1',t2']) ->
+         if n == or_code
+         then do replaceType (t2,t2')
+                 modifyTerm $ addHT (\x -> ((Free $ Global "intro_or2")
+                                             :!: (t1,t1') :!: (t2,t2'))
+                                           :@: x)
+         else throw CommandInvalid
+       _ -> throw CommandInvalid
+habitar Split =
+  do x <- getType
+     case x of
+       Just (RenameTy _ [t1,t2], RenameTTy n [t1',t2']) ->
+         if n == and_code
+         then do newSubProofs 2 [Just (t1,t1'), Just (t2,t2')]
+                 modifyTerm $ addDHT (\x y -> ((Free $ Global "intro_and")
+                                                :!: (t1,t1') :!: (t2,t2'))
+                                              :@: x :@: y)
+         else throw CommandInvalid
+       _ -> throw CommandInvalid
+habitar (Exact (Right te)) =
+  do op <- getUsrOpers
+     n <- getTTermVars
+     btc <- getBTypeContext
+     ftc <- getFTypeContext
+     te' <- eitherToProof $ withoutName op n (ftc,btc) te
+     c <- getTermContext
+     teo <- getTeorems
+     q <- getTBTypeVars
+     (_,t') <- eitherToProof $ inferType q c teo te'
+     x <- getType
+     (tt,tt') <- maybeToProof EmptyType x
+     unless (t' == tt') $ throw $ ExactE1 tt
+     endSubProof
+     modifyTerm $ simplify te'
+habitar (Exact (Left ty)) =
+  do x <- getType
+     when (isJust x) $ throw $ ExactE2 $ fst $ fromJust x
+     op <- getUsrOpers
+     btc <- getBTypeContext
+     ftc <- getFTypeContext
+     ty' <- eitherToProof $ typeWhitoutName op (ftc,btc) ty
+     endSubProof
+     modifyTerm $ simplifyTypeInTerm (ty,ty')
+habitar (Unfold s Nothing) =
+  do x <- getType
+     (t,t') <- maybeToProof EmptyType x
+     op <- getUsrOpers
+     (m, (_, (tt,tt'), _, _)) <- maybeToProof (UnfoldE1 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
+     btc <- getBTypeContext
+     ftc <- getFTypeContext
+     replaceType $ unfoldComm (t,t') (tt,tt') m btc ftc
+habitar (Unfold s (Just h)) =
+  do op <- getUsrOpers
+     (m, (_, (tt,tt'), _, _)) <- maybeToProof (UnfoldE1 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
+     n <- getTTermVars
+     i <- maybeToProof (HypoE h) $ getHypothesisValue n h
+     c <- getTermContext
+     let (x,y,t,t') = S.index c (n-i-1)
+     btc <- getBTypeContext
+     ftc <- getFTypeContext
+     let (r,r') = unfoldComm (t,t') (tt,tt') m btc ftc
+     updateTermContext (n-i-1) (x,y,r,r')
+-- TERMINAR. Combinar "renameType" con "typeWhitoutName"
+habitar (Absurd ty) =
+  do x <- getType
+     case x of
+       Just (RenameTy _ [] , RenameTTy n []) ->
+         if n == bottom_code
+         then do op <- getUsrOpers
+                 btc <- getBTypeContext
+                 ftc <- getFTypeContext
+                 tty <- eitherToProof $ typeWhitoutName op (ftc,btc) ty
+                 let ty' = renameType ftc (map snd (toList btc)) ty
+                 newSubProofs 2 [Just (ty', tty), Just (RenameTy not_text [ty'], RenameTTy not_code [tty])]
+                 modifyTerm $ addDHT (\x y -> ((Free $ Global "intro_bottom")
+                                                :!: (ty', tty))
+                                              :@: x :@: y)
+         else throw CommandInvalid
+       _ -> throw CommandInvalid
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando INTRO e INTROS
 
@@ -141,17 +169,26 @@ introsComm = catch (do habitar Intro
 
 -- Asumimos que las tuplas del 2º arg. , tienen la forma correcta.
 elimComm :: Int -> (Type, TType) -> (Type, TType) -> Proof ()
-elimComm i (t,t') (RenameTy s [t1,t2], RenameTTy _ [t1',t2'])
-  | s == and_text = do replaceType (Fun t1 (Fun t2 t), TFun t1' (TFun t2' t'))
-                       modifyTerm $ addHT (\x -> ((Free $ Global "elim_and")
-                                                   :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
-                                                 :@: (Bound i) :@: x)
-  | s == or_text = do newSubProofs 2 [ Just (Fun t1 t, TFun t1' t')
-                                         , Just (Fun t2 t, TFun t2' t') ]
-                      modifyTerm $ addDHT (\x y -> ((Free $ Global "elim_or")
-                                                     :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
-                                                   :@: (Bound i) :@: x :@: y)
-  | otherwise = throw ElimE1
+elimComm i (t,t') (RenameTy _ [t1,t2], RenameTTy n [t1',t2'])
+  | n == and_code =
+      do replaceType (Fun t1 (Fun t2 t), TFun t1' (TFun t2' t'))
+         modifyTerm $ addHT (\x -> ((Free $ Global "elim_and")
+                                     :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
+                                   :@: (Bound i) :@: x)
+  | n == or_code =
+      do newSubProofs 2 [ Just (Fun t1 t, TFun t1' t')
+                        , Just (Fun t2 t, TFun t2' t') ]
+         modifyTerm $ addDHT (\x y -> ((Free $ Global "elim_or")
+                                        :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
+                                      :@: (Bound i) :@: x :@: y)
+  | otherwise =
+      throw ElimE1
+elimComm i t (RenameTy _ [], RenameTTy n [])
+  | n == bottom_code =
+      do endSubProof
+         modifyTerm $ simplify $ (Free $ Global "elim_bottom") :!: t :@: (Bound i)
+  | otherwise =
+      throw ElimE1
 elimComm _ _ _ = throw ElimE1
 
 ----------------------------------------------------------------------------------------------------------------------
@@ -758,7 +795,7 @@ getTypeVar n (_,m, t, t') = (t, renameTType (n-m) t')
 -- Funciones auxiliares de "habitar".
 
 -- Obtiene el entero que contiene el 2º argumento.
--- Además, chequea que el valor sea válidos.
+-- Además, chequea que dicho valor sea válido.
 getHypothesisValue :: Int -> String -> Maybe Int
 getHypothesisValue n h
   | isDefault h = let x = getValue h

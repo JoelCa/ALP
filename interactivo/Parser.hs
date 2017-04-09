@@ -214,6 +214,7 @@ termTac = assumptionP
           <|> exactP
           <|> inferP
           <|> unfoldP
+          <|> absurdP
 
 
 assumptionP :: Parser Tactic
@@ -279,6 +280,11 @@ inferP = do symbol "infer"
             char '.'
             return $ Infer l
 
+absurdP :: Parser Tactic
+absurdP = do symbol "absurd"
+             ty <- typeTerm
+             char '.'
+             return $ Absurd ty
 
 --------------------------------------------------------------------------------------
 

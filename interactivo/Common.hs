@@ -99,13 +99,14 @@ data Tactic = Assumption | Apply String | Intro | Intros | Split
             | Elim String | CLeft | CRight | Print String 
             | CExists Type | Cut Type | Exact (Either Type LamTerm)
             | Infer LamTerm | Unfold String (Maybe String)
+            | Absurd Type
             deriving (Show)
 
 
   -- Excepciones.
 data ProofExceptions = PNotFinished | PNotStarted | PExist String
                      | PNotExist String | SyntaxE | AssuE
-                     | IntroE1 | ApplyE1 Type Type | ApplyE2
+                     | IntroE1 | ApplyE1 Type Type | HypoE String
                      | Unif1 | Unif2 | Unif3 | Unif4
                      | ElimE1 | CommandInvalid | PropRepeated1 String
                      | PropRepeated2 String | PropNotExists String
@@ -113,7 +114,6 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String
                      | ExactE2 Type | PSE | EmptyType | TermE String
                      | InferE1 String | InferE2 Type | InferE3 Type
                      | InferE4 Type | DefE String | UnfoldE1 String
-                     | UnfoldE2
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
@@ -130,8 +130,8 @@ data Operands = Empty
   -- 3. Cantidad de operandos (a lo sumo 2).
 and_ = (['/','\\'] , -1, Binary)
 or_ = (['\\','/'], -2, Binary)
-bottom_ = ("False", -3, Empty
-          )
+bottom_ = ("False", -3, Empty)
+
 and_text = fst3 and_
 or_text = fst3 or_
 bottom_text = fst3 bottom_

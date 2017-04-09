@@ -246,7 +246,6 @@ errorMessage op (ApplyE1 t1 t2) =
   outputStrLn $ "error: comando apply mal aplicado, \"" ++
   (render $ printType op t1) ++  "\" no coincide con \"" ++
   (render $ printType op t2) ++ "\"."
-errorMessage _ ApplyE2 = outputStrLn "error: comando apply, hipótesis no existe."
 errorMessage _ Unif1 = outputStrLn "error: unificación inválida 1."
 errorMessage _ Unif2 = outputStrLn "error: unificación inválida 2."
 errorMessage _ Unif3 = outputStrLn "error: unificación inválida 3."
@@ -269,7 +268,7 @@ errorMessage op (InferE3 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El ti
 errorMessage op (InferE4 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El tipo no es un para todo."
 errorMessage op (DefE s) = outputStrLn $ "error: " ++ s ++ " es un operador que ya existe."
 errorMessage _ (UnfoldE1 s) = outputStrLn $ "error: " ++ s ++ " no es un operador foldeable."
-errorMessage _ UnfoldE2 = outputStrLn $ "error: comando unfold, la hipótesis no existe."
+errorMessage _ (HypoE s) = outputStrLn $ "error: la hipótesis " ++ s ++ " no existe."
 
 
 errorInferPrintTerm :: FOperations -> Type -> String

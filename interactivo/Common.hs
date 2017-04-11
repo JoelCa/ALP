@@ -17,7 +17,7 @@ type Parser a = ParserState UsrOpsParsers a
 
 type UsrOpsParsers = [ParserParser Type]
 
-newtype ParserParser a = P { runParser :: Parser a}
+newtype ParserParser a = PP { runParser :: Parser a }
 
   -- Nombres.
 data Name

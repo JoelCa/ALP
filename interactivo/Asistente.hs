@@ -8,7 +8,6 @@ import qualified Data.Map as M (Map, lookup, insert, empty, size)
 import qualified Data.Sequence as S
 import Data.Maybe (fromJust, isJust)
 import ProofState
-import Data.Foldable (foldl, toList) -- BORRAR toList
 import qualified Data.Vector as V
 
 -- Contruye la prueba.
@@ -136,6 +135,17 @@ habitar (Absurd ty) =
                                               :@: x :@: y)
          else throw CommandInvalid
        _ -> throw CommandInvalid
+habitar (Cut ty) =
+  do x <- getType
+     (t,t') <- maybeToProof EmptyType x
+     op <- getUsrOpers
+     btc <- getBTypeContext
+     ftc <- getFTypeContext
+     (tty, tty') <- eitherToProof $ getRenamedType op ftc btc ty
+     newSubProofs 2 [ Just (Fun tty t, TFun tty' t')
+                    , Just (tty, tty') ]
+     modifyTerm $ addDHT (\x y -> x :@: y)
+
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando INTRO e INTROS
 
@@ -348,7 +358,7 @@ unfoldComm (ForAll v t, TForAll t') r n btc ftc =
 applyTypes :: FTypeContext -> BTypeContext -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
 applyTypes _ _ t [] = t
 applyTypes fs bs t xs = let l = length xs
-                        in applyTypes' l 0 fs [] (foldl (\xs (_,x) -> x : xs ) [] bs) (getBodyForAll l t) xs
+                        in applyTypes' l 0 fs [] (foldr (\(_,x) xs -> x : xs) [] bs) (getBodyForAll l t) xs
 
 -- Realiza la sust. de tipos.
 -- 1. Cantidad de tipos a reemplazar.
@@ -360,7 +370,7 @@ applyTypes fs bs t xs = let l = length xs
 -- 6. Tipo sobre el que se hace la sust. Sin los "para todos" que se van a sustituir.
 -- 7. Tipos que se sustituyen.
 applyTypes' :: Int -> Int -> FTypeContext -> [String] -> [String]
-           -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
+            -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
 applyTypes' l n fs bs rs (B v, TBound m) ts
   | (n <= m) && (m < l) =
       let (x,y) = ts !! (l - m - 1)
@@ -407,7 +417,6 @@ renameType' bs fs rs (ForAll v t) = let v' = getRename v fs rs
                                     in ForAll v' $ renameType' (v:bs) fs (v':rs) t
 renameType' bs fs rs (Fun t t') = Fun (renameType' bs fs rs t) (renameType' bs fs rs t')
 renameType' bs fs rs (RenameTy s ts) = RenameTy s $ map (renameType' bs fs rs) ts
-
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Reglas de eliminación e introducción del "and","or", y "bottom".
@@ -666,7 +675,7 @@ checkOperands _ _ = False
 -- El 1º argumento, es la tabla de operaciones "foldeables".
 withoutName :: FOperations -> FTypeContext -> BTypeContext -> Int
             -> LamTerm -> Either ProofExceptions Term
-withoutName op fs bs = let bs' = foldl (\xs (_,x) -> x : xs) [] bs
+withoutName op fs bs = let bs' = foldr (\(_,x) xs -> x : xs) [] bs
                        in withoutName' [] bs' bs' fs op
 
 withoutName' :: [String] -> [String] -> [String] -> FTypeContext -> FOperations -> Int
@@ -730,9 +739,12 @@ typeWithoutName rs bs fs op (RenameTy s ts) =
                    return (RenameTy s tt, RenameTTy m tt')
            else throw $ OpE1 s
 
+-- Obtiene el tipo con nombre renombrado, y el tipo sin nombre, del tipo dado
+-- por el 4º argumento.
+-- El renombramiento se realiza de modo tal que se respete la Convención 1 (ver informe).
 getRenamedType :: FOperations -> FTypeContext -> BTypeContext
                -> Type -> Either ProofExceptions (Type, TType)
-getRenamedType op fs bs = let bs' = foldl (\xs (_,x) -> x : xs) [] bs
+getRenamedType op fs bs = let bs' = foldr (\(_,x) xs -> x : xs) [] bs
                           in typeWithoutName bs' bs' fs op
                  
 ----------------------------------------------------------------------------------------------------------------------

@@ -10,7 +10,7 @@ Para chequear eliminación de existe. ARREGLAR pretty printer del término. (VER
 - Theorem t3: (exists y, forall x, x -> y) -> (forall x, exists y, x -> y).
 Para chequear eliminación de existe. NO chequee el lambda termino.
 
-Cason sin existenciales:
+Casos sin existenciales:
 - Theorem t4: (forall x, forall y, forall z, y -> y) -> (p -> p).
 Para ver que los tipos "vacios" se instancian correctamente.
 - Theorem t5: (forall a, (forall c, a)  -> (forall c, a)) -> (forall c, p) -> (forall c, p).
@@ -87,7 +87,7 @@ NO funciona el inferidor sobre el lambda término que se obtiene de la prueba.
 - Theorem t34: forall x, x -> x /\ (x <-> x).
 NO funciona el inferidor sobre el lambda término que se obtiene de la prueba.
 - Theorem t35: False -> ~p.
-NO se infiere "False -> ~p".
+Para probar la táctica de eliminación del bottom.
 - Definition fun3 w y := forall x, w -> x -> y -> w.
   Theorem t36: fun3 p q -> fun2 q.
 Para probar el pretty printer (precedencias).
@@ -96,3 +96,5 @@ Para probar el pretty printer (precedencias).
 - Theorem k38: forall bb, forall aa, aa -> (forall aa0, aa0 -> aa).
 Probar con "intro" y "exact (\aa.\x:aa.\aa.\y:aa.x)". Para chequear el renombramiento de var. de tipo
 en el lambda término final.
+- Theorem k39: forall x, forall y, (x -> ~y) -> y -> x -> ~x.
+Para probar "cut" y "absurd".

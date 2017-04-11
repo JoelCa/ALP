@@ -107,4 +107,45 @@ y se añade una nueva prueba p_2 con el tipo t1.
 Ejemplo: infer \aa.\x:aa.\aa.\y:aa.x.
 Ver k14, en plantilla_p2.v
 
+- Se renombran las variables de tipos de los lambda términos a los que les aplica el comando infer,
+de modo tal de que se respete la siguiente convención.
+Convención: Cada abstracción de tipo (con la forma "\a.") debe ser diferente.
+En la implementación, incluso renombramos las variables de tipo ligadas (correspondiente a "forall x, .."),
+de modo tal de que cada una sea distinta de las que fueron declaradas previamente.
+
+- Transformo Seq en Listas mediante la función foldr, en las funciones: applyTypes, withoutName, y getRenamedType.
+
+- Analizar si se admite la utilización de los comandos "infer" y "Definition" durante una prueba.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

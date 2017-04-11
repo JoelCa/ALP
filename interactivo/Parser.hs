@@ -215,6 +215,7 @@ termTac = assumptionP
           <|> inferP
           <|> unfoldP
           <|> absurdP
+          <|> cutP
 
 
 assumptionP :: Parser Tactic
@@ -244,6 +245,15 @@ elimP = tacticIdentArg "elim" Elim
 printP :: Parser Tactic
 printP = tacticIdentArg "print" Print
 
+inferP :: Parser Tactic
+inferP = tacticOneArg lambTerm "infer" Infer
+
+absurdP :: Parser Tactic
+absurdP = tacticTypeArg "absurd" Absurd
+
+cutP :: Parser Tactic
+cutP = tacticTypeArg "cut" Cut
+
 unfoldP :: Parser Tactic
 unfoldP = do symbol "unfold"
              op <- validIdent2
@@ -268,23 +278,17 @@ tacticZeroArg s tac = do symbol s
                          char '.'
                          return tac
 
-tacticIdentArg :: String -> (String -> Tactic) -> Parser Tactic
-tacticIdentArg s tac = do symbol s
-                          x <- identifier
+tacticOneArg :: Parser a -> String -> (a -> Tactic) -> Parser Tactic
+tacticOneArg p s tac = do symbol s
+                          arg <- p
                           char '.'
-                          return $ tac x                            
+                          return $ tac arg
 
-inferP :: Parser Tactic
-inferP = do symbol "infer"
-            l <- lambTerm
-            char '.'
-            return $ Infer l
+tacticIdentArg :: String -> (String -> Tactic) -> Parser Tactic
+tacticIdentArg = tacticOneArg identifier
 
-absurdP :: Parser Tactic
-absurdP = do symbol "absurd"
-             ty <- typeTerm
-             char '.'
-             return $ Absurd ty
+tacticTypeArg :: String -> (Type -> Tactic) -> Parser Tactic
+tacticTypeArg = tacticOneArg typeTerm
 
 --------------------------------------------------------------------------------------
 

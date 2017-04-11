@@ -11,6 +11,7 @@
 \usepackage{amssymb}
 \usepackage{tikz}
 \usepackage{prooftree}
+\usepackage{enumitem}
 \usetikzlibrary{positioning, babel,shapes}
 \newdimen\nodeDist
 \nodeDist=35mm
@@ -107,7 +108,24 @@ Consideramos que todas ellas tienen el mismo contexto, comparten tanto los campo
   \item \texttt{ty}: tipos objetivos de cada subprueba.
 \end{itemize}
 
-A continuación, explicamos el data type utilizado para representar al lambda término que construye el usuario.
+
+Utilizamos el siguiente AST para representar a un lambda término:
+\begin{verbatim}
+  data Term  = Bound Int
+             | Free Name 
+             | Term :@: Term
+             | Lam (Type,TType) Term
+             | BLam Var Term
+             | Term :!: (Type,TType)
+\end{verbatim}
+  
+Donde, \texttt{Type} es el AST de los tipos, y \texttt{TType} es el AST de los tipos sin nombres, es decir que estos emplean la notación De Bruijn.
+\texttt{Type} nos es útil a la hora de imprimir en pantalla el tipo del lambda término, de modo tal que tenga casi el mismo tipo ingresado por el usuario 
+(posible renombramiento de tipos).
+Mientras que, \texttt{TType} lo usamos en todas las operatorias sobre los tipos de los lambda términos, por ejemplo, en la unificación de tipos, que
+se realiza cuando se aplica la regla de eliminación del \textbf{para todo}.
+
+A continuación, explicamos el data type utilizado para representar al lambda término que se construye de manera interactiva por el usuario.
 
 \begin{verbatim}
 data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) |
@@ -174,18 +192,46 @@ $\langle prefixOps_{0} \rangle$
 Consideramos a $\langle prefixOps_{i} \rangle$, con $0 \leq i \leq 2$, como las gramáticas de los operadores prefijos definidos por el usuario.
 Mientras que $\langle infixOps \rangle$ es la gramática de los operadores binarios infijos, el cual debe hacer referencia a $\langle unit_{4} \rangle$.
 
+Precedencia de los operadores:
+\setlist[enumerate,1]{start=0}
+\begin{enumerate}
+  \item \textit{Prefix ops.}
+  \item $\sim$
+  \item \textit{Infix binary ops.}
+  \item $\wedge$
+  \item $\vee$
+  \item $\rightarrow$
+  \item $\leftrightarrow$
+  \item $forall$
+\end{enumerate}
+
+Los operadores con un valor de precedencia (\textit{pv}) alto tienen menos precedencia que otro con un valor más bajo.
+Por ejemplo, $\wedge$ tiene más precedencia que $\vee$, pues $pv (\wedge) < pv (\vee)$.
+
+\textit{Prefix ops.} es el conjunto de los todos los operadores prefijos definidos por el usuario. Consideramos
+que todos ellos tienen la misma precedencia.
+Mientras que \textit{Infix binary ops.} es el conjunto de los operadores infijos (binarios) declarados por el usuario.
+Cada operador infijo que da el usuario, tiene asociado un valor de precedencia (el 2) y un valor de precedencia infija (\textit{ipv}).
+Un nuevo operador infijo tiene un \textit{ipv} más alto que los operadores previamente declarados.
+Es decir que, cada operador infijo tiene menos precedencia que aquellos que fueron declarados previamente.
+Solo los operadores binarios infijos dados por el usuario mantienen un \textit{ipv}.
+
+Consideramos que todos los operadores binarios infijos asocian a derecha.
+
+
 
 \section{Observaciones}
 \begin{itemize}
   \item El comando \texttt{apply} puede actuar como el comando \texttt{assumption}.
-  \item Cuando aplicamos el comando \texttt{intro} sobre un goal con ``para todo'', las variables
-  ligadas al/los para todo/s, pasan a ser libres en el nuevo goal. 
+
   \item La substitución que encuentra el algoritmo de unificación es un termino cerrado.
-  \item Sean $\Gamma_{t}$ el contexto de tipos inicial, y $\alpha$ un tipo dado por el usuario. Luego, $FV(\alpha) \subseteq \Gamma_{t}$.
-  Además, si $FV(\alpha) \cap BV(\alpha) \neq  \emptyset$, se encuentra mediante substituciones de variables de tipos ligadas, un tipo $\alpha'$ 
-  equivalente a $\alpha$, tal que $FV(\alpha') \cap BV(\alpha') = \emptyset$, y $FV(\alpha') = FV(\alpha)$.
   
-  El contexto de tipos inicial, se define a partir del comando \texttt{Props}.
+  \item Cuando se ingresa un tipo mediante el comando \texttt{Theorem}, posiblemente se lo renombre de modo tal de que éste respete la siguiente
+  convención.
+  \textbf{Convención 1}: Cada una de las variables de tipo ligadas (correspondiente a \texttt{forall x, ..}) debe ser distinta a las declaradas previamente,
+  y al conjunto de variables de tipo libres.
+  
+  El conjunto de variables de tipos libres se declara mediante el comando \texttt{Props}.
   
   \item Al implementar el comando \texttt{intro} sobre un ``para todo'', no es necesario chequear que no la variable de tipo ligada no se encuentre
   en el contexto de tipos, pues ya sabemos que no está allí, gracias al renombramiento de variables de tipos ligadas.
@@ -213,26 +259,6 @@ Mientras que $\langle infixOps \rangle$ es la gramática de los operadores binar
   Por lo tanto, $t = (t_{1} . t_{2} \dots t_{n-2} . t_{n-1}) \; t_{n}$, donde $t_{n}$ es un lambda término no vació, que sirve de argumento a la composiciones
   de funciones. Cada $t_{i}$, con $i \in \{ 1 \dots n \}$, se corresponde con una regla de tipado, que a su vez se corresponde con una regla de deducción natural, 
   que da el usuario.
-  
-  \item Utilizamos el siguiente AST para representar a un lambda término:
-  \begin{verbatim}
-  data Term  = Bound Int
-             | Free Name 
-             | Term :@: Term
-             | Lam (Type,TType) Term
-             | BLam Var Term
-             | Term :!: (Type,TType)
-  \end{verbatim}
-  
-  Donde, \texttt{Type} es el AST de los tipos, y \texttt{TType} es el AST de los tipos sin nombres, es decir que estos emplean la notación De Bruijn.
-  \texttt{Type} nos es útil a la hora de imprimir en pantalla el tipo del lambda término, de modo tal que tenga el tipo ingresado por el usuario.
-  Mientras que, \texttt{TType} lo usamos en todas las operatorias sobre los tipos de los lambda términos, por ejemplo, en la unificación de tipos, que
-  se realiza cuando se aplica la regla de eliminación del \textbf{para todo}.
-  
-  Si solo emplearíamos \texttt{TType}, el tipo de lambda término no coincidiría con el tipo dado por el usuario.
-  
-  \item Cuando el tipo $\alpha$ no contiene \textbf{para todos} ni \textbf{existes}, la representación de $\alpha$ mediante el AST \texttt{Type} es 
-  prácticamente la misma que \texttt{TType}, solo varían en el nombre de los constructores.
   
   \item Una subprueba se corresponde a un nodo en el árbol de derivación de la fórmula. Las tácticas que ingresa el usuario construyen dicho árbol,
   así se obtiene el lambda término que lo representa. La demostración de una fórmula puede requerir la prueba de otras fórmulas. Por ejemplo,
@@ -375,16 +401,13 @@ Mientras que $\langle infixOps \rangle$ es la gramática de los operadores binar
 \begin{itemize}
   \item Hacer el comando \texttt{infer} completo. Es decir, que funcione cuando en el lambda término aparecen operaciones foldeables.
   Ver \texttt{Theorem t34}, \texttt{Theorem t35}, en \texttt{casos.txt}.
-  \item Incluir tácticas sobre $\bot$.
+  
+  \item Implementar la táctica \texttt{cut}.
+  
+  \item Implementar el tipo \textit{exist}.
+  
+  \item Simplificar código.
 \end{itemize}
-
-
-
-
-
-
-
-
 
 
 

@@ -53,9 +53,9 @@ initProverState = PSt { global = PGlobal { teorems = initialT
                                          , opers = V.fromList [ not_op
                                                               , iff_op
                                                               ]
-                                         , parsers = [ P emptyParser
-                                                     , P emptyParser
-                                                     , P basicInfixParser
+                                         , parsers = [ PP emptyParser
+                                                     , PP emptyParser
+                                                     , PP basicInfixParser
                                                      ]
                                          }
                       , proof = Nothing
@@ -114,16 +114,16 @@ checkCommand (TypeDef (op, body, operands, isInfix)) =
      case (operands, isInfix) of
        (Empty, False) ->
          lift $ put $ s {global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix)
-                                      , parsers = [P $ getConstParser op $ runParser p1, p2, p3] }}
+                                      , parsers = [PP $ getConstParser op $ runParser p1, p2, p3] }}
        (Unary, False) ->
          lift $ put $ s {global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix)
-                                      , parsers = [p1, P $ getUnaryPrefixParser op $ runParser p2, p3] }}
+                                      , parsers = [p1, PP $ getUnaryPrefixParser op $ runParser p2, p3] }}
        (Binary, False) ->
          lift $ put $ s {global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix)
-                                      , parsers = [p1, P $ getBinaryPrefixParser op $ runParser p2, p3] }}
+                                      , parsers = [p1, PP $ getBinaryPrefixParser op $ runParser p2, p3] }}
        (Binary, True) ->
          lift $ put $ s {global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix)
-                                      , parsers = [p1, p2, P $ getInfixParser op $ runParser p3] }}
+                                      , parsers = [p1, p2, PP $ getInfixParser op $ runParser p3] }}
        _ -> error "error: checkCommand, no debería pasar."
      s' <- lift get        -- BORRAR
      outputStrLn $ show $ opers $ global s'       

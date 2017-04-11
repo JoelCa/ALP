@@ -82,7 +82,7 @@ habitar (Exact (Right te)) =
      n <- getTTermVars
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     te' <- eitherToProof $ withoutName op n (ftc,btc) te
+     te' <- eitherToProof $ withoutName op ftc btc n te
      c <- getTermContext
      teo <- getTeorems
      q <- getTBTypeVars
@@ -98,9 +98,9 @@ habitar (Exact (Left ty)) =
      op <- getUsrOpers
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     ty' <- eitherToProof $ typeWhitoutName op (ftc,btc) ty
+     ty' <- eitherToProof $ getRenamedType op ftc btc ty
      endSubProof
-     modifyTerm $ simplifyTypeInTerm (ty,ty')
+     modifyTerm $ simplifyTypeInTerm ty'
 habitar (Unfold s Nothing) =
   do x <- getType
      (t,t') <- maybeToProof EmptyType x
@@ -120,7 +120,6 @@ habitar (Unfold s (Just h)) =
      ftc <- getFTypeContext
      let (r,r') = unfoldComm (t,t') (tt,tt') m btc ftc
      updateTermContext (n-i-1) (x,y,r,r')
--- TERMINAR. Combinar "renameType" con "typeWhitoutName"
 habitar (Absurd ty) =
   do x <- getType
      case x of
@@ -129,11 +128,11 @@ habitar (Absurd ty) =
          then do op <- getUsrOpers
                  btc <- getBTypeContext
                  ftc <- getFTypeContext
-                 tty <- eitherToProof $ typeWhitoutName op (ftc,btc) ty
-                 let ty' = renameType ftc (map snd (toList btc)) ty
-                 newSubProofs 2 [Just (ty', tty), Just (RenameTy not_text [ty'], RenameTTy not_code [tty])]
+                 (tty, tty') <- eitherToProof $ getRenamedType op ftc btc ty
+                 newSubProofs 2 [ Just (tty, tty')
+                                , Just (RenameTy not_text [tty], RenameTTy not_code [tty']) ]
                  modifyTerm $ addDHT (\x y -> ((Free $ Global "intro_bottom")
-                                                :!: (ty', tty))
+                                                :!: (tty, tty'))
                                               :@: x :@: y)
          else throw CommandInvalid
        _ -> throw CommandInvalid
@@ -349,7 +348,7 @@ unfoldComm (ForAll v t, TForAll t') r n btc ftc =
 applyTypes :: FTypeContext -> BTypeContext -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
 applyTypes _ _ t [] = t
 applyTypes fs bs t xs = let l = length xs
-                        in applyTypes' l 0 fs [] (foldl (\xs (_,x) -> x : xs )[] bs) (getBodyForAll l t) xs
+                        in applyTypes' l 0 fs [] (foldl (\xs (_,x) -> x : xs ) [] bs) (getBodyForAll l t) xs
 
 -- Realiza la sust. de tipos.
 -- 1. Cantidad de tipos a reemplazar.
@@ -363,11 +362,13 @@ applyTypes fs bs t xs = let l = length xs
 applyTypes' :: Int -> Int -> FTypeContext -> [String] -> [String]
            -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
 applyTypes' l n fs bs rs (B v, TBound m) ts
-  | (n <= m) && (m < l) = let (x,y) = ts !! (l - m - 1)
-                          in (renameType fs rs x, renameTType n y )
-  | otherwise = case findIndex (\x -> x == v) bs of
-                  Just i -> (B $ rs !! i, TBound m)
-                  Nothing -> error "error: applyTypes', no debería pasar."
+  | (n <= m) && (m < l) =
+      let (x,y) = ts !! (l - m - 1)
+      in (renameType fs rs x, renameTType n y )
+  | otherwise =
+      case findIndex (\x -> x == v) bs of
+        Just i -> (B $ rs !! i, TBound m)
+        Nothing -> error "error: applyTypes', no debería pasar."
 applyTypes' _ _ _ _ _ x@(_, TFree f) _ = x
 applyTypes' l n fs bs rs (ForAll v t1, TForAll t1') ts =
   let v' = getRename v fs rs
@@ -617,7 +618,7 @@ getRename v fv rv
 -- Retorna el tipo de su segundo arg. con las siguientes características:
 -- Un tipo equivalente si hay conflicto con las variables ligadas.
 -- En notación de brujin.
--- El 1º arg. son el conj. de proposiciones válidas, y el 2º las operaciones "unfoldeables".
+-- El 1º arg. son el conj. de proposiciones válidas, y el 2º las operaciones "foldeables".
 rename :: FTypeContext -> FOperations -> Type -> Either ProofExceptions (Type, TType)
 rename = rename' [] []
 
@@ -657,16 +658,20 @@ checkOperands _ _ = False
 ----------------------------------------------------------------------------------------------------------------------
 -- Trasformadores: Se pasa de un lambda término con nombre, al equivalente sin nombre.
 
--- Genera el lambda término, sin nombre de término ni de tipo.
--- Chequea que las variables de tipo sean válidas de acuerdo al contexto de tipos
--- dado por 3º arg., y que las variables de términos también lo sean, de
--- acuerdo la longitud del contexto de variables de términos "iniciales", dado por el 2º arg.
--- El 1º argumento, es la tabla de operaciones "unfoldeables".
-withoutName :: FOperations -> Int -> (FTypeContext, BTypeContext) -> LamTerm -> Either ProofExceptions Term
-withoutName = withoutName' []
+-- Genera el lambda término sin nombre.
+-- Chequea que las variables de tipo sean válidas de acuerdo a los contexto de tipos
+-- dados por 2º y 3º arg. En caso de ser necesario renombra las variables de tipo "ligadas".
+-- Además, chequea que las variables de términos también sean válidas, de
+-- acuerdo la longitud del contexto de variables de términos "iniciales", dado por el 4º arg.
+-- El 1º argumento, es la tabla de operaciones "foldeables".
+withoutName :: FOperations -> FTypeContext -> BTypeContext -> Int
+            -> LamTerm -> Either ProofExceptions Term
+withoutName op fs bs = let bs' = foldl (\xs (_,x) -> x : xs) [] bs
+                       in withoutName' [] bs' bs' fs op
 
-withoutName' :: [String] -> FOperations -> Int -> (FTypeContext, BTypeContext) -> LamTerm -> Either ProofExceptions Term
-withoutName' teb _ n _ (LVar x)
+withoutName' :: [String] -> [String] -> [String] -> FTypeContext -> FOperations -> Int
+             -> LamTerm -> Either ProofExceptions Term
+withoutName' teb _ _ _ _ n (LVar x)
   | n == 0 = case elemIndex x teb of
                Just m -> return $ Bound m
                Nothing -> return $ Free $ Global x
@@ -676,41 +681,59 @@ withoutName' teb _ n _ (LVar x)
                             Just h -> return $ Bound $ n - h - 1
                             Nothing -> return $ Free $ Global x
   | otherwise = error "error: withoutName', no debería pasar."
-withoutName' teb op n tyc (Abs x t e) = do t' <- typeWhitoutName op tyc t
-                                           e' <- withoutName' (x:teb) op n tyc e
-                                           return $ Lam (t, t') e'
-withoutName' teb op n tyc (App e1 e2) = do e1' <- withoutName' teb op n tyc e1
-                                           e2' <- withoutName' teb op n tyc e2
-                                           return $ e1' :@: e2'
-withoutName' teb op n (ftyc,btyc) (BAbs x e) = do e' <- withoutName' teb op n (ftyc, (0,x) S.<| btyc) e
-                                                  return $ BLam x e'
-withoutName' teb op n tyc (BApp e t) = do e' <- withoutName' teb op n tyc e
-                                          t' <- typeWhitoutName op tyc t
-                                          return $ e' :!: (t,t')
+withoutName' teb rs bs fs op n (Abs x t e) =
+  do t <- typeWithoutName rs bs fs op t
+     e' <- withoutName' (x:teb) rs bs fs op n e
+     return $ Lam t e'
+withoutName' teb rs bs fs op n (App e1 e2) =
+  do e1' <- withoutName' teb rs bs fs op n e1
+     e2' <- withoutName' teb rs bs fs op n e2
+     return $ e1' :@: e2'
+withoutName' teb rs bs fs op n (BAbs x e) =
+  do let v = getRename x fs rs
+     e' <- withoutName' teb (v:rs) (x:bs) fs op n e
+     return $ BLam v e'
+withoutName' teb rs bs fs op n (BApp e t) =
+  do e' <- withoutName' teb rs bs fs op n e
+     t <- typeWithoutName rs bs fs op t
+     return $ e' :!: t
 
-
-typeWhitoutName :: FOperations -> (FTypeContext, BTypeContext) -> Type -> Either ProofExceptions TType
-typeWhitoutName _ (ftyc,btyc) (B x) = case S.findIndexL (\y-> snd y == x) btyc of
-                                        Just n -> return $ TBound n
-                                        Nothing -> if elem x ftyc
-                                                   then return $ TFree x
-                                                   else throw $ TermE x
-typeWhitoutName op (ftyc,btyc) (ForAll x t) = do r <- typeWhitoutName op (ftyc, (0,x) S.<| btyc) t
-                                                 return $ TForAll r
-typeWhitoutName op tyc (Fun t1 t2) = do r1 <- typeWhitoutName op tyc t1
-                                        r2 <- typeWhitoutName op tyc t2
-                                        return $ TFun r1 r2
-typeWhitoutName op tyc (RenameTy s ts) =
+typeWithoutName :: [String] -> [String] -> FTypeContext -> FOperations
+                -> Type -> Either ProofExceptions (Type, TType)
+typeWithoutName rs bs fs _ (B x) =
+  case findIndex (\y -> y == x) bs of
+    Just n -> return (B $ rs !! n, TBound n)
+    Nothing -> if elem x fs
+               then return (B x, TFree x)
+               else throw $ TermE x
+typeWithoutName rs bs fs op (ForAll x t) =
+  do let v = getRename x fs rs
+     (tt,tt') <- typeWithoutName (v:rs) (x:bs) fs op t
+     return (ForAll v tt, TForAll tt')
+typeWithoutName rs bs fs op (Fun t1 t2) =
+  do (tt1, tt1') <- typeWithoutName rs bs fs op t1
+     (tt2, tt2') <- typeWithoutName rs bs fs op t2
+     return (Fun tt1 tt2, TFun tt1' tt2')
+typeWithoutName rs bs fs op (RenameTy s ts) =
   case find (\(x,_,_) -> x == s) notFoldeableOps of
-    Just (_,n,to) -> if checkOperands to ts
-                     then do rs <- sequence $ map (typeWhitoutName op tyc) ts
-                             return $ RenameTTy n rs
-                     else throw $ OpE1 s
-    Nothing -> do (m, (_,_,to,_)) <- maybeToEither (OpE2 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
-                  if checkOperands to ts
-                    then do rs <- sequence $ map (typeWhitoutName op tyc) ts
-                            return $ RenameTTy m rs
-                    else throw $ OpE1 s
+    Just (_,n,to) ->
+      if checkOperands to ts
+      then do rs <- sequence $ map (typeWithoutName rs bs fs op) ts
+              let (tt, tt') = unzip rs
+              return (RenameTy s tt, RenameTTy n tt')
+      else throw $ OpE1 s
+    Nothing ->
+      do (m, (_,_,to,_)) <- maybeToEither (OpE2 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
+         if checkOperands to ts
+           then do rs <- sequence $ map (typeWithoutName rs bs fs op) ts
+                   let (tt, tt') = unzip rs
+                   return (RenameTy s tt, RenameTTy m tt')
+           else throw $ OpE1 s
+
+getRenamedType :: FOperations -> FTypeContext -> BTypeContext
+               -> Type -> Either ProofExceptions (Type, TType)
+getRenamedType op fs bs = let bs' = foldl (\xs (_,x) -> x : xs) [] bs
+                          in typeWithoutName bs' bs' fs op
                  
 ----------------------------------------------------------------------------------------------------------------------
 -- Algoritmo de inferencia de tipos de un lambda término.

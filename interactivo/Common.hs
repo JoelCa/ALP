@@ -72,7 +72,7 @@ type TermContext = Seq TermVar
   -- Para cada variable de tipo ligada, tenemos (por posición en la tupla):
   -- 1. Su posición en el contexto. Útil a la hora de imprimirlo.
   -- 2. El nombre.
-type BTypeVar = (Int,String)
+type BTypeVar = (Int, String)
 
   -- Secuencia de variables de tipo ligadas.
 type BTypeContext = Seq BTypeVar

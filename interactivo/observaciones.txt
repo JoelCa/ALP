@@ -103,3 +103,8 @@ dos cosas. Consideramos a p_t como la cola de subps.
  2. Si p_h tiene los tipos t_1, .. t_2, se quita t_1 de los tipos asignados a p_h, 
 y se añade una nueva prueba p_2 con el tipo t1.
 
+- (ARREGLADO) Funciona mal el inferidor de tipos, pues no renombra los tipos con nombres (withoutName).
+Ejemplo: infer \aa.\x:aa.\aa.\y:aa.x.
+Ver k14, en plantilla_p2.v
+
+

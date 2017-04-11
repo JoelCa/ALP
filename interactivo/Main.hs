@@ -138,7 +138,7 @@ checkCommand (Ta (Print x)) =
      prover
 checkCommand (Ta (Infer x)) =
   do s <- lift get
-     te <- returnInput $ withoutName (opers $ global s) 0 (fTypeContext $ global s, S.empty) x
+     te <- returnInput $ withoutName (opers $ global s) (fTypeContext $ global s) (S.empty) 0 x
      (ty,ty') <- returnInput $ inferType 0 S.empty (teorems $ global s) te
      outputStrLn $ render $ printType (opers $ global s) ty
      --outputStrLn $ render $ printTerm (opers $ global s) te

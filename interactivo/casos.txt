@@ -93,3 +93,6 @@ NO se infiere "False -> ~p".
 Para probar el pretty printer (precedencias).
 - Theorem k37: fun1 p /\ (p -> p).
 Para probar el pretty printer (precedencias).
+- Theorem k38: forall bb, forall aa, aa -> (forall aa0, aa0 -> aa).
+Probar con "intro" y "exact (\aa.\x:aa.\aa.\y:aa.x)". Para chequear el renombramiento de var. de tipo
+en el lambda término final.

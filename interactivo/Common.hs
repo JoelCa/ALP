@@ -10,7 +10,7 @@ import Data.Map (Map)
 import Control.Monad (ap, liftM)
 import Control.Monad.State.Lazy
 import Data.Sequence (Seq)
-import Parsing
+import Parsing (ParserState)
 import qualified Data.Vector as V (Vector, ifoldl)
 
 type Parser a = ParserState UsrOpsParsers a
@@ -150,9 +150,6 @@ not_code = 0 :: Int
   -- Conjunto de operaciones NO "foldeables".
 notFoldeableOps :: [(String, Int, Operands)]
 notFoldeableOps = [and_, or_, bottom_]
-
--- num_notFOps :: Int
--- num_notFOps = 3
 
   -- Operación "foldeable", donde:
   -- 1. El texto que la identifica.

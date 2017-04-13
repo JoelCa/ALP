@@ -98,3 +98,9 @@ Probar con "intro" y "exact (\aa.\x:aa.\aa.\y:aa.x)". Para chequear el renombram
 en el lambda término final.
 - Theorem k39: forall x, forall y, (x -> ~y) -> y -> x -> ~x.
 Para probar "cut" y "absurd".
+- Theorem k40: forall x, forall y, x -> y -> (forall x, forall y, x /\ y -> x \/ y) -> x \/ y.
+Para probar "cut x /\ y".
+- Definition fun3 x := ~x /\ (forall x, x).
+  Theorem k41: forall x, fun3 x -> x -> x \/ ~x.
+Para probar "cut False".
+NO funciona el inferidor sobre el lambda término que se obtiene de la prueba.

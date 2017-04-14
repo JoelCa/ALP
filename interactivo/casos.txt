@@ -104,8 +104,6 @@ Para probar "cut x /\ y".
   Theorem k41: forall x, fun3 x -> x -> x \/ ~x.
 Para probar "cut False".
 NO funciona el inferidor sobre el lambda término que se obtiene de la prueba.
-
-Definition op x := forall y, y -> x.
-Theorem k: False -> op (forall y, y) -> (forall y0, y0 -> False).
-
-NO funciona sin parentesis.
+- Definition op x := forall y, y -> x.
+  Theorem k42: False -> op (forall y, y) -> forall y0, y0 -> False.
+Para probar el parser (Antes NO funcionaba).

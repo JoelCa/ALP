@@ -177,8 +177,9 @@ $\langle abs \rangle$ \> $::=$ \texttt{'$\lambda$'} $\langle var \rangle$ \textt
 Gramática de fórmulas o tipos.
 
 \begin{tabbing}
-$\langle typeterm \rangle$ \= $::=$ $\langle unit_{1} \rangle$ ( \texttt{'<->'} $\langle typeterm \rangle$ | $\varepsilon$ ) |
-\texttt{'forall'} $\langle var \rangle$ \texttt{'.'} $\langle typeterm \rangle$\\
+$\langle typeterm \rangle$ \= $::=$ $\langle unit_{1} \rangle$ \texttt{'<->'} $\langle typeterm \rangle$ | $\langle unit_{1}' \rangle$\\
+$\langle unit_{1}' \rangle$ \= $::=$ $\langle unit_{2} \rangle$ ( \texttt{'->'} $\langle unit_{1}' \rangle$ | $\varepsilon$ ) 
+| \texttt{'forall'} $\langle var \rangle$ \texttt{'.'} $\langle typeterm \rangle$\\
 $\langle unit_{1} \rangle$ \= $::=$ $\langle unit_{2} \rangle$ ( \texttt{'->'} $\langle unit_{1} \rangle$ | $\varepsilon$ ) \\
 $\langle unit_{2} \rangle$ \= $::=$ $\langle unit_{3} \rangle$ ( \texttt{'$\vee$'} $\langle unit_{2} \rangle$ | $\varepsilon$ ) \\
 $\langle unit_{3} \rangle$ \= $::=$ $\langle infixOps \rangle$ ( \texttt{'$\wedge$'} $\langle unit_{3} \rangle$ | $\varepsilon$ ) \\
@@ -202,7 +203,7 @@ Precedencia de los operadores:
   \item $\vee$
   \item $\rightarrow$
   \item $\leftrightarrow$
-  \item $forall$
+  \item $forall$ (operador infijo)
 \end{enumerate}
 
 Los operadores con un valor de precedencia (\textit{pv}) alto tienen menos precedencia que otro con un valor más bajo.

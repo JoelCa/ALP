@@ -47,15 +47,22 @@ exprTy = do symbol "Theorem"
 -- Parser de los tipos (o fórmulas lógicas).
 typeTerm :: Parser Type
 typeTerm = do u <- unit1
-              (do symbol iff_text
-                  t <- typeTerm
-                  return $ RenameTy iff_text [u, t]
-               <|> return u)
-           <|> do symbol "forall"
-                  v <- validIdent1
-                  symbol ","
-                  t <- typeTerm
-                  return $ ForAll v t
+              symbol iff_text
+              t <- typeTerm
+              return $ RenameTy iff_text [u, t]
+           <|> unit1'
+
+unit1' :: Parser Type
+unit1' = do u <- unit2
+            (do symbol "->"
+                t <- unit1'
+                return $ Fun u t
+             <|> return u)
+         <|> do symbol "forall"
+                v <- validIdent1
+                symbol ","
+                t <- typeTerm
+                return $ ForAll v t
 
 unit1 :: Parser Type
 unit1 = do u <- unit2

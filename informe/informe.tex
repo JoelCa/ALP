@@ -226,12 +226,20 @@ Consideramos que todos los operadores binarios infijos asocian a derecha.
 
   \item La substitución que encuentra el algoritmo de unificación es un termino cerrado.
   
-  \item Cuando se ingresa un tipo mediante el comando \texttt{Theorem}, posiblemente se lo renombre de modo tal de que éste respete la siguiente
+  \item Cuando se ingresa un tipo mediante el comando \texttt{Theorem}, posiblemente se lo renombre, de modo tal de que éste respete la siguiente
   convención.
-  \textbf{Convención 1}: Cada una de las variables de tipo ligadas (correspondiente a \texttt{forall x, ..}) debe ser distinta a las declaradas previamente,
-  y al conjunto de variables de tipo libres.
   
-  El conjunto de variables de tipos libres se declara mediante el comando \texttt{Props}.
+  \textbf{Convención 1}: Sea \textit{t} un tipo. 
+  En \textit{t}, no se declaran dos variables de tipo ligadas con el mismo nombre, una más anidada que la otra.
+  Además, $BV (t) \cap (\Gamma_{t} \cup Props) = \emptyset$. Donde, $\Gamma_{t}$ es el conjunto de variables de tipo del contexto, y $Props$ es el conjunto
+  de variables de tipos libres.
+  
+  La \textbf{Convención 1} se aplica al tipo del \textit{goal}.
+  
+  \item La \textbf{Convención 1} nos permite evitar la captura de variables, a la hora de realizar la sustitución generada por el comando \texttt{unfold},
+  y que en el entorno de variables de tipos no se ingrese la misma variable más de dos veces (cuando se aplica \texttt{intro}).
+ 
+  \item Cuando implementamos el comando \texttt{unfold}, nos aseguramos que el tipo resultado de la sustitución, respete la \textbf{Convención 1}.
   
   \item Al implementar el comando \texttt{intro} sobre un ``para todo'', no es necesario chequear que no la variable de tipo ligada no se encuentre
   en el contexto de tipos, pues ya sabemos que no está allí, gracias al renombramiento de variables de tipos ligadas.

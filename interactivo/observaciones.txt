@@ -117,6 +117,11 @@ de modo tal de que cada una sea distinta de las que fueron declaradas previament
 
 - Analizar si se admite la utilización de los comandos "infer" y "Definition" durante una prueba.
 
+- Consideramos que dos tipos son iguales si sus tipos sin nombres son iguales.
+Como consedcuencia de esto, un lambda término tiene infinitos tipos.
+Por ejemplo, (\x:forall w,w.x) : ((forall w,w) -> forall w,w), y también
+(\x:forall w,w.x) : ((forall w,w) -> forall k,k).
+
 
 
 

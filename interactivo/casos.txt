@@ -107,3 +107,6 @@ NO funciona el inferidor sobre el lambda término que se obtiene de la prueba.
 - Definition op x := forall y, y -> x.
   Theorem k42: False -> op (forall y, y) -> forall y0, y0 -> False.
 Para probar el parser (Antes NO funcionaba).
+- Definition x $ y := forall w, (w /\ x) /\ y -> w.
+  Theorem t43: forall w, forall p, w -> forall p, p $ w -- forall w, forall p, w /\ p.
+Para probar el parser, con "para todo" sin paréntesis (NO se probó su veracidad).

@@ -46,51 +46,65 @@ exprTy = do symbol "Theorem"
          
 -- Parser de los tipos (o fórmulas lógicas).
 typeTerm :: Parser Type
-typeTerm = do u <- unit1
-              symbol iff_text
-              t <- typeTerm
-              return $ RenameTy iff_text [u, t]
+typeTerm = forall
            <|> unit1'
+           <|> do u <- unit1                                   -- OBS: los unit primados DEBEN ir antes que unit1,
+                  (do symbol iff_text                          -- pues unit1 NO falla cuando no puede parsear más.
+                      t <- typeTerm
+                      return $ RenameTy iff_text [u, t]
+                   <|> return u)
+
+infixParser :: String -> (Type -> Type -> Type)
+            -> Parser Type -> Parser Type
+infixParser s c p = do u <- p
+                       (do symbol s
+                           t <- infixParser s c p
+                           return $ c u t
+                        <|> return u)
+
+infixParser' :: String -> (Type -> Type -> Type)
+             -> Parser Type -> Parser Type -> Parser Type
+infixParser' s c p1 p2 = do u <- p1
+                            symbol s
+                            (do t <- infixParser' s c p1 p2
+                                return $ c u t
+                             <|> do x <- forall
+                                    return $ c u x)
+                         <|> p2
+
+
+forall :: Parser Type
+forall = do symbol "forall"
+            v <- validIdent1
+            symbol ","
+            t <- typeTerm
+            return $ ForAll v t
+  
+unit1 :: Parser Type
+unit1 = infixParser "->" Fun unit2
 
 unit1' :: Parser Type
-unit1' = do u <- unit2
-            (do symbol "->"
-                t <- unit1'
-                return $ Fun u t
-             <|> return u)
-         <|> do symbol "forall"
-                v <- validIdent1
-                symbol ","
-                t <- typeTerm
-                return $ ForAll v t
-
-unit1 :: Parser Type
-unit1 = do u <- unit2
-           (do symbol "->"
-               t <- unit1
-               return $ Fun u t
-            <|> return u)
+unit1' = infixParser' "->" Fun unit2 $ unit2' 
 
 unit2 :: Parser Type
-unit2 = do u <- unit3
-           (do symbol or_text
-               t <- unit2
-               return $ RenameTy or_text [u, t]
-            <|> return u)
+unit2 = infixParser or_text (\x y -> RenameTy or_text [x,y]) unit3
+
+unit2' :: Parser Type
+unit2' = infixParser' or_text (\x y -> RenameTy or_text [x,y]) unit3 $ unit3'
 
 unit3 :: Parser Type
-unit3 = do [_,_,p3] <- get
-           u <- runParser p3
-           (do symbol and_text
-               t <- unit3
-               return $ RenameTy and_text [u, t]
-            <|> return u)
+unit3 = do [_, _, p3, _] <- get
+           infixParser and_text (\x y -> RenameTy and_text [x,y]) (runParser p3)
+
+unit3' :: Parser Type
+unit3' = do [_, _, p3, p4] <- get
+            infixParser' and_text (\x y -> RenameTy and_text [x,y]) (runParser p3) (runParser p4)
 
 unit4 :: Parser Type
 unit4 = do symbol not_text
            u <- unit4
            return $ RenameTy not_text [u]
-        <|> do [_, p2, _] <- get
+        <|> do [_, p2, _, _] <- get
                runParser p2   -- OJO! El nombre de la operación que se parsea puede ser
                               -- tomada como una proposición.
                               -- Por eso, lo ponemos antes del caso "unit5"
@@ -102,32 +116,9 @@ unit5 = parens typeTerm
                return $ B v
         <|> do symbol "False"
                return $ RenameTy bottom_text []
-        <|> do [p1, _, _] <- get
+        <|> do [p1, _, _, _] <- get
                runParser p1
 
--- prefixConst :: FOperations -> Parser Type
--- prefixConst [] = empty
--- prefixConst ((s,_,Empty,False):xs) =
---   do symbol s
---      return $ RenameTy s []
---   <|> prefixConst xs
--- prefixConst (_:xs) = prefixConst xs
-
--- prefixOps :: FOperations -> Parser Type
--- prefixOps [] = empty
--- prefixOps ((s,_,Unary,False):xs) =
---   do symbol s
---      u <- unit5
---      return $ RenameTy s [u]
---   <|> prefixOps xs
--- prefixOps ((s,_,Binary,False): xs) =
---   do symbol s
---      u <- unit5
---      u' <- unit5
---      return $ RenameTy s [u, u']
---   <|> prefixOps xs
--- prefixOps (_:xs) =
---   prefixOps xs
 
 -- Parser del lambda término con nombre.
 lambTerm :: Parser LamTerm
@@ -299,29 +290,41 @@ tacticTypeArg = tacticOneArg typeTerm
 
 --------------------------------------------------------------------------------------
 
-getInfixParser :: String -> Parser Type -> Parser Type
-getInfixParser s p =
-  do u <- p
-     (do symbol s
-         t <- getInfixParser s p
-         return $ RenameTy s [u, t]
-      <|> return u)
+-- Genera el parser de la operacion infija definida por el usuario, donde
+-- NO hay "para todos" sin paréntesis.
+-- Argumentos:
+-- 1º La nueva operación infija.
+-- 2º El parser de operaciones infijas (con más precedencia),
+-- donde NO hay "para todos" sin paréntesis.
+usrInfixParserNotP :: String -> Parser Type -> Parser Type
+usrInfixParserNotP s p = infixParser s (\x y -> RenameTy s [x, y]) p
 
-getConstParser :: String -> Parser Type -> Parser Type
-getConstParser s p =
+-- Genera el parser de la operación infijas definida por el usuario, donde
+-- hay "para todos" sin paréntesis.
+-- Argumentos:
+-- 1º Identificador de la op.
+-- 2º El parser de operaciones infijas (con más precedencia),
+-- donde NO hay "para todos" sin paréntesis.
+-- 3º El parser de operaciones infijas (con más precedencia),
+-- con "para todos" sin paréntesis, previo.
+usrInfixParserP :: String -> Parser Type -> Parser Type -> Parser Type
+usrInfixParserP s p1 p2 = infixParser' s (\x y -> RenameTy s [x, y]) p1 p2              
+
+usrConstParser :: String -> Parser Type -> Parser Type
+usrConstParser s p =
   do symbol s
      return $ RenameTy s []
   <|> p
 
-getUnaryPrefixParser :: String -> Parser Type -> Parser Type
-getUnaryPrefixParser s p =
+usrUnaryPrefixParser :: String -> Parser Type -> Parser Type
+usrUnaryPrefixParser s p =
   do symbol s
      u <- unit5
      return $ RenameTy s [u]
   <|> p
 
-getBinaryPrefixParser :: String -> Parser Type -> Parser Type
-getBinaryPrefixParser s p =
+usrBinaryPrefixParser :: String -> Parser Type -> Parser Type
+usrBinaryPrefixParser s p =
   do symbol s
      u <- unit5
      u' <- unit5

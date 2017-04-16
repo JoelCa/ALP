@@ -7,8 +7,8 @@ import Control.Monad.State.Lazy (get)
 
 type ProofCommand = Either ProofExceptions Command
 
-reservedWords = ["Theorem", "Definition", "forall", "False"]
-reservedSymbols = [':', '.', '\\', '[', ']']
+reservedWords = ["Theorem", "Definition", "forall", "False", "exists", "let", "in"]
+reservedSymbols = [':', '.', '\\', '[', ']','{','}']
 
 -- Identificadores alfa-numéricos (incluido el guión bajo), exceptuando las palabras reservados.
 validIdent1 :: Parser String
@@ -46,7 +46,7 @@ exprTy = do symbol "Theorem"
          
 -- Parser de los tipos (o fórmulas lógicas).
 typeTerm :: Parser Type
-typeTerm = forall
+typeTerm = quantifiers
            <|> unit1'
            <|> do u <- unit1                                   -- OBS: los unit primados DEBEN ir antes que unit1,
                   (do symbol iff_text                          -- pues unit1 NO falla cuando no puede parsear más.
@@ -68,17 +68,21 @@ infixParser' s c p1 p2 = do u <- p1
                             symbol s
                             (do t <- infixParser' s c p1 p2
                                 return $ c u t
-                             <|> do x <- forall
+                             <|> do x <- quantifiers
                                     return $ c u x)
                          <|> p2
 
-
-forall :: Parser Type
-forall = do symbol "forall"
-            v <- validIdent1
-            symbol ","
-            t <- typeTerm
-            return $ ForAll v t
+quantifiers :: Parser Type
+quantifiers = do symbol "forall"
+                 v <- validIdent1
+                 symbol ","
+                 t <- typeTerm
+                 return $ ForAll v t
+              <|> do symbol "exists"
+                     v <- validIdent1
+                     symbol ","
+                     t <- typeTerm
+                     return $ Exists v t
   
 unit1 :: Parser Type
 unit1 = infixParser "->" Fun unit2
@@ -160,16 +164,25 @@ unitT = do x <- validIdent1
 abstraction :: Parser LamTerm
 abstraction = do char '\\'
                  v <- validIdent1
-                 symbol ":"
-                 t <- typeTerm
-                 symbol "."
-                 e <- lambTerm
-                 return $ Abs v t e
-              <|> do char '\\'
-                     v <- validIdent1
+                 (do symbol ":"
+                     t <- typeTerm
                      symbol "."
                      e <- lambTerm
-                     return $ BAbs v e
+                     return $ Abs v t e
+                  <|> do symbol "."
+                         e <- lambTerm
+                         return $ BAbs v e)
+              <|> do (t, e) <- braces2 (symbol "*" >> typeTerm) lambTerm
+                     symbol "as"
+                     t' <- typeTerm
+                     return $ EPack t e t'
+              <|> do symbol "let"
+                     (v1, v2) <- braces2 validIdent1 validIdent1
+                     symbol "="
+                     e1 <- lambTerm
+                     symbol "in"
+                     e2 <- lambTerm
+                     return $ EUnpack v1 v2 e1 e2
 
 -- Parser de definición de tipos.
 typeDef :: Parser (String, Type, Operands, Bool)

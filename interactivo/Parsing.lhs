@@ -180,6 +180,13 @@ Ignoring spacing
 >               symbol ")"
 >               return x
 
+> braces2 :: ParserState s a -> ParserState s b -> ParserState s (a, b)
+> braces2 p1 p2 = do symbol "{"
+>                    x <- p1
+>                    symbol ","
+>                    y <- p2
+>                    symbol "}"
+>                    return (x,y)
 
 
 -- usar: string-insert-rectangle, para insertar ">"

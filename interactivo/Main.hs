@@ -56,7 +56,7 @@ initProverState = PSt { global = PGlobal { teorems = initialT
                                          , parsers = [ PP emptyParser        -- const
                                                      , PP emptyParser        -- unary y binary
                                                      , PP basicInfixParser   -- infixOps
-                                                     , PP emptyParser        -- infix'
+                                                     , PP emptyParser        -- infixOps'
                                                      ]
                                          }
                       , proof = Nothing

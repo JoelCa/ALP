@@ -150,6 +150,12 @@ printTType' op (i,j,k) bs (f:fs) (TForAll t) =
   text f <> 
   text "," <+> 
   printTType' op (7,j,k) (f:bs) fs t
+printTType' op (i,j,k) bs (f:fs) (TExists t) =
+  parenIf (i < 7) $ 
+  text "exists" <+> 
+  text f <> 
+  text "," <+> 
+  printTType' op (7,j,k) (f:bs) fs t
 printTType' op prec@(i,j,k) bs fs (RenameTTy n [t1,t2])
   | n == and_code = printBinInfix (\x t -> printTType' op x bs fs t)
                     (getTextFromDefaultOp n) prec 3 t1 t2
@@ -193,6 +199,12 @@ printType' prec op (Fun t1 t2) =
 printType' (i,j,k) op (ForAll v t) =
   parenIf (i < 7) $
   text "forall" <+>
+  text v <>
+  text "," <+>
+  printType' (7,j,k) op t
+printType' (i,j,k) op (Exists v t) =
+  parenIf (i < 7) $
+  text "exists" <+>
   text v <>
   text "," <+>
   printType' (7,j,k) op t

@@ -150,7 +150,8 @@ $\langle term \rangle$ \> $::=$ $\langle term \rangle$ ($\langle unitterm \rangl
 $\langle unitterm \rangle$ \> $::=$ \texttt{'('} $\langle lambterm \rangle$ \texttt{')'} |
 $\langle var \rangle$ | $\langle unitterm \rangle$ \texttt{'['} $\langle typeterm \rangle$ \texttt{']'}\\
 
-$\langle abs \rangle$ \> $::=$ \texttt{'$\lambda$'} $\langle var \rangle$ \texttt{'.'} $\langle lamterm \rangle$ \\
+$\langle abs \rangle$ \> $::=$ \texttt{'$\lambda$'} $\langle var \rangle$ ( \texttt{':'} $\langle typeterm \rangle$ \texttt{'.'} $\langle lamterm \rangle$
+| \texttt{'.'} $\langle lamterm \rangle$)
 \end{tabbing}
 
 Consideramos a $\langle var \rangle$, como la gramática de palabras alfanuméricas, incluido el guión bajo, exceptuando
@@ -171,7 +172,8 @@ $\langle unitterm' \rangle$ \> $::=$ \texttt{'['} $\langle typeterm \rangle$ \te
 
 $\langle unit \rangle$ \> $::=$ \texttt{'('} $\langle lambterm \rangle$ \texttt{')'} | $\langle var \rangle$ \\
 
-$\langle abs \rangle$ \> $::=$ \texttt{'$\lambda$'} $\langle var \rangle$ \texttt{'.'} $\langle lamterm \rangle$
+$\langle abs \rangle$ \> $::=$ \texttt{'$\lambda$'} $\langle var \rangle$ ( \texttt{':'} $\langle typeterm \rangle$ \texttt{'.'} $\langle lamterm \rangle$
+| \texttt{'.'} $\langle lamterm \rangle$)
 \end{tabbing}
 
 Gramática de fórmulas o tipos.

@@ -641,6 +641,9 @@ rename' rv bv fv _ (B v) =
 rename' rv bv fv op (ForAll v t) = do let v' = getRename v fv rv
                                       (x,y) <- rename' (v':rv) (v:bv) fv op t
                                       return (ForAll v' x, TForAll y)
+rename' rv bv fv op (Exists v t) = do let v' = getRename v fv rv
+                                      (x,y) <- rename' (v':rv) (v:bv) fv op t
+                                      return (Exists v' x, TExists y)
 rename' rv bv fv op (Fun t t') = do (x,y) <- rename' rv bv fv op t
                                     (x',y') <- rename' rv bv fv op t'
                                     return (Fun x x', TFun y y')
@@ -691,9 +694,9 @@ withoutName' teb _ _ _ _ n (LVar x)
                             Nothing -> return $ Free $ Global x
   | otherwise = error "error: withoutName', no debería pasar."
 withoutName' teb rs bs fs op n (Abs x t e) =
-  do t <- typeWithoutName rs bs fs op t
+  do t' <- typeWithoutName rs bs fs op t
      e' <- withoutName' (x:teb) rs bs fs op n e
-     return $ Lam t e'
+     return $ Lam t' e'
 withoutName' teb rs bs fs op n (App e1 e2) =
   do e1' <- withoutName' teb rs bs fs op n e1
      e2' <- withoutName' teb rs bs fs op n e2
@@ -704,8 +707,17 @@ withoutName' teb rs bs fs op n (BAbs x e) =
      return $ BLam v e'
 withoutName' teb rs bs fs op n (BApp e t) =
   do e' <- withoutName' teb rs bs fs op n e
-     t <- typeWithoutName rs bs fs op t
-     return $ e' :!: t
+     t' <- typeWithoutName rs bs fs op t
+     return $ e' :!: t'
+withoutName' teb rs bs fs op n (EPack t e t') =
+  do tt <- typeWithoutName rs bs fs op t
+     e' <- withoutName' teb rs bs fs op n e
+     tt' <- typeWithoutName rs bs fs op t'
+     return $ (tt, e') ::: tt'
+-- withoutName' teb rs bs fs op n (EUnpack _ y e e') =
+--   do e <- withoutName' teb rs bs fs op n e
+--      e' <- withoutName' (y:teb) rs bs fs op n e
+
 
 typeWithoutName :: [String] -> [String] -> FTypeContext -> FOperations
                 -> Type -> Either ProofExceptions (Type, TType)

@@ -25,29 +25,34 @@ data Name
      |  Quote   Int
      deriving (Show, Eq)
     
-type Var = String
+type TermV = String
+type TypeV = String
 
   -- Tipos con nombre.
-data Type = B Var
+data Type = B TypeV
           | Fun Type Type
-          | ForAll Var Type
+          | ForAll TypeV Type
+          | Exists TypeV Type
           | RenameTy String [Type]
           deriving (Show, Eq)
   
   -- Tipos sin nombre.
 data TType = TBound Int
-           | TFree Var
+           | TFree TypeV
            | TFun TType TType
            | TForAll TType
+           | TExists TType
            | RenameTTy Int [TType]
            deriving (Show, Eq)
 
   -- Lambda términos con nombres.
-data LamTerm  =  LVar String
-              |  Abs String Type LamTerm
-              |  App LamTerm LamTerm
-              |  BAbs String LamTerm
-              |  BApp LamTerm Type
+data LamTerm  = LVar TermV
+              | Abs TermV Type LamTerm
+              | App LamTerm LamTerm
+              | BAbs TypeV LamTerm
+              | BApp LamTerm Type
+              | EPack Type LamTerm Type
+              | EUnpack TypeV TermV LamTerm LamTerm
               deriving (Show, Eq)
 
   -- Lambda términos sin nombres.
@@ -55,8 +60,10 @@ data Term  = Bound Int
            | Free Name 
            | Term :@: Term
            | Lam (Type,TType) Term
-           | BLam Var Term
+           | BLam TypeV Term
            | Term :!: (Type,TType)
+           | ((Type,TType), Term) ::: (Type,TType)
+           | Term :#: Term
            deriving (Show, Eq)
 
   -- Para cada variable de término, tenemos (por posición en la 4-tupla):

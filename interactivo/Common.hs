@@ -120,7 +120,7 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String
                      | OpE1 String | OpE2 String | ExactE1 Type
                      | ExactE2 Type | PSE | EmptyType | TermE String
                      | InferE1 String | InferE2 LamTerm Type | InferE3 LamTerm String
-                     | DefE String | UnfoldE1 String
+                     | InferE4 LamTerm | DefE String | UnfoldE1 String
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions

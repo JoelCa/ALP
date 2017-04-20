@@ -582,7 +582,11 @@ unifRename pos n sust (t:ts) (tt:tts) (tt':tts') =
   do res <- unif pos n sust t (tt, tt')
      unifRename pos n res ts tts tts'
 
--- Obtiene la substitución, a partir de la profundidad dada por el 1º argumento.
+-- Obtiene la substitución para la unificación, de acuerdo a la profundidad dada por el 1º argumento.
+-- Realiza un corrimiento "negativo" de las variables de tipo escapadas.
+-- Argumentos:
+-- 1. Número de corrimiento.
+-- 2. Tipo sobre el que se realiza el corrimiento.
 substitution :: Int -> (Type, TType) -> Maybe (Type, TType)
 substitution = substitution' 0
 
@@ -719,6 +723,7 @@ withoutName' teb rs bs fs op n (EUnpack x y e1 e2) =
      let v = getRename x fs rs
      (ee2, ee2') <- withoutName' (y:teb) (v:rs) (x:bs) fs op n e2
      return (EUnpack v y ee1 ee2, Unpack v ee1' ee2')
+     
 
 typeWithoutName :: [String] -> [String] -> FTypeContext -> FOperations
                 -> Type -> Either ProofExceptions (Type, TType)
@@ -793,7 +798,7 @@ inferType n c te (App e1 e2, e1' :@: e2') =
          do (tt2, tt2') <- inferType n c te (e2, e2')
             if tt2' == t1'
               then return (t2, t2')
-              else throw $ InferE2 e2 tt1
+              else throw $ InferE2 e2 t1
        _ -> throw $ InferE3 e1 "* -> *"
 inferType n c te (BAbs _ e, BLam v e') =
   do (t,t') <- inferType (n+1) c te (e, e')
@@ -804,17 +809,26 @@ inferType n c te (BApp e _, e' :!: (t,t')) =
        (ForAll _ t1, TForAll t1') ->
          return $ inferReplaceType (t1,t1') (t,t')
        _ -> throw $ InferE3 e "forall *"
-inferType n c te (EPack _ e _, (t1,e') ::: t@(Exists v t2 , TExists t2')) =
+inferType n c te (EPack _ e _, (t1,e') ::: t@(Exists _ t2 , TExists t2')) =
   do (tt1,tt1') <- inferType n c te (e, e')
      let (tt2, tt2') = inferReplaceType (t2,t2') t1
      if tt1' == tt2'
        then return t
        else throw $ InferE2 e tt2
--- TERMINAR
+inferType n c te (EUnpack _ _ e1 e2, Unpack _ e1' e2') =
+  do t1 <- inferType n c te (e1, e1')
+     case t1 of
+       (Exists _ tt1, TExists tt1') -> 
+         do t2 <- inferType (n+1) ((0,n+1,tt1,tt1') S.<| c) te (e2, e2')
+            case substitution 1 t2 of
+              Just t2' -> return t2'
+              Nothing -> throw $ InferE4 e2
+       _ -> throw $ InferE3 e1 "exists *"
 
-
--- Renombra todas las variables de tipo ligadas "escapadas", nos referimos a aquellas
--- variables cuyo cuantificador en el tipo del 2º arg.
+-- Realiza un corrimiento "positivo" sobre las variables de tipo ligadas "escapadas".
+-- Argumentos:
+-- 1. Número de corrimiento.
+-- 2. Tipo sin nombre sobre el que se realiza el corrimiento.
 renameTType :: Int -> TType -> TType
 renameTType 0 = id
 renameTType n = renameTType' 0 n

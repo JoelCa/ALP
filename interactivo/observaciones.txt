@@ -51,18 +51,6 @@ en término de los tipos del sistema F.
 - ¿Por qué es necesario declarar las proposiciones (o variables de tipo)?. Lo hacemos para tener un
 un mejor algoritmo de reescritura de variables de tipos ligadas sobre el tipo que da el usuario.
 
-- Casos de pruebas para el inferidor de tipos:
-Válidos:
-infer \d.\a.\x: a -> d.\b.\y:b.x.
-infer \a.\b.\x:a->b.\c.\y:a->c.\d.\z:a->b.y.
-infer \a.\b.\w:a->b.(\c.\x:a->c.\d.\y:forall o, d->c. y [d]) [a].
-
-Inválidos:
-infer (\a.\x:a.\a.\b.\y:a->b. (y) x).
-
-- El inferidos de tipo permite superposición de variables ligadas.
-Por ej: infer \a.\x:a.\a.\b.\y:a->b. (y) x.
-
 - Aquellas variables de tipo que declaramos, mediante el comando "Props", aparecen como variables
 de tipo libre en el lambda término que las utiliza.
 
@@ -73,10 +61,6 @@ unificación solo para algunos "para todos".
 - Utilizé las estructuras de datos Map y Seq.
 
 - Utilizé el tipo de datos Doc, como pretty printer.
-
-- Casos para probar la definición de tipos:
-Definition c1 x := ~(x /\  (forall w, w)) \/ x.
-(Hacer un teorema).
 
 - Tanto "~" como "<->", están definidos de manera "hardcode".
 
@@ -121,36 +105,3 @@ de modo tal de que cada una sea distinta de las que fueron declaradas previament
 Como consedcuencia de esto, un lambda término tiene infinitos tipos.
 Por ejemplo, (\x:forall w,w.x) : ((forall w,w) -> forall w,w), y también
 (\x:forall w,w.x) : ((forall w,w) -> forall k,k).
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -152,11 +152,13 @@ checkCommand (Ta (Print x)) =
 checkCommand (Ta (Infer x)) =
   do s <- lift get
      te <- returnInput $ withoutName (opers $ global s) (fTypeContext $ global s) (S.empty) 0 x
-     (ty,ty') <- returnInput $ inferType 0 S.empty (teorems $ global s) te
-     outputStrLn $ render $ printType (opers $ global s) ty
-     --outputStrLn $ render $ printTerm (opers $ global s) te
+     --(ty,ty') <- returnInput $ inferType 0 S.empty (teorems $ global s) te
+     --outputStrLn $ render $ printType (opers $ global s) ty
+     --outputStrLn $ show x ++ "\n"
+     --outputStrLn $ show te ++ "\n"
+     outputStrLn $ "Renombramiento: " ++ render $ printTerm (opers $ global s) te
      --outputStrLn $ render $ printTermTType (opers $ global s) te
-     outputStrLn $ render $ printTType (opers $ global s) ty'
+     --outputStrLn $ render $ printTType (opers $ global s) ty'
      prover                            
 checkCommand (Ta ta) =
   do s <- lift get
@@ -276,17 +278,18 @@ errorMessage op (ExactE2 ty) = outputStrLn $ "error: debe ingresar una prueba de
 errorMessage _ PSE = outputStrLn "error: operación sobre el estado interno inválida"
 errorMessage _ (TermE x) = outputStrLn $ "error: el tipo \"" ++ x ++ "\" no fue declarado."
 errorMessage _ (InferE1 x) = outputStrLn $ "error: la variable de término \"" ++ x ++ "\" no fue declarada."
-errorMessage op (InferE2 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El tipo no unifica con la función."
-errorMessage op (InferE3 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El tipo no es una función."
-errorMessage op (InferE4 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El tipo no es un para todo."
+errorMessage op (InferE2 te ty) = outputStrLn $ errorInferPrintTerm op $ render (printType op ty)
+errorMessage op (InferE3 te s) = outputStrLn $ errorInferPrintTerm op s
+errorMessage op (InferE4 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El tipo no es un para todo.
+errorMessage op (InferE5 ty) = outputStrLn $ errorInferPrintTerm op ty ++ "El tipo no es un para todo."
 errorMessage op (DefE s) = outputStrLn $ "error: " ++ s ++ " es un operador que ya existe."
 errorMessage _ (UnfoldE1 s) = outputStrLn $ "error: " ++ s ++ " no es un operador foldeable."
 errorMessage _ (HypoE s) = outputStrLn $ "error: la hipótesis " ++ s ++ " no existe."
 
 
-errorInferPrintTerm :: FOperations -> Type -> String
-errorInferPrintTerm op ty =
-  "error: no se esperaba el tipo \"" ++ render (printType op ty) ++ "\". "
+errorInferPrintTerm :: FOperations -> LamTerm -> String -> String
+errorInferPrintTerm op s ty =
+  "error: se esperaba el tipo \"" ++ s ++ "\", del término \"" ++ render (printLamTerm op ty) ++ "\."
 
 
 returnInput :: Either ProofExceptions a -> ProverInputState a

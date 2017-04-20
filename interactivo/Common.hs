@@ -63,7 +63,7 @@ data Term  = Bound Int
            | BLam TypeV Term
            | Term :!: (Type,TType)
            | ((Type,TType), Term) ::: (Type,TType)
-           | Term :#: Term
+           | Unpack TypeV Term Term
            deriving (Show, Eq)
 
   -- Para cada variable de término, tenemos (por posición en la 4-tupla):
@@ -119,8 +119,8 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String
                      | PropRepeated2 String | PropNotExists String
                      | OpE1 String | OpE2 String | ExactE1 Type
                      | ExactE2 Type | PSE | EmptyType | TermE String
-                     | InferE1 String | InferE2 Type | InferE3 Type
-                     | InferE4 Type | DefE String | UnfoldE1 String
+                     | InferE1 String | InferE2 LamTerm Type | InferE3 LamTerm String
+                     | DefE String | UnfoldE1 String
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
@@ -223,9 +223,9 @@ instance Monad (StateExceptions s e) where
                                      Left e -> Left e)
 
 instance MonadState s (StateExceptions s e) where
-    get = StateExceptions (\s -> Right (s, s))
-    put s = StateExceptions (\_ -> Right ((), s))
-    state f = StateExceptions (\s -> Right $ f s)
+  get = StateExceptions (\s -> Right (s, s))
+  put s = StateExceptions (\_ -> Right ((), s))
+  state f = StateExceptions (\s -> Right $ f s)
 
 instance Applicative (StateExceptions s e) where
   pure  = return

@@ -90,7 +90,7 @@ habitar (Exact (Right te)) =
      (tt,tt') <- maybeToProof EmptyType x
      unless (t' == tt') $ throw $ ExactE1 tt
      endSubProof
-     modifyTerm $ simplify te'
+     modifyTerm $ simplify (snd te')
 habitar (Exact (Left ty)) =
   do x <- getType
      when (isJust x) $ throw $ ExactE2 $ fst $ fromJust x
@@ -668,56 +668,57 @@ checkOperands Binary [_,_] = True
 checkOperands _ _ = False
   
 ----------------------------------------------------------------------------------------------------------------------
--- Trasformadores: Se pasa de un lambda término con nombre, al equivalente sin nombre.
+-- Trasformadores de lambda términos: Se pasa de un lambda término con nombre, al equivalente sin nombre.
 
--- Genera el lambda término sin nombre.
+-- Genera el lambda término con renombre de variables de tipo, y el lambda término sin nombre.
 -- Chequea que las variables de tipo sean válidas de acuerdo a los contexto de tipos
 -- dados por 2º y 3º arg. En caso de ser necesario renombra las variables de tipo "ligadas".
 -- Además, chequea que las variables de términos también sean válidas, de
 -- acuerdo la longitud del contexto de variables de términos "iniciales", dado por el 4º arg.
+-- Se asume que el 4º argumento es mayor o igual a cero.
 -- El 1º argumento, es la tabla de operaciones "foldeables".
+-- Obs: es util generar el lambda término con nombres renombramos para imprimir mejor los errores.
+-- Se usa en el algoritmo de inferencia.
 withoutName :: FOperations -> FTypeContext -> BTypeContext -> Int
-            -> LamTerm -> Either ProofExceptions Term
+            -> LamTerm -> Either ProofExceptions (LamTerm, Term)
 withoutName op fs bs = let bs' = foldr (\(_,x) xs -> x : xs) [] bs
                        in withoutName' [] bs' bs' fs op
 
 withoutName' :: [String] -> [String] -> [String] -> FTypeContext -> FOperations -> Int
-             -> LamTerm -> Either ProofExceptions Term
-withoutName' teb _ _ _ _ n (LVar x)
-  | n == 0 = case elemIndex x teb of
-               Just m -> return $ Bound m
-               Nothing -> return $ Free $ Global x
-  | n > 0 = case elemIndex x teb of
-               Just m -> return $ Bound m
-               Nothing -> case getHypothesisValue n x of
-                            Just h -> return $ Bound $ n - h - 1
-                            Nothing -> return $ Free $ Global x
-  | otherwise = error "error: withoutName', no debería pasar."
+             -> LamTerm -> Either ProofExceptions (LamTerm, Term)
+withoutName' teb _ _ _ _ n w@(LVar x) =
+  case elemIndex x teb of
+    Just m -> return (w, Bound m)
+    Nothing -> let r = case getHypothesisValue n x of
+                         Just h -> Bound $ n - h - 1
+                         Nothing -> Free $ Global x
+               in return (w, r)
 withoutName' teb rs bs fs op n (Abs x t e) =
   do t' <- typeWithoutName rs bs fs op t
-     e' <- withoutName' (x:teb) rs bs fs op n e
-     return $ Lam t' e'
+     (ee, ee') <- withoutName' (x:teb) rs bs fs op n e
+     return (Abs x (fst t') ee, Lam t' ee')
 withoutName' teb rs bs fs op n (App e1 e2) =
-  do e1' <- withoutName' teb rs bs fs op n e1
-     e2' <- withoutName' teb rs bs fs op n e2
-     return $ e1' :@: e2'
+  do (ee1, ee1') <- withoutName' teb rs bs fs op n e1
+     (ee2, ee2') <- withoutName' teb rs bs fs op n e2
+     return (App ee1 ee2, ee1' :@: ee2')
 withoutName' teb rs bs fs op n (BAbs x e) =
   do let v = getRename x fs rs
-     e' <- withoutName' teb (v:rs) (x:bs) fs op n e
-     return $ BLam v e'
+     (ee, ee') <- withoutName' teb (v:rs) (x:bs) fs op n e
+     return (BAbs v ee, BLam v ee')
 withoutName' teb rs bs fs op n (BApp e t) =
-  do e' <- withoutName' teb rs bs fs op n e
+  do (ee, ee') <- withoutName' teb rs bs fs op n e
      t' <- typeWithoutName rs bs fs op t
-     return $ e' :!: t'
+     return (BApp ee (fst t'), ee' :!: t')
 withoutName' teb rs bs fs op n (EPack t e t') =
   do tt <- typeWithoutName rs bs fs op t
-     e' <- withoutName' teb rs bs fs op n e
+     (ee, ee') <- withoutName' teb rs bs fs op n e
      tt' <- typeWithoutName rs bs fs op t'
-     return $ (tt, e') ::: tt'
--- withoutName' teb rs bs fs op n (EUnpack _ y e e') =
---   do e <- withoutName' teb rs bs fs op n e
---      e' <- withoutName' (y:teb) rs bs fs op n e
-
+     return (EPack (fst tt) ee (fst tt'), (tt, ee') ::: tt')
+withoutName' teb rs bs fs op n (EUnpack x y e1 e2) =
+  do (ee1, ee1') <- withoutName' teb rs bs fs op n e1
+     let v = getRename x fs rs
+     (ee2, ee2') <- withoutName' (y:teb) (v:rs) (x:bs) fs op n e2
+     return (EUnpack v y ee1 ee2, Unpack v ee1' ee2')
 
 typeWithoutName :: [String] -> [String] -> FTypeContext -> FOperations
                 -> Type -> Either ProofExceptions (Type, TType)
@@ -731,6 +732,10 @@ typeWithoutName rs bs fs op (ForAll x t) =
   do let v = getRename x fs rs
      (tt,tt') <- typeWithoutName (v:rs) (x:bs) fs op t
      return (ForAll v tt, TForAll tt')
+typeWithoutName rs bs fs op (Exists x t) =
+  do let v = getRename x fs rs
+     (tt,tt') <- typeWithoutName (v:rs) (x:bs) fs op t
+     return (Exists v tt, TExists tt')
 typeWithoutName rs bs fs op (Fun t1 t2) =
   do (tt1, tt1') <- typeWithoutName rs bs fs op t1
      (tt2, tt2') <- typeWithoutName rs bs fs op t2
@@ -762,37 +767,51 @@ getRenamedType op fs bs = let bs' = foldr (\(_,x) xs -> x : xs) [] bs
 ----------------------------------------------------------------------------------------------------------------------
 -- Algoritmo de inferencia de tipos de un lambda término.
 
--- Infiere el tipo sin nombre de un lambda término, de acuerdo a la
--- lista de teoremas dada por el 3º arg.
+-- Infiere el tipo de un lambda término.
 -- Suponemos que ninguna de las pruebas de los teoremas son recursivas.
 -- Es decir, que su lambda término es recursivo.
--- El 1º arg. indica la profundidad (respecto al cuantificador "para todo")
+-- Argumentos:
+-- 1. Indica la profundidad (respecto al cuantificador "para todo")
 -- desde la que se quiere inferir.
--- El 2º arg. es el contexto de variables de términos, desde el que se quiere inferir.
-inferType :: Int -> TermContext -> Teorems -> Term -> Either ProofExceptions (Type, TType)
-inferType n _ te (Free (Global x)) =
+-- 2. Contexto de variables de términos, desde el que se quiere inferir.
+-- 3. Lista de teoremas.
+inferType :: Int -> TermContext -> Teorems -> (LamTerm, Term) -> Either ProofExceptions (Type, TType)
+inferType n _ te (_, Free (Global x)) =
   case M.lookup x te of
     Just (_,t) -> return t
     Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean teoremas.
-inferType n c te (Bound x) = let (_,m,t,t') = S.index c x
-                             in return (t,renameTType (n-m) t')
-inferType n c te (Lam (t,t') x) = do (tt,tt') <- inferType n ((0,n,t,t') S.<| c) te x
-                                     return (Fun t tt, TFun t' tt')
-inferType n c te (x :@: y) = do (tt1, tt1') <- inferType n c te x
-                                case (tt1, tt1') of
-                                  (Fun _ t2, TFun t1' t2') ->
-                                    do (tt2, tt2') <- inferType n c te y
-                                       if tt2' == t1'
-                                         then return (t2, t2')
-                                         else throw $ InferE2 tt2
-                                  _ -> throw $ InferE3 tt1
-inferType n c te (BLam v x) = do (t,t') <- inferType (n+1) c te x
-                                 return (ForAll v t, TForAll t')
-inferType n c te (x :!: (t,t')) = do (tt,tt') <- inferType n c te x
-                                     case (tt, tt') of
-                                       (ForAll _ t1, TForAll t1') ->
-                                         return $ inferReplaceType (t1,t1') (t,t')
-                                       _ -> throw $ InferE4 tt
+inferType n c te (_, Bound x) =
+  let (_,m,t,t') = S.index c x
+  in return (t,renameTType (n-m) t')
+inferType n c te (Abs _ _ e, Lam (t,t') e') =
+  do (tt,tt') <- inferType n ((0,n,t,t') S.<| c) te (e,e')
+     return (Fun t tt, TFun t' tt')
+inferType n c te (App e1 e2, e1' :@: e2') =
+  do (tt1, tt1') <- inferType n c te (e1, e1')
+     case (tt1, tt1') of
+       (Fun t1 t2, TFun t1' t2') ->
+         do (tt2, tt2') <- inferType n c te (e2, e2')
+            if tt2' == t1'
+              then return (t2, t2')
+              else throw $ InferE2 e2 tt1
+       _ -> throw $ InferE3 e1 "* -> *"
+inferType n c te (BAbs _ e, BLam v e') =
+  do (t,t') <- inferType (n+1) c te (e, e')
+     return (ForAll v t, TForAll t')
+inferType n c te (BApp e _, e' :!: (t,t')) =
+  do (tt,tt') <- inferType n c te (e, e')
+     case (tt, tt') of
+       (ForAll _ t1, TForAll t1') ->
+         return $ inferReplaceType (t1,t1') (t,t')
+       _ -> throw $ InferE3 e "forall *"
+inferType n c te (EPack _ e _, (t1,e') ::: t@(Exists v t2 , TExists t2')) =
+  do (tt1,tt1') <- inferType n c te (e, e')
+     let (tt2, tt2') = inferReplaceType (t2,t2') t1
+     if tt1' == tt2'
+       then return t
+       else throw $ InferE2 e tt2
+-- TERMINAR
+
 
 -- Renombra todas las variables de tipo ligadas "escapadas", nos referimos a aquellas
 -- variables cuyo cuantificador en el tipo del 2º arg.
@@ -809,7 +828,7 @@ renameTType' n r (TForAll t) = TForAll $ renameTType' (n+1) r t
 renameTType' n r (TFun t1 t2) = TFun (renameTType' n r t1) (renameTType' n r t2)
 renameTType' n r (RenameTTy op ts) = RenameTTy op $ map (renameTType' n r) ts
 
--- Consideramos que el 1º argumento corresponde al cuerpo de un "para todo".
+-- Consideramos que el 1º argumento corresponde al cuerpo de una cuantificación ("para todo", "existe").
 -- Se reemplaza la variable ligada más "externa" por el 2º argumento.
 -- Además, se corrigen las varibles ligadas escapadas.
 inferReplaceType :: (Type, TType) -> (Type, TType) -> (Type, TType)
@@ -845,6 +864,7 @@ getTypeVar n (_,m, t, t') = (t, renameTType (n-m) t')
 -- Además, chequea que dicho valor sea válido.
 getHypothesisValue :: Int -> String -> Maybe Int
 getHypothesisValue n h
+  | n <= 0 = Nothing
   | isDefault h = let x = getValue h
                   in if isValidValue n x
                      then return x

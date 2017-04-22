@@ -135,6 +135,17 @@ habitar (Absurd ty) =
                                               :@: x :@: y)
          else throw CommandInvalid
        _ -> throw CommandInvalid
+habitar (CExists ty) =
+  do x <- getType
+     case x of
+       Just tt@(Exists v t, TExists t') ->
+         do op <- getUsrOpers
+            btc <- getBTypeContext
+            ftc <- getFTypeContext
+            ty' <- eitherToProof $ getRenamedType op ftc btc ty
+            replaceType $ applyTypes ftc btc (t,t') [ty']
+            modifyTerm $ addHT (\x -> (ty', x) ::: tt)
+       _ -> throw CommandInvalid
 habitar (Cut ty) =
   do x <- getType
      (t,t') <- maybeToProof EmptyType x
@@ -358,11 +369,11 @@ unfoldComm (ForAll v t, TForAll t') r n btc ftc =
 applyTypes :: FTypeContext -> BTypeContext -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
 applyTypes _ _ t [] = t
 applyTypes fs bs t xs = let l = length xs
-                        in applyTypes' l 0 fs [] (foldr (\(_,x) xs -> x : xs) [] bs) (getBodyForAll l t) xs
+                        in applyTypes' 0 l fs [] (foldr (\(_,x) xs -> x : xs) [] bs) (getBodyForAll l t) xs
 
 -- Realiza la sust. de tipos.
--- 1. Cantidad de tipos a reemplazar.
--- 2. Profundidad ("para todos"), procesados.
+-- 1. Profundidad ("para todos"), procesados.
+-- 2. Cantidad de tipos a reemplazar (podemos pensarlo como el número de corrimientos).
 -- 3. Conjunto de variables de tipo libres.
 -- 4. Conjunto de variables de tipo ligadas (con nombres) procesadas.
 -- 5. Conjunto de los renombres de las variables de tipo ligadas (con nombres) del 4º arg.
@@ -371,25 +382,25 @@ applyTypes fs bs t xs = let l = length xs
 -- 7. Tipos que se sustituyen.
 applyTypes' :: Int -> Int -> FTypeContext -> [String] -> [String]
             -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
-applyTypes' l n fs bs rs (B v, TBound m) ts
-  | (n <= m) && (m < l) =
-      let (x,y) = ts !! (l - m - 1)
-      in (renameType fs rs x, renameTType n y )
-  | otherwise =
-      case findIndex (\x -> x == v) bs of
-        Just i -> (B $ rs !! i, TBound m)
-        Nothing -> error "error: applyTypes', no debería pasar."
+applyTypes' n l fs bs rs (B v, TBound x) ts
+  | x < n = case findIndex (\x -> x == v) bs of
+              Just i -> (B $ rs !! i, TBound x)
+              Nothing -> error "error: applyTypes', no debería pasar."
+  | (n <= x) && (x < l) =
+      let (ty,ty') = ts !! (l - x - 1)
+      in (renameType fs rs ty, renameTType n ty')
+  | otherwise = (B v, TBound $ x - l + n)
 applyTypes' _ _ _ _ _ x@(_, TFree f) _ = x
-applyTypes' l n fs bs rs (ForAll v t1, TForAll t1') ts =
+applyTypes' n l fs bs rs (ForAll v t1, TForAll t1') ts =
   let v' = getRename v fs rs
-      (tt, tt') = applyTypes' (l+1) (n+1) fs (v:bs) (v':rs) (t1,t1') ts
+      (tt, tt') = applyTypes' (n+1) (l+1) fs (v:bs) (v':rs) (t1,t1') ts
   in (ForAll v' tt, TForAll tt')
-applyTypes' l n fs bs rs (Fun t1 t2, TFun t1' t2') ts =
-  let (tt1, tt1') = applyTypes' l n fs bs rs (t1,t1') ts
-      (tt2, tt2') = applyTypes' l n fs bs rs (t2,t2') ts
+applyTypes' n l fs bs rs (Fun t1 t2, TFun t1' t2') ts =
+  let (tt1, tt1') = applyTypes' n l fs bs rs (t1,t1') ts
+      (tt2, tt2') = applyTypes' n l fs bs rs (t2,t2') ts
   in (Fun tt1 tt2, TFun tt1' tt2')
-applyTypes' l n fs bs rs (RenameTy s xs, RenameTTy op xs') ts =
-  let (r, r') = unzip $ map (\x -> applyTypes' l n fs bs rs x ts) $ zip xs xs'
+applyTypes' n l fs bs rs (RenameTy s xs, RenameTTy op xs') ts =
+  let (r, r') = unzip $ map (\x -> applyTypes' n l fs bs rs x ts) $ zip xs xs'
   in (RenameTy s r, RenameTTy op r')
 
 -- Función auxiliar.

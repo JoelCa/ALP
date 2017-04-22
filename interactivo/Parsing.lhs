@@ -174,11 +174,18 @@ Ignoring spacing
 > vSymbol :: [Char] -> ParserState s String
 > vSymbol syms = token $ many $ sat (\x -> (not $ isAlphaNum x) && (x /= ' ') && (not $ elem x syms))
 >
+> between :: String -> String -> ParserState s a -> ParserState s a
+> between s1 s2 p = do symbol s1
+>                      x <- p
+>                      symbol s2
+>                      return x
+>
+> brackets :: ParserState s a -> ParserState s a
+> brackets = between "[" "]"
+
 > parens :: ParserState s a -> ParserState s a
-> parens p = do symbol "("
->               x <- p
->               symbol ")"
->               return x
+> parens = between "(" ")"
+
 
 > braces2 :: ParserState s a -> ParserState s b -> ParserState s (a, b)
 > braces2 p1 p2 = do symbol "{"

@@ -114,11 +114,14 @@ Para probar el parser, con "para todo" sin paréntesis (NO se probó su veracida
 
 Casos de inferencia OK:
 - infer \A. \B. \x:A. \y:False. let {B,x} = {*B, \B.\x:False. x} as exists A, forall Q, False -> False in (\C. x [False] y) [B].
-ARREGLAR: se imprime mal el renombramiento, falta paréntesis en el "in".
 - infer \A.\B.let {W,x} = {*A, \C.\y:B. y} as exists A, forall R, B -> B in x.
 - infer \a.\b.\x:a->b.\c.\y:a->c.\d.\z:a->b.y.
 - infer \a.\b.\w:a->b.(\c.\x:a->c.\d.\y:forall o, d->c. y [d]) [a].
-ARREGLAR: se imprime mal el renombramiento, falta paréntesis.
+- infer \a.\b. \x:forall a, a -> a. \y: forall q, q. x [a] (y [a]).
+Para chequear el pretty printer.
+- infer \A.\B.\x:(B -> (forall A, B -> B)). \y:B. x y [A] y.
+Para chequear el pretty printer.
+
 
 Casos de inferencia ERROR:
 - infer \B. let {A,a} = {*B, \x:B.x} as exists C, C -> C in a.

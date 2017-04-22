@@ -127,39 +127,29 @@ unit5 = parens typeTerm
 -- Parser del lambda término con nombre.
 lambTerm :: Parser LamTerm
 lambTerm = abstraction
-           <|> do t <- lterm
+           <|> do t <- app
                   (do a <- abstraction
                       return $ App t a
                    <|> return t)
 
-lterm :: Parser LamTerm
-lterm = do x <- unitTerm
-           f <- lterm'
-           return $ f x
+app :: Parser LamTerm
+app = do x <- unitTerm
+         f <- app'
+         return $ f x
 
-lterm' :: Parser (LamTerm -> LamTerm)
-lterm' = do  x <- unitTerm
-             f <- lterm'
-             return $ \a -> f $ App a x
-         <|> return id
+app' :: Parser (LamTerm -> LamTerm)
+app' = do t <- brackets typeTerm
+          f <- app'
+          return $ \a -> f $ BApp a t
+       <|> do u <- unitTerm
+              f <- app'
+              return $ \a -> f $ App a u
+       <|> return id
 
 unitTerm :: Parser LamTerm
-unitTerm = do x <- unitT
-              f <- unitTerm'
-              return $ f x
-
-unitTerm' :: Parser (LamTerm -> LamTerm)
-unitTerm' = do symbol "["
-               t <- typeTerm
-               symbol "]"
-               f <- unitTerm'
-               return $ \a -> f $ BApp a t
-            <|> return id
-
-unitT :: Parser LamTerm
-unitT = do x <- validIdent1
-           return $ LVar x
-        <|> parens lambTerm
+unitTerm = do x <- validIdent1
+              return $ LVar x
+           <|> parens lambTerm
 
 abstraction :: Parser LamTerm
 abstraction = do char '\\'
@@ -264,6 +254,9 @@ absurdP = tacticTypeArg "absurd" Absurd
 
 cutP :: Parser Tactic
 cutP = tacticTypeArg "cut" Cut
+
+existP :: Parser Tactic
+existP = tacticTypeArg "exists" CExists
 
 unfoldP :: Parser Tactic
 unfoldP = do symbol "unfold"

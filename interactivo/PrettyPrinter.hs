@@ -176,7 +176,7 @@ printTerm' op (i,j) bs (f:fs) (Unpack x t u) =
   text "=" <+>
   printTerm' op (1,j) bs fs t <+>
   text "in" <+>
-  printTerm' op (1,j) bs fs u
+  printTerm' op (1,j) (f:bs) fs u
 printTerm' _ _ _ [] (Lam _ _) =
   error "prinTerm': no hay nombres para elegir"
 

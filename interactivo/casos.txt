@@ -6,7 +6,7 @@ Casos con existenciales:
 - Theorem t1 : (forall x, x -> x) -> (exists x, x -> x) -> (exists x, x -> x).
 Para chequear que el para todo unifica con el existe.
 - Theorem t2 : p -> (exists x, p -> x) -> (exists y, y).
-Para chequear eliminación de existe. ARREGLAR pretty printer del término. (VER)
+Para chequear eliminación de existe, y el inferidor.
 - Theorem t3: (exists y, forall x, x -> y) -> (forall x, exists y, x -> y).
 Para chequear eliminación de existe. NO chequee el lambda termino.
 
@@ -113,16 +113,20 @@ Para probar el parser, con "para todo" sin paréntesis (NO se probó su veracida
 
 
 Casos de inferencia OK:
-- infer \A. \B. \x:A. \y:False. let {B,x} = {*B, \B.\x:False. x} as exists A, forall Q, False -> False in (\C. x [False] y) [B].
-- infer \A.\B.let {W,x} = {*A, \C.\y:B. y} as exists A, forall R, B -> B in x.
-- infer \a.\b.\x:a->b.\c.\y:a->c.\d.\z:a->b.y.
-- infer \a.\b.\w:a->b.(\c.\x:a->c.\d.\y:forall o, d->c. y [d]) [a].
-- infer \a.\b. \x:forall a, a -> a. \y: forall q, q. x [a] (y [a]).
+1. infer \A. \B. \x:A. \y:False. let {B,x} = {*B, \B.\x:False. x} as exists A, forall Q, False -> False in (\C. x [False] y) [B].
+2. infer \A.\B.let {W,x} = {*A, \C.\y:B. y} as exists A, forall R, B -> B in x.
+3. infer \a.\b.\x:a->b.\c.\y:a->c.\d.\z:a->b.y.
+4. infer \a.\b.\w:a->b.(\c.\x:a->c.\d.\y:forall o, d->c. y [d]) [a].
+5. infer \a.\b. \x:forall a, a -> a. \y: forall q, q. x [a] (y [a]).
 Para chequear el pretty printer.
-- infer \A.\B.\x:(B -> (forall A, B -> B)). \y:B. x y [A] y.
+6. infer \A.\B.\x:(B -> (forall A, B -> B)). \y:B. x y [A] y.
 Para chequear el pretty printer.
+7. infer \x:forall w, False -> w.\a.\b.{*forall a0, forall b0, forall c, c -> a0, \c.x [forall a0, forall b0, forall c0, c0 -> a0]} as exists x, forall c, False -> x.
+8. infer \p.{*p, \w.\x:p.x} as exists x, forall w, p -> x.
 
 
 Casos de inferencia ERROR:
-- infer \B. let {A,a} = {*B, \x:B.x} as exists C, C -> C in a.
-- infer \a.\x:a.\a.\b.\y:a->b. y x.
+1. infer \B. let {A,a} = {*B, \x:B.x} as exists C, C -> C in a.
+2. infer \a.\x:a.\a.\b.\y:a->b. y x.
+
+

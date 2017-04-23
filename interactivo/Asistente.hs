@@ -143,7 +143,7 @@ habitar (CExists ty) =
             btc <- getBTypeContext
             ftc <- getFTypeContext
             ty' <- eitherToProof $ getRenamedType op ftc btc ty
-            replaceType $ applyTypes ftc btc (t,t') [ty']
+            replaceType $ applyTypes 1 ftc btc (t,t') [ty']
             modifyTerm $ addHT (\x -> (ty', x) ::: tt)
        _ -> throw CommandInvalid
 habitar (Cut ty) =
@@ -165,7 +165,7 @@ introComm (Just (Fun t1 t2, TFun t1' t2')) =
   do modifyTVars (+1)
      q <- getTBTypeVars
      tv <- getTVars
-     addTermContext (tv,q,t1,t1')
+     addTermContext (tv, q, t1, t1')
      replaceType (t2, t2')
      modifyTerm $ addHT (\x -> Lam (t1,t1') x)
 introComm (Just (ForAll v t, TForAll t')) =
@@ -189,6 +189,18 @@ introsComm = catch (do habitar Intro
 
 -- Asumimos que las tuplas del 2º arg. , tienen la forma correcta.
 elimComm :: Int -> (Type, TType) -> (Type, TType) -> Proof ()
+elimComm i (t,t') (Exists v tt, TExists tt') =
+  do modifyTVars (+1)
+     tv <- getTVars
+     addBTypeContext (tv, v)
+     modifyTVars (+1)
+     q <- getTBTypeVars
+     tv <- getTVars
+     addTermContext (tv, q, tt, tt')
+     btc <- getBTypeContext
+     ftc <- getFTypeContext
+     replaceType (renameType (v:ftc) (foldr (\(_,x) xs -> x : xs) [] btc) t, renameTType 1 t')
+     modifyTerm $ addHT (\x -> Unpack v (Bound i) x)
 elimComm i (t,t') (RenameTy _ [t1,t2], RenameTTy n [t1',t2'])
   | n == and_code =
       do replaceType (Fun t1 (Fun t2 t), TFun t1' (TFun t2' t'))
@@ -334,14 +346,15 @@ addTypeTerm (HTy h) x = HTy $ \y -> addTypeTerm (h y) x
 
 -- Argumentos:
 -- 1. Tipo (con y sin nombre) sobre el que se aplica el unfold.
--- 2. Tipo (con y sin nombre) que tiene el "cuerpo" del operador foldeado.
+-- 2. Tipo (con y sin nombre) que define al operador foldeado.
 -- 3. Código de la operación a "unfoldear".
 -- 4. Conjunto de variables de tipos ligadas.
 -- 5. Conjunto de variables de tipos libres.
 unfoldComm :: (Type, TType) -> (Type, TType) -> Int -> BTypeContext -> FTypeContext -> (Type, TType)
 unfoldComm t@(B _, _) _ _ _ _ = t
 unfoldComm (RenameTy s ts, RenameTTy m ts') r n btc ftc
-  | m == n = applyTypes ftc btc r mapUnfoldComm
+  | m == n = let l = length mapUnfoldComm
+             in applyTypes l ftc btc (getBodyForAll l r) mapUnfoldComm
   | otherwise = let (xs, ys) = unzip mapUnfoldComm
                 in (RenameTy s xs, RenameTTy m ys)
     where mapUnfoldComm = map (\x -> unfoldComm x r n btc ftc) $ zip ts ts'
@@ -352,6 +365,9 @@ unfoldComm (Fun t t', TFun tt tt') r n btc ftc =
 unfoldComm (ForAll v t, TForAll t') r n btc ftc =
   let (t1, t1') = unfoldComm (t,t') r n btc ftc
   in (ForAll v t1, TForAll t1')
+unfoldComm (Exists v t, TExists t') r n btc ftc =
+  let (t1, t1') = unfoldComm (t,t') r n btc ftc
+  in (Exists v t1, TExists t1')
 
 
 -- Realiza la sustitución de tipos: (((t [T1]) [T2])..) [Tn].
@@ -362,14 +378,14 @@ unfoldComm (ForAll v t, TForAll t') r n btc ftc =
 -- 2. Renombra las variables de tipo ligadas (con nombres) del 3º arg., de modo tal que no halla
 -- dos var. de tipo ligadas con el mismo nombre, una más anidada que la otra.
 -- Argumentos:
--- 1. Conjunto de variables de tipo de libres.
--- 2. Conjunto de variables de tipo ligadas (con nombres), del contexto.
--- 3. Cuerpo del tipo (con nombres y sin nombres), sobre el que se realiza la sust.
--- 4. Tipos T1,..,Tn.
-applyTypes :: FTypeContext -> BTypeContext -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
-applyTypes _ _ t [] = t
-applyTypes fs bs t xs = let l = length xs
-                        in applyTypes' 0 l fs [] (foldr (\(_,x) xs -> x : xs) [] bs) (getBodyForAll l t) xs
+-- 1. Cantidad de sustituciones a realizar.
+-- 2. Conjunto de variables de tipo de libres.
+-- 3. Conjunto de variables de tipo ligadas (con nombres), del contexto.
+-- 4. Tipo (con nombres y sin nombres), sobre el que se realiza la sust.
+-- 5. Tipos T1,..,Tn.
+applyTypes :: Int -> FTypeContext -> BTypeContext -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
+applyTypes _ _ _ t [] = t
+applyTypes l fs bs t xs = applyTypes' 0 l fs [] (foldr (\(_,x) xs -> x : xs) [] bs) t xs
 
 -- Realiza la sust. de tipos.
 -- 1. Profundidad ("para todos"), procesados.
@@ -395,6 +411,10 @@ applyTypes' n l fs bs rs (ForAll v t1, TForAll t1') ts =
   let v' = getRename v fs rs
       (tt, tt') = applyTypes' (n+1) (l+1) fs (v:bs) (v':rs) (t1,t1') ts
   in (ForAll v' tt, TForAll tt')
+applyTypes' n l fs bs rs (Exists v t1, TExists t1') ts =
+  let v' = getRename v fs rs
+      (tt, tt') = applyTypes' (n+1) (l+1) fs (v:bs) (v':rs) (t1,t1') ts
+  in (Exists v' tt, TExists tt')
 applyTypes' n l fs bs rs (Fun t1 t2, TFun t1' t2') ts =
   let (tt1, tt1') = applyTypes' n l fs bs rs (t1,t1') ts
       (tt2, tt2') = applyTypes' n l fs bs rs (t2,t2') ts
@@ -416,6 +436,8 @@ getBodyForAll _ _ = error "error: getBodyForAll, no debería pasar."
 -- Es decir que tiene los nombres de la variables que no puede aparecer ligadas
 -- en el resultado.
 -- 3. Tipo sobre el que se realiza el renombramiento.
+-- Obs: Asumimos que el tipo del 3º argumento está bien formado. Es decir que,
+-- NO tiene variables espadas que no han sido declaradas en el contexto.
 renameType :: FTypeContext -> [String] -> Type -> Type
 renameType = renameType' []
 
@@ -426,6 +448,8 @@ renameType' bs fs rs (B v) =
     Nothing -> B v
 renameType' bs fs rs (ForAll v t) = let v' = getRename v fs rs
                                     in ForAll v' $ renameType' (v:bs) fs (v':rs) t
+renameType' bs fs rs (Exists v t) = let v' = getRename v fs rs
+                                    in Exists v' $ renameType' (v:bs) fs (v':rs) t
 renameType' bs fs rs (Fun t t') = Fun (renameType' bs fs rs t) (renameType' bs fs rs t')
 renameType' bs fs rs (RenameTy s ts) = RenameTy s $ map (renameType' bs fs rs) ts
 
@@ -583,6 +607,7 @@ unif pos n sust (RenameTTy x ts) (RenameTy _ tts, RenameTTy y tts')
   | x == y = unifRename pos n sust ts tts tts'
   | otherwise = throw Unif4                
 unif pos n sust (TForAll t') (ForAll _ tt, TForAll tt') = unif (pos+1) (n+1) sust t' (tt,tt')
+unif pos n sust (TExists t') (Exists _ tt, TExists tt') = unif (pos+1) (n+1) sust t' (tt,tt')
 unif _ _ _ _ _ = throw Unif4
 
 -- Función auxiliar de unif. Trata el caso en el tipo a unificar sea una operación "foldeable".
@@ -618,6 +643,9 @@ substitution' m n (RenameTy s ts, RenameTTy op ts') =
 substitution' m n (ForAll v t, TForAll t') =
   do (x,x') <- substitution' (m+1) (n+1) (t,t')
      return (ForAll v x, TForAll x')
+substitution' m n (Exists v t, TExists t') =
+  do (x,x') <- substitution' (m+1) (n+1) (t,t')
+     return (Exists v x, TExists x')
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Trasformadores: Se pasa de un tipo con nombre, al equivalente sin nombre.
@@ -850,6 +878,7 @@ renameTType' n r t@(TBound x)
   | otherwise = TBound (x+r)
 renameTType' _ _ t@(TFree x) = t
 renameTType' n r (TForAll t) = TForAll $ renameTType' (n+1) r t
+renameTType' n r (TExists t) = TExists $ renameTType' (n+1) r t
 renameTType' n r (TFun t1 t2) = TFun (renameTType' n r t1) (renameTType' n r t2)
 renameTType' n r (RenameTTy op ts) = RenameTTy op $ map (renameTType' n r) ts
 
@@ -868,6 +897,9 @@ inferReplaceType' n x@(tt, TFree f) _ = x
 inferReplaceType' n (ForAll v t1, TForAll t1') t =
   let (tt, tt') = inferReplaceType' (n+1) (t1,t1') t
   in (ForAll v tt, TForAll tt')
+inferReplaceType' n (Exists v t1, TExists t1') t =
+  let (tt, tt') = inferReplaceType' (n+1) (t1,t1') t
+  in (Exists v tt, TExists tt')
 inferReplaceType' n (Fun t1 t2, TFun t1' t2') t =
   let (tt1, tt1') = inferReplaceType' n (t1,t1') t
       (tt2, tt2') = inferReplaceType' n (t2,t2') t

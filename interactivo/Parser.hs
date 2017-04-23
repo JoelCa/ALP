@@ -213,6 +213,7 @@ termTac = assumptionP
           <|> rightP
           <|> printP
           <|> exactP
+          <|> existsP
           <|> inferP
           <|> unfoldP
           <|> absurdP
@@ -255,8 +256,8 @@ absurdP = tacticTypeArg "absurd" Absurd
 cutP :: Parser Tactic
 cutP = tacticTypeArg "cut" Cut
 
-existP :: Parser Tactic
-existP = tacticTypeArg "exists" CExists
+existsP :: Parser Tactic
+existsP = tacticTypeArg "exists" CExists
 
 unfoldP :: Parser Tactic
 unfoldP = do symbol "unfold"

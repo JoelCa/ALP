@@ -405,6 +405,14 @@ Consideramos que todos los operadores binarios infijos asocian a derecha.
   \item Coq en algunos casos nos devuelve, mediante el comando \texttt{Print}, un lambda término ``incompleto'', al cual no es posible encontrarle
   un tipo mediante el comando \texttt{Check}. Ver \textit{Theorem k12}, en \texttt{plantilla\_p2.v}.
   
+  \item En la implementación de la regla de tipado, correspondiente a la introducción del existe, consideramos que $t_{2}$ debe tener un tipo equivalente
+  a $T_{2}[X:=U]$, llamemos lo $T$. Es decir que $T$ puede variar de $T_{2}[X:=U]$, con respecto a los nombres de las variables de tipo ligadas que aparecen en 
+  el segundo.
+  Hacemos esto para respetar la \textbf{Convención 1}. 
+  
+  El tipo $T$ lo calcula la función \texttt{applyTypes}. Para ello, realiza la sustitución $T_{2}[X:=U]$, más un renombramiento que respete la \textbf{Convención 1}.
+  Ver Ejemplo 7, en los casos de inferencia OK.
+  
 
 \end{itemize}
 

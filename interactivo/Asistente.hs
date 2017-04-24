@@ -199,7 +199,7 @@ elimComm i (t,t') (Exists v tt, TExists tt') =
      addTermContext (tv, q, tt, tt')
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     replaceType (renameType (v:ftc) (foldr (\(_,x) xs -> x : xs) [] btc) t, renameTType 1 t')
+     replaceType (renameType ftc (v:foldr (\(_,x) xs -> x : xs) [] btc) t, renameTType 1 t')
      modifyTerm $ addHT (\x -> Unpack v (Bound i) x)
 elimComm i (t,t') (RenameTy _ [t1,t2], RenameTTy n [t1',t2'])
   | n == and_code =

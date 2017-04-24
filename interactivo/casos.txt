@@ -3,12 +3,15 @@ Casos probados:
 Props p q.
 
 Casos con existenciales:
-- Theorem t1 : (forall x, x -> x) -> (exists x, x -> x) -> (exists x, x -> x).
+- Theorem t1: (forall x, x -> x) -> (exists x, x -> x) -> (exists w, w -> w).
 Para chequear que el para todo unifica con el existe.
-- Theorem t2 : p -> (exists x, p -> x) -> (exists y, y).
+- Theorem t2: p -> (exists x, p -> x) -> (exists y, y).
 Para chequear eliminación de existe, y el inferidor.
 - Theorem t3: (exists y, forall x, x -> y) -> (forall x, exists y, x -> y).
 Para chequear eliminación de existe. NO chequee el lambda termino.
+- Theorem t44: (forall x, exists y, y /\ x \/ exists k, x) -> forall t, exists q, q /\ (t -> q) \/ exists m, (t -> m).
+Para chequear la unicación cuando hay exists.
+
 
 Casos sin existenciales:
 - Theorem t4: (forall x, forall y, forall z, y -> y) -> (p -> p).
@@ -110,6 +113,8 @@ Para probar el parser (Antes NO funcionaba).
 - Definition x $ y := forall w, (w /\ x) /\ y -> w.
   Theorem t43: forall w, forall p, w -> forall p, p $ w -- forall w, forall p, w /\ p.
 Para probar el parser, con "para todo" sin paréntesis (NO se probó su veracidad).
+- Theorem t45: forall t, forall g, (forall x, forall y, exists z, z /\ x \/ ~exists k, k -> y) -> exists q, q /\ (t -> g) \/ ~exists m, m -> g -> t.
+Para probar el parser, y el inferidor.
 
 
 Casos de inferencia OK:
@@ -128,5 +133,3 @@ Para chequear el pretty printer.
 Casos de inferencia ERROR:
 1. infer \B. let {A,a} = {*B, \x:B.x} as exists C, C -> C in a.
 2. infer \a.\x:a.\a.\b.\y:a->b. y x.
-
-

@@ -46,13 +46,11 @@ exprTy = do symbol "Theorem"
          
 -- Parser de los tipos (o fórmulas lógicas).
 typeTerm :: Parser Type
-typeTerm = quantifiers
-           <|> unit1'
-           <|> do u <- unit1                                   -- OBS: los unit primados DEBEN ir antes que unit1,
-                  (do symbol iff_text                          -- pues unit1 NO falla cuando no puede parsear más.
-                      t <- typeTerm
-                      return $ RenameTy iff_text [u, t]
-                   <|> return u)
+typeTerm = do u <- unit1                                   -- OBS: los unit primados DEBEN ir antes que unit1,
+              (do symbol iff_text                          -- pues unit1 NO falla cuando no puede parsear más.
+                  t <- typeTerm
+                  return $ RenameTy iff_text [u, t]
+               <|> return u)
 
 infixParser :: String -> (Type -> Type -> Type)
             -> Parser Type -> Parser Type
@@ -61,16 +59,6 @@ infixParser s c p = do u <- p
                            t <- infixParser s c p
                            return $ c u t
                         <|> return u)
-
-infixParser' :: String -> (Type -> Type -> Type)
-             -> Parser Type -> Parser Type -> Parser Type
-infixParser' s c p1 p2 = do u <- p1
-                            symbol s
-                            (do t <- infixParser' s c p1 p2
-                                return $ c u t
-                             <|> do x <- quantifiers
-                                    return $ c u x)
-                         <|> p2
 
 quantifiers :: Parser Type
 quantifiers = do symbol "forall"
@@ -87,22 +75,12 @@ quantifiers = do symbol "forall"
 unit1 :: Parser Type
 unit1 = infixParser "->" Fun unit2
 
-unit1' :: Parser Type
-unit1' = infixParser' "->" Fun unit2 $ unit2' 
-
 unit2 :: Parser Type
 unit2 = infixParser or_text (\x y -> RenameTy or_text [x,y]) unit3
-
-unit2' :: Parser Type
-unit2' = infixParser' or_text (\x y -> RenameTy or_text [x,y]) unit3 $ unit3'
 
 unit3 :: Parser Type
 unit3 = do [_, _, p3, _] <- get
            infixParser and_text (\x y -> RenameTy and_text [x,y]) (runParser p3)
-
-unit3' :: Parser Type
-unit3' = do [_, _, p3, p4] <- get
-            infixParser' and_text (\x y -> RenameTy and_text [x,y]) (runParser p3) (runParser p4)
 
 unit4 :: Parser Type
 unit4 = do symbol not_text
@@ -113,6 +91,7 @@ unit4 = do symbol not_text
                               -- tomada como una proposición.
                               -- Por eso, lo ponemos antes del caso "unit5"
         <|> unit5
+        <|> quantifiers
 
 unit5 :: Parser Type
 unit5 = parens typeTerm

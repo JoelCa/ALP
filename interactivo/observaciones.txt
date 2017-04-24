@@ -105,7 +105,3 @@ de modo tal de que cada una sea distinta de las que fueron declaradas previament
 Como consedcuencia de esto, un lambda término tiene infinitos tipos.
 Por ejemplo, (\x:forall w,w.x) : ((forall w,w) -> forall w,w), y también
 (\x:forall w,w.x) : ((forall w,w) -> forall k,k).
-
-HACER:
-- Un caso donde "entre" al caso del existe, en el inferReplaceType'.
-- Un caso donde "entre" al caso del existe, en el unif.

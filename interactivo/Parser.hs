@@ -79,14 +79,14 @@ unit2 :: Parser Type
 unit2 = infixParser or_text (\x y -> RenameTy or_text [x,y]) unit3
 
 unit3 :: Parser Type
-unit3 = do [_, _, p3, _] <- get
+unit3 = do [_, _, p3] <- get
            infixParser and_text (\x y -> RenameTy and_text [x,y]) (runParser p3)
 
 unit4 :: Parser Type
 unit4 = do symbol not_text
            u <- unit4
            return $ RenameTy not_text [u]
-        <|> do [_, p2, _, _] <- get
+        <|> do [_, p2, _] <- get
                runParser p2   -- OJO! El nombre de la operación que se parsea puede ser
                               -- tomada como una proposición.
                               -- Por eso, lo ponemos antes del caso "unit5"
@@ -99,7 +99,7 @@ unit5 = parens typeTerm
                return $ B v
         <|> do symbol "False"
                return $ RenameTy bottom_text []
-        <|> do [p1, _, _, _] <- get
+        <|> do [p1, _, _] <- get
                runParser p1
 
 
@@ -276,25 +276,12 @@ tacticTypeArg = tacticOneArg typeTerm
 
 --------------------------------------------------------------------------------------
 
--- Genera el parser de la operacion infija definida por el usuario, donde
--- NO hay "para todos" sin paréntesis.
+-- Genera el parser de la operaciones infijas definidas por el usuario.
 -- Argumentos:
 -- 1º La nueva operación infija.
 -- 2º El parser de operaciones infijas (con más precedencia),
--- donde NO hay "para todos" sin paréntesis.
-usrInfixParserNotP :: String -> Parser Type -> Parser Type
-usrInfixParserNotP s p = infixParser s (\x y -> RenameTy s [x, y]) p
-
--- Genera el parser de la operación infijas definida por el usuario, donde
--- hay "para todos" sin paréntesis.
--- Argumentos:
--- 1º Identificador de la op.
--- 2º El parser de operaciones infijas (con más precedencia),
--- donde NO hay "para todos" sin paréntesis.
--- 3º El parser de operaciones infijas (con más precedencia),
--- con "para todos" sin paréntesis, previo.
-usrInfixParserP :: String -> Parser Type -> Parser Type -> Parser Type
-usrInfixParserP s p1 p2 = infixParser' s (\x y -> RenameTy s [x, y]) p1 p2              
+usrInfixParser :: String -> Parser Type -> Parser Type
+usrInfixParser s p = infixParser s (\x y -> RenameTy s [x, y]) p
 
 usrConstParser :: String -> Parser Type -> Parser Type
 usrConstParser s p =

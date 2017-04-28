@@ -4,8 +4,8 @@ import Common
 import Text.PrettyPrint.HughesPJ hiding (parens)
 import qualified Text.PrettyPrint.HughesPJ as PP 
 import Data.List
-import qualified Data.Sequence as S
 import qualified Data.Vector as V
+import Hypothesis (printHypothesis)
 
 -----------------------
 --- pretty printer
@@ -400,31 +400,30 @@ printFTypeVar x = text x <+>
 
 printRestContext :: FOperations -> BTypeContext -> TermContext -> Doc
 printRestContext op btc c
-  | S.null btc = printRestTermC op c
-  | S.null c = printRestBTypeC btc
-  | otherwise = let x = S.index btc 0
-                    y = S.index c 0
+  | V.null btc = printRestTermC op c
+  | V.null c = printRestBTypeC btc
+  | otherwise = let x = V.head btc
+                    y = V.head c
                 in if fst x > fst4 y
-                   then printRestContext op (S.drop 1 btc) c $$
+                   then printRestContext op (V.drop 1 btc) c $$
                         printBTypeVar x
-                   else printRestContext op btc (S.drop 1 c) $$
-                        printTermVar (S.length c) op y
+                   else printRestContext op btc (V.drop 1 c) $$
+                        printTermVar (V.length c) op y
 
 printRestTermC :: FOperations -> TermContext -> Doc
 printRestTermC op c
-  | S.null c = empty
-  | otherwise = printRestTermC op (S.drop 1 c) $$
-                printTermVar (S.length c) op (S.index c 0)
+  | V.null c = empty
+  | otherwise = printRestTermC op (V.drop 1 c) $$
+                printTermVar (V.length c) op (V.head c)
 
 printRestBTypeC :: BTypeContext -> Doc
 printRestBTypeC btc
-  | S.null btc = empty
-  | otherwise = printRestBTypeC (S.drop 1 btc) $$
-                printBTypeVar (S.index btc 0)
+  | null btc = empty
+  | otherwise = printRestBTypeC (V.drop 1 btc) $$
+                printBTypeVar (V.head btc)
 
 printTermVar :: Int -> FOperations -> TermVar -> Doc
-printTermVar n op (_,_,t,_) = text "H" <>
-                              text (show (n-1)) <+> 
+printTermVar n op (_,_,t,_) = text (printHypothesis (n-1)) <+>
                               text ":" <+>
                               printType op t
 

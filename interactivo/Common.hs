@@ -9,9 +9,8 @@ import System.Console.Haskeline.MonadException (Exception)
 import Data.Map (Map)
 import Control.Monad (ap, liftM)
 import Control.Monad.State.Lazy
-import Data.Sequence (Seq)
 import Parsing (ParserState)
-import qualified Data.Vector as V (Vector, ifoldl)
+import Data.Vector (Vector, ifoldl)
 
 type Parser a = ParserState UsrOpsParsers a
 
@@ -74,7 +73,7 @@ data Term  = Bound Int
 type TermVar = (Int,Int,Type,TType)
 
   -- Secuencia de variables de términos. 
-type TermContext = Seq TermVar
+type TermContext = Vector TermVar
 
   -- Para cada variable de tipo ligada, tenemos (por posición en la tupla):
   -- 1. Su posición en el contexto. Útil a la hora de imprimirlo.
@@ -82,7 +81,7 @@ type TermContext = Seq TermVar
 type BTypeVar = (Int, String)
 
   -- Secuencia de variables de tipo ligadas.
-type BTypeContext = Seq BTypeVar
+type BTypeContext = Vector BTypeVar
 
   -- Tabla de teoremas.
   -- Clave: Nombre del teorema.
@@ -102,10 +101,10 @@ data Command = Ty String Type
              deriving (Show)
 
   -- Tácticas.
-data Tactic = Assumption | Apply String | Intro | Intros | Split
-            | Elim String | CLeft | CRight | Print String 
+data Tactic = Assumption | Apply Int | Intro | Intros | Split
+            | Elim Int | CLeft | CRight | Print String 
             | CExists Type | Cut Type | Exact (Either Type LamTerm)
-            | Infer LamTerm | Unfold String (Maybe String)
+            | Infer LamTerm | Unfold String (Maybe Int)
             | Absurd Type
             deriving (Show)
 
@@ -113,7 +112,7 @@ data Tactic = Assumption | Apply String | Intro | Intros | Split
   -- Excepciones.
 data ProofExceptions = PNotFinished | PNotStarted | PExist String
                      | PNotExist String | SyntaxE | AssuE
-                     | IntroE1 | ApplyE1 Type Type | HypoE String
+                     | IntroE1 | ApplyE1 Type Type | HypoE Int
                      | Unif1 | Unif2 | Unif3 | Unif4
                      | ElimE1 | CommandInvalid | PropRepeated1 String
                      | PropRepeated2 String | PropNotExists String
@@ -165,7 +164,7 @@ notFoldeableOps = [and_, or_, bottom_]
   -- 4. Es True sii es un operador infijo.
   -- Todas las operaciones que define el usuario son foldeables.
 type FoldeableOp = (String, (Type, TType), Operands, Bool)
-type FOperations = V.Vector FoldeableOp
+type FOperations = Vector FoldeableOp
 
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState
@@ -250,12 +249,16 @@ instance MonadException (Either e) e where
                 Left x -> f x
                 Right x -> Right x
 
+maybeToEither :: e -> Maybe a -> Either e a
+maybeToEither errorval Nothing = throw errorval
+maybeToEither _ (Just normalval) = return normalval
+
 fst3 :: (a, b, c) -> a
 fst3 (x, _, _) = x
 
 snd3 :: (a, b, c) -> b
 snd3 (_, x, _) = x
 
-getElemIndex :: (a -> Bool) -> V.Vector a -> Maybe (Int, a)
-getElemIndex f v = V.ifoldl (\r i x -> if f x then Just (i, x) else r) Nothing v
+getElemIndex :: (a -> Bool) -> Vector a -> Maybe (Int, a)
+getElemIndex f v = ifoldl (\r i x -> if f x then Just (i, x) else r) Nothing v
 

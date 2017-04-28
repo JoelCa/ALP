@@ -85,10 +85,9 @@ Para probar el pretty printer (precedencias).
 - Theorem t32: (p -- q ^ q -- p) ^ (q ++ q) ^ p.
 Para probar el pretty printer (precedencias).
 - Theorem t33: ~p \/ fun1 p.
-Para probar el pretty printer (precedencias).
-NO funciona el inferidor sobre el lambda término que se obtiene de la prueba.
+Para probar el pretty printer (precedencias), y el inferidor de tipos.
 - Theorem t34: forall x, x -> x /\ (x <-> x).
-NO funciona el inferidor sobre el lambda término que se obtiene de la prueba.
+Para probar el inferidor de tipos.
 - Theorem t35: False -> ~p.
 Para probar la táctica de eliminación del bottom.
 - Definition fun3 w y := forall x, w -> x -> y -> w.
@@ -105,8 +104,7 @@ Para probar "cut" y "absurd".
 Para probar "cut x /\ y".
 - Definition fun3 x := ~x /\ (forall x, x).
   Theorem k41: forall x, fun3 x -> x -> x \/ ~x.
-Para probar "cut False".
-NO funciona el inferidor sobre el lambda término que se obtiene de la prueba.
+Para probar "cut False", o "unfold fun3 in H0".
 - Definition op x := forall y, y -> x.
   Theorem k42: False -> op (forall y, y) -> forall y0, y0 -> False.
 Para probar el parser (Antes NO funcionaba).
@@ -115,6 +113,8 @@ Para probar el parser (Antes NO funcionaba).
 Para probar el parser, con "para todo" sin paréntesis (NO se probó su veracidad).
 - Theorem t45: forall t, forall g, (forall x, forall y, exists z, z /\ x \/ ~exists k, k -> y) -> exists q, q /\ (t -> g) \/ ~exists m, m -> g -> t.
 Para probar el parser, y el inferidor.
+- Theorem t46: (forall w, forall d, forall a, a -> d)-> forall b, forall c, b -> c.
+Para probar la unificación, donde hay que ingregar un tipo mediante exact.
 
 
 Casos de inferencia OK:

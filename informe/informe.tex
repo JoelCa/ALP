@@ -413,6 +413,12 @@ Consideramos que todos los operadores binarios infijos asocian a derecha.
   El tipo $T$ lo calcula la función \texttt{applyTypes}. Para ello, realiza la sustitución $T_{2}[X:=U]$, más un renombramiento que respete la \textbf{Convención 1}.
   Ver Ejemplo 7, en los casos de inferencia OK.
   
+  \item El comando \texttt{exact} puede recibir un tipo cuando la unificación no puede precisar
+  una instancia de tipo.
+  Decidimos utilizar la palabra reservada $type$, para identificar que \texttt{exact} toma un tipo.
+  Si no hiciésemos esto, en ciertos casos no podríamos determinar si lo que recibe \texttt{exact} es un
+  tipo o un lambda término.
+  
 
 \end{itemize}
 

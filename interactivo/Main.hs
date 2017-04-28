@@ -1,6 +1,6 @@
 import System.Environment
 import System.Console.Haskeline
-import Asistente
+import Commands
 import Parser
 import Common hiding (State, catch, get)
 import Text.PrettyPrint.HughesPJ (render)
@@ -11,9 +11,12 @@ import Control.Monad.State.Strict
 import Control.Monad.IO.Class
 import Data.Maybe
 import qualified Data.Map as Map
-import qualified Data.Sequence as S
 import Data.List (find, findIndex, elemIndex)
 import qualified Data.Vector as V
+import Rules
+import Transformers
+import Hypothesis (printHypothesis)
+
 
 type ProverInputState a = InputT (StateT ProverState IO) a
 
@@ -29,22 +32,6 @@ initialT' = [ ("intro_and", intro_and),
 
 initialT = Map.fromList initialT'
 
--- Operaciones "foldeables" por default.
-not_op :: FoldeableOp
-not_op = (not_text,
-          (ForAll "a" $ Fun (B "a") $ RenameTy bottom_text []
-          , TForAll $ TFun (TBound 0) $ RenameTTy bottom_code [])
-         , Unary
-         , False)
-
-iff_op :: FoldeableOp
-iff_op = (iff_text
-         , (ForAll "a" $ ForAll "b" $ RenameTy and_text
-            [Fun (B "a") (B "b"), Fun (B "b") (B "a")]
-           , TForAll $ TForAll $ RenameTTy and_code
-             [TFun (TBound 1) (TBound 0), TFun (TBound 0) (TBound 1)])
-         , Binary
-         , True)
 
 -- Estado inicial.
 initProverState :: ProverState
@@ -144,15 +131,16 @@ checkCommand (Ta (Print x)) =
      prover
 checkCommand (Ta (Infer x)) =
   do s <- lift get
-     (te,te') <- returnInput $ withoutName (opers $ global s) (fTypeContext $ global s) (S.empty) 0 x
+     let op = opers $ global s
+     (te,te') <- returnInput $ withoutName op (fTypeContext $ global s) (V.empty) 0 x
      outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
-     (ty,ty') <- returnInput $ inferType 0 S.empty (teorems $ global s) (te,te')
+     (ty,ty') <- returnInput $ inferType 0 V.empty (teorems $ global s) op (te,te')
      --outputStrLn $ "Renombramiento: " ++ (render $ printTerm (opers $ global s) te')
-     outputStrLn $ render $ printType (opers $ global s) ty
+     outputStrLn $ render $ printType op ty
      --outputStrLn $ show x ++ "\n"
      --outputStrLn $ show te ++ "\n"
      --outputStrLn $ render $ printTermTType (opers $ global s) te
-     outputStrLn $ render $ printTType (opers $ global s) ty'
+     outputStrLn $ render $ printTType op ty'
      prover                            
 checkCommand (Ta ta) =
   do s <- lift get
@@ -196,8 +184,8 @@ getTermFromProof _ = error "getTermFromProof: no debería pasar"
 -- Crea una prueba.
 newProof :: ProverGlobal -> String -> Type -> TType -> ProofState
 newProof pglobal name ty tty =
-  let s = SP { termContext = S.empty
-             , bTypeContext = S.empty
+  let s = SP { termContext = V.empty
+             , bTypeContext = V.empty
              , lsubp = 1
              , tvars = length $ fTypeContext $ pglobal
              , ty = [Just (ty, tty)]
@@ -277,7 +265,7 @@ errorMessage op (InferE3 te s) = outputStrLn $ errorInferPrintTerm op te s
 errorMessage op (InferE4 te) = outputStrLn $ "error: tipo inesperado, en el término \"" ++ render (printLamTerm op te) ++ "\"."
 errorMessage op (DefE s) = outputStrLn $ "error: " ++ s ++ " es un operador que ya existe."
 errorMessage _ (UnfoldE1 s) = outputStrLn $ "error: " ++ s ++ " no es un operador foldeable."
-errorMessage _ (HypoE s) = outputStrLn $ "error: la hipótesis " ++ s ++ " no existe."
+errorMessage _ (HypoE i) = outputStrLn $ "error: la hipótesis " ++ printHypothesis i ++ " no existe."
 
 errorInferPrintTerm :: FOperations -> LamTerm -> String -> String
 errorInferPrintTerm op te s =

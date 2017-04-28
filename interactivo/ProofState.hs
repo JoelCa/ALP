@@ -2,7 +2,8 @@ module ProofState where
 
 import Common
 import Control.Monad.State.Lazy (get, modify)
-import qualified Data.Sequence as S
+import qualified Data.Vector as V
+
 
 -- Operaciones que modifican el estado de la monada Proof.
 -- Es decir que, estas operaciones cambian la prueba.
@@ -41,11 +42,11 @@ getTVars = getAttribute tvars
 
 getTTermVars :: Proof Int
 getTTermVars = do c <- getAttribute termContext
-                  return $ S.length c
+                  return $ length c
 
 getTBTypeVars :: Proof Int
 getTBTypeVars = do tc <- getAttribute bTypeContext
-                   return $ S.length tc
+                   return $ length tc
 
 getSubProofLevel :: Proof (Maybe SubProof)
 getSubProofLevel = do ps <- get
@@ -65,21 +66,21 @@ addTermContext = modify . addTermContext'
 
 addTermContext' :: TermVar -> ProofConstruction -> ProofConstruction
 addTermContext' x ps@(PConstruction {subps=sp:sps}) =
-  ps {subps = sp {termContext = x S.<| termContext sp} : sps}
+  ps {subps = sp {termContext = V.cons x (termContext sp)} : sps}
 
 updateTermContext :: Int -> TermVar -> Proof ()
 updateTermContext n x = modify $ updateTermContext' n x
 
 updateTermContext' :: Int -> TermVar -> ProofConstruction -> ProofConstruction
 updateTermContext' n x ps@(PConstruction {subps=sp:sps}) =
-  ps {subps = sp {termContext = S.update n x $ termContext sp} : sps}
+  ps {subps = sp {termContext = V.update (termContext sp) $ V.singleton (n,x)} : sps}
 
 addBTypeContext :: BTypeVar -> Proof ()
 addBTypeContext = modify . addBTypeContext'
 
 addBTypeContext' :: BTypeVar -> ProofConstruction -> ProofConstruction
 addBTypeContext' x ps@(PConstruction {subps=sp:sps})=
-  ps {subps = sp {bTypeContext = x S.<| (bTypeContext sp)} : sps}
+  ps {subps = sp {bTypeContext = V.cons x $ bTypeContext sp} : sps}
 
 modifyLevelSubp :: (Int -> Int) -> Proof ()
 modifyLevelSubp = modify . modifyLevelSubp'
@@ -149,13 +150,14 @@ evaluateSubProof n ts
   | n > 1 = newSubProofs n ts
 
 endSubProof :: Proof ()
-endSubProof = do level <- getSubProofLevel
-                 modifySubps tail
-                 modifyTotalSubp (+ (-1))
-                 case level of
-                   Just l -> if lsubp l == 1
-                             then return ()
-                             else do modifyType tail
-                                     modifyLevelSubp (+ (-1))
-                                     modifySubps $ newSubProof $ head $ ty l
-                   Nothing -> return ()
+endSubProof =
+  do level <- getSubProofLevel
+     modifySubps tail
+     modifyTotalSubp (+ (-1))
+     case level of
+       Just l -> if lsubp l == 1
+                 then return ()
+                 else do modifyType tail
+                         modifyLevelSubp (+ (-1))
+                         modifySubps $ newSubProof $ head $ ty l
+       Nothing -> return ()

@@ -25,7 +25,7 @@ validSymbol = vSymbol reservedSymbols
 
 getCommand :: String -> UsrOpsParsers -> ProofCommand
 getCommand s op = case parse exprTy s op of
-                    [(x,[],y)] -> return x
+                    [(x,[],_)] -> return x
                     _ -> throw SyntaxE
 
 exprTy :: Parser Command
@@ -218,10 +218,10 @@ rightP :: Parser Tactic
 rightP = tacticZeroArg "right" CRight
 
 applyP :: Parser Tactic
-applyP = tacticIdentArg "apply" Apply
+applyP = tacticIndexArg "apply" Apply
 
 elimP :: Parser Tactic
-elimP = tacticIdentArg "elim" Elim
+elimP = tacticIndexArg "elim" Elim
 
 printP :: Parser Tactic
 printP = tacticIdentArg "print" Print
@@ -242,7 +242,8 @@ unfoldP :: Parser Tactic
 unfoldP = do symbol "unfold"
              op <- validIdent2
              (do symbol "in"
-                 h <- identifier
+                 char 'H'
+                 h <- nat
                  symbol "."
                  return $ Unfold op $ Just h
               <|> do symbol "."
@@ -250,12 +251,13 @@ unfoldP = do symbol "unfold"
 
 exactP :: Parser Tactic
 exactP = do symbol "exact"
-            (do ty <- typeTerm
+            (do te <- lambTerm
                 char '.'
-                return $ Exact $ Left ty
-             <|> do te <- lambTerm
+                return $ Exact $ Right te
+             <|> do symbol "type"
+                    ty <- typeTerm
                     char '.'
-                    return $ Exact $ Right te)
+                    return $ Exact $ Left ty)
 
 tacticZeroArg :: String -> Tactic -> Parser Tactic
 tacticZeroArg s tac = do symbol s
@@ -273,6 +275,14 @@ tacticIdentArg = tacticOneArg identifier
 
 tacticTypeArg :: String -> (Type -> Tactic) -> Parser Tactic
 tacticTypeArg = tacticOneArg typeTerm
+
+tacticIndexArg :: String -> (Int -> Tactic) -> Parser Tactic
+tacticIndexArg = tacticOneArg (char 'H' >> nat)
+
+getHypothesisValue :: String -> Maybe Int
+getHypothesisValue s = case parse (char 'H' >> nat) s [] of
+                         [(x,[],_)] -> return x
+                         _ -> Nothing
 
 --------------------------------------------------------------------------------------
 

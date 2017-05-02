@@ -96,8 +96,8 @@ Para probar el pretty printer (precedencias).
 - Theorem k37: fun1 p /\ (p -> p).
 Para probar el pretty printer (precedencias).
 - Theorem k38: forall bb, forall aa, aa -> (forall aa0, aa0 -> aa).
-Probar con "intro" y "exact (\aa.\x:aa.\aa.\y:aa.x)". Para chequear el renombramiento de var. de tipo
-en el lambda término final.
+Probar con "intro" y "exact (\aa.\x:aa.\aa.\y:aa.x) as forall bb, bb -> (forall cc, cc -> bb)".
+Para chequear el renombramiento de var. de tipo en el lambda término final.
 - Theorem k39: forall x, forall y, (x -> ~y) -> y -> x -> ~x.
 Para probar "cut" y "absurd".
 - Theorem k40: forall x, forall y, x -> y -> (forall x, forall y, x /\ y -> x \/ y) -> x \/ y.
@@ -115,7 +115,9 @@ Para probar el parser, con "para todo" sin paréntesis (NO se probó su veracida
 Para probar el parser, y el inferidor.
 - Theorem t46: (forall w, forall d, forall a, a -> d)-> forall b, forall c, b -> c.
 Para probar la unificación, donde hay que ingregar un tipo mediante exact.
-
+- Theorem t47: forall p, forall q, p -> q -> ((forall x, x -> x) /\ (forall w, w -> w)) /\ forall k, p /\ q.
+Para chequear el comando "exact" con "as".
+Hice: intros; split; split; exact (\a. \x:a. x) as forall ww, ww -> ww; exact (\q. \y:q. y) as forall kk, kk -> kk; exact (\z. intro_and [p] [q] H0 H1) as forall mm, p /\ q.
 
 Casos de inferencia OK:
 1. infer \A. \B. \x:A. \y:False. let {B,x} = {*B, \B.\x:False. x} as exists A, forall Q, False -> False in (\C. x [False] y) [B].
@@ -130,7 +132,7 @@ Para chequear el pretty printer.
 8. infer \p.{*p, \w.\x:p.x} as exists x, forall w, p -> x.
 9. infer (\A. \x:A. \y: A -> forall B, A. y as A -> forall W, A x as A [A]) as forall B, B -> (B -> forall C, B) -> B.
 Para probar precedencia del "as".
-10.  infer (\A. \x:forall B, A. \y: A -> A. y as (A -> A) (x as (forall C, A) [A])) as forall B, (forall C, B) -> (B -> B) -> B.
+10. infer (\A. \x:forall B, A. \y: A -> A. y as (A -> A) (x as (forall C, A) [A])) as forall B, (forall C, B) -> (B -> B) -> B.
 Para probar precedencia del "as".
 
 

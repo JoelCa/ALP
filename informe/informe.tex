@@ -55,7 +55,9 @@ data ProverGlobal = PGlobal { fTypeContext :: FTypeContext
 Este registro contiene los datos globales del asistente.
 \begin{itemize}
   \item \texttt{fTypeContext}: variables de tipo libres.
-  \item \texttt{teorems}: teoremas ya probados.
+  \item \texttt{teorems}: teoremas probados. Consiste en una lista de pares clave-valor.
+  Donde la clave es el nombre del teorema, y el valor es el lambda término de la prueba,
+  el cual tiene asociado su tipo mediante el constructor \texttt{as}.
   \item \texttt{opers}: representa a las operaciones que pueden desplegarse.
 \end{itemize}
 

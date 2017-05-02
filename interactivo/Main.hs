@@ -15,9 +15,8 @@ import Data.List (find, findIndex, elemIndex)
 import qualified Data.Vector as V
 import Rules
 import Transformers
-import Hypothesis (printHypothesis)
-
-
+import ErrorMsj
+  
 type ProverInputState a = InputT (StateT ProverState IO) a
 
 -- Teoremas iniciales.
@@ -67,7 +66,8 @@ prover = do s <- lift get
               Just "" -> prover
               Just x -> catch (do command <- returnInput $ getCommand x (parsers $ global s)
                                   checkCommand command)
-                        (\e -> errorMessage (opers $ global s) (e :: ProofExceptions) >> prover)
+                        (\e -> outputStrLn (errorMessage (opers $ global s) (e :: ProofExceptions))
+                               >> prover)
 
 
 -- Aplicación de los comandos.
@@ -126,8 +126,8 @@ checkCommand (Ta (Print x)) =
      let ter = teorems $ global s
      when (Map.notMember x ter) (throwIO $ PNotExist x)
      let t = ter Map.! x
-     outputStrLn $ render $ printTerm (opers $ global s) $ fst t
-     outputStrLn $ render $ printType (opers $ global s) $ fst $ snd t
+     outputStrLn $ render $ printTerm (opers $ global s) $ t
+     --outputStrLn $ render $ printType (opers $ global s) $ fst $ snd t
      prover
 checkCommand (Ta (Infer x)) =
   do s <- lift get
@@ -150,7 +150,7 @@ checkCommand (Ta ta) =
      lift $ put $ s {proof = Just $ pr {constr = p}}
      if (isFinalTerm p)
        then ((outputStrLn $ "Prueba completa.\n"
-              ++ renderFinalTerm p ++ "\n")
+              ++ renderFinalTerm (opers $ cglobal p) (getTermFromProof p (types pr))  ++ "\n")
              >> reloadProver)
        else (outputStrLn (renderProof p) >> (outputStrLn $ show $ length $ term p))
      prover
@@ -176,9 +176,9 @@ isFinalTerm (PConstruction {term=[Term _]}) = True
 isFinalTerm _ = False
 
 -- Obtiene el lambda término final de la prueba construida.
-getTermFromProof :: ProofConstruction -> Term
-getTermFromProof (PConstruction {term=[Term t]}) = t
-getTermFromProof _ = error "getTermFromProof: no debería pasar"
+getTermFromProof :: ProofConstruction -> (Type, TType) -> Term
+getTermFromProof (PConstruction {term=[Term t]}) ty = t ::: ty
+getTermFromProof _ _ = error "getTermFromProof: no debería pasar"
 
 
 -- Crea una prueba.
@@ -212,64 +212,23 @@ reloadProver = do s <- lift get
                   let p = fromJust $ proof s
                   lift $ put $ PSt { global= (global s)
                                              {teorems=Map.insert (name p)
-                                                    (getTermFromProof (constr p), types p)
+                                                    (getTermFromProof (constr p) (types p))
                                                     (teorems $ global s)}
                                    , proof = Nothing
                                    }
 
 -- Impresión del lambda término final.
-renderFinalTerm :: ProofConstruction -> String
-renderFinalTerm p = render $ printTerm (opers $ cglobal p) $ getTermFromProof p
+renderFinalTerm :: FOperations -> Term -> String
+renderFinalTerm op t = render $ printTerm op t
 
 -- Impresión del lambda término final sin nombres (a modo de prueba).
-renderFinalTermWithoutName :: ProofConstruction -> String
-renderFinalTermWithoutName p = render $ printTermTType (opers $ cglobal p) $ getTermFromProof p
+renderFinalTermWithoutName :: FOperations -> Term -> String
+renderFinalTermWithoutName op t = render $ printTermTType op t
 
 -- Impresión de la prueba en construcción
 renderProof :: ProofConstruction -> String
 renderProof p = render $ printProof (tsubp p) (opers $ cglobal p) (fTypeContext $ cglobal p) (subps p)
 
-
--- Mensajes de error.
-errorMessage :: FOperations -> ProofExceptions -> ProverInputState ()
-errorMessage _ SyntaxE = outputStrLn "error de sintaxis."
-errorMessage _ PNotFinished = outputStrLn "error: prueba no terminada."
-errorMessage _ PNotStarted = outputStrLn "error: prueba no comenzada."
-errorMessage _ (PExist s) = outputStrLn $ "error: " ++ s ++ " ya existe."
-errorMessage _ (PNotExist s) = outputStrLn $ "error: " ++ s ++ " no existe."
-errorMessage _ AssuE = outputStrLn "error: comando assumption mal aplicado."
-errorMessage _ IntroE1 = outputStrLn "error: comando intro mal aplicado."
-errorMessage op (ApplyE1 t1 t2) =
-  outputStrLn $ "error: comando apply mal aplicado, \"" ++
-  (render $ printType op t1) ++  "\" no coincide con \"" ++
-  (render $ printType op t2) ++ "\"."
-errorMessage _ Unif1 = outputStrLn "error: unificación inválida 1."
-errorMessage _ Unif2 = outputStrLn "error: unificación inválida 2."
-errorMessage _ Unif3 = outputStrLn "error: unificación inválida 3."
-errorMessage _ Unif4 = outputStrLn "error: unificación inválida 4."
-errorMessage _ ElimE1 = outputStrLn "error: comando elim mal aplicado."
-errorMessage _ CommandInvalid = outputStrLn "error: comando inválido."
-errorMessage _ EmptyType = outputStrLn "error: comando inválido (debe añadir una fórmula mediante \"exact\")."
-errorMessage _ (PropRepeated1 s) = outputStrLn $ "error: proposición \""++ s ++"\" repetida."
-errorMessage _ (PropRepeated2 s) = outputStrLn $ "error: proposición \""++ s ++"\" ya existe."
-errorMessage _ (PropNotExists s) = outputStrLn $ "error: proposición \""++ s ++"\" no existe en el entorno."
-errorMessage _ (OpE1 s) = outputStrLn $ "error: cantidad de operandos en la operación \""++ s ++"\"."
-errorMessage _ (OpE2 s) = outputStrLn $ "error: la operación \""++ s ++"\" no existe."
-errorMessage op (ExactE1 ty) = outputStrLn $ "error: el término ingresado no tiene el tipo \"" ++ render (printType op ty) ++ "\". "
-errorMessage op (ExactE2 ty) = outputStrLn $ "error: debe ingresar una prueba de \"" ++ render (printType op ty) ++ "\". "
-errorMessage _ PSE = outputStrLn "error: operación sobre el estado interno inválida"
-errorMessage _ (TermE x) = outputStrLn $ "error: el tipo \"" ++ x ++ "\" no fue declarado."
-errorMessage _ (InferE1 x) = outputStrLn $ "error: la variable de término \"" ++ x ++ "\" no fue declarada."
-errorMessage op (InferE2 te ty) = outputStrLn $ errorInferPrintTerm op te $ render (printType op ty)
-errorMessage op (InferE3 te s) = outputStrLn $ errorInferPrintTerm op te s
-errorMessage op (InferE4 te) = outputStrLn $ "error: tipo inesperado, en el término \"" ++ render (printLamTerm op te) ++ "\"."
-errorMessage op (DefE s) = outputStrLn $ "error: " ++ s ++ " es un operador que ya existe."
-errorMessage _ (UnfoldE1 s) = outputStrLn $ "error: " ++ s ++ " no es un operador foldeable."
-errorMessage _ (HypoE i) = outputStrLn $ "error: la hipótesis " ++ printHypothesis i ++ " no existe."
-
-errorInferPrintTerm :: FOperations -> LamTerm -> String -> String
-errorInferPrintTerm op te s =
-  "error: se esperaba el tipo \"" ++ s ++ "\", en el término \"" ++ render (printLamTerm op te) ++ "\"."
 
 returnInput :: Either ProofExceptions a -> ProverInputState a
 returnInput (Left exception) = throwIO exception

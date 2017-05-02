@@ -7,7 +7,7 @@ import Control.Monad.State.Lazy (get)
 
 type ProofCommand = Either ProofExceptions Command
 
-reservedWords = ["Theorem", "Definition", "forall", "False", "exists", "let", "in"]
+reservedWords = ["Theorem", "Definition", "forall", "False", "exists", "let", "in", "as"]
 reservedSymbols = [':', '.', '\\', '[', ']','{','}']
 
 -- Identificadores alfa-numéricos (incluido el guión bajo), exceptuando las palabras reservados.
@@ -126,9 +126,16 @@ app' = do t <- brackets typeTerm
        <|> return id
 
 unitTerm :: Parser LamTerm
-unitTerm = do x <- validIdent1
-              return $ LVar x
-           <|> parens lambTerm
+unitTerm = do u <- unitaryTerm
+              (do symbol "as"
+                  t <- typeTerm
+                  return $ As u t
+               <|> return u)
+
+unitaryTerm :: Parser LamTerm
+unitaryTerm = do x <- validIdent1
+                 return $ LVar x
+              <|> parens lambTerm
 
 abstraction :: Parser LamTerm
 abstraction = do char '\\'

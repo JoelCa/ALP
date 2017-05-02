@@ -102,6 +102,21 @@ de modo tal de que cada una sea distinta de las que fueron declaradas previament
 - Analizar si se admite la utilización de los comandos "infer" y "Definition" durante una prueba.
 
 - Consideramos que dos tipos son iguales si sus tipos sin nombres son iguales.
-Como consedcuencia de esto, un lambda término tiene infinitos tipos.
+Como consecuencia de esto, un lambda término tiene infinitos tipos.
 Por ejemplo, (\x:forall w,w.x) : ((forall w,w) -> forall w,w), y también
 (\x:forall w,w.x) : ((forall w,w) -> forall k,k).
+
+- Gracias al renombramiento, NO puede producirse el "encapsulamiento" de variables.
+Es decir que, por la substitución, variables libres en un tipo pasen a estar ligadas.
+Ejemplo:
+> infer \w.(\a.\x:forall w, a. x) [w -> w].
+Se renombra a: \w.(\a.\x:forall w0, a.x) [w -> w]
+El tipo "forall w, a", es renombrado a "forall w0, a", de modo tal que
+al calcular "(forall w0, a)[a := w -> w]", no hay variables ligadas a "w0". 
+
+- NO podemos expresar la regla de introducción del existe de la misma forma que hicimos con los
+otros operadores. Pues requerimos del encapsulamiento para construirla.
+Podriamos expresar una parte de la regla de esta forma:
+\s'. \t. \y. \f:forall x, t -> y. f [s']
+Sin embargo, para cualquier instancia t0 de t, "x" NO aparece en t0 (por el renombramiento). 
+Es decir, t0 [x := w] = t0.

@@ -52,6 +52,7 @@ data LamTerm  = LVar TermV
               | BApp LamTerm Type
               | EPack Type LamTerm Type
               | EUnpack TypeV TermV LamTerm LamTerm
+              | As LamTerm Type
               deriving (Show, Eq)
 
   -- Lambda términos sin nombres.
@@ -61,8 +62,9 @@ data Term  = Bound Int
            | Lam (Type,TType) Term
            | BLam TypeV Term
            | Term :!: (Type,TType)
-           | ((Type,TType), Term) ::: (Type,TType)
+           | Pack (Type,TType) Term (Type,TType)
            | Unpack TypeV Term Term
+           | Term ::: (Type,TType)
            deriving (Show, Eq)
 
   -- Para cada variable de término, tenemos (por posición en la 4-tupla):
@@ -85,8 +87,8 @@ type BTypeContext = Vector BTypeVar
 
   -- Tabla de teoremas.
   -- Clave: Nombre del teorema.
-  -- Valor: El lambda término de la prueba, junto con su tipo, con y sin nombres.
-type Teorems = Map String (Term,(Type,TType))
+  -- Valor: El lambda término de la prueba.
+type Teorems = Map String Term
 
 type FTypeVar = String
 

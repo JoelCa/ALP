@@ -77,7 +77,7 @@ checkCommand (Ty name ty) =
      when (isJust $ proof s) (throwIO PNotFinished)
      let glo = global s
      when (Map.member name (teorems $ glo)) (throwIO $ PExist name)
-     (tyr,tty) <- returnInput $ rename (fTypeContext glo) (opers glo) ty
+     (tyr,tty) <- returnInput $ renamedType (fTypeContext glo) (opers glo) ty
      let p = newProof glo name tyr tty
      lift $ put $ PSt {global=glo, proof=Just p}
      outputStrLn $ renderProof $ constr p
@@ -96,7 +96,7 @@ checkCommand (TypeDef (op, body, operands, isInfix)) =
   do s <- lift get
      let glo = global s
      when (isJust $ V.find (\(x,_,_,_)-> x == op) $ opers glo) (throwIO $ DefE op)
-     t <- returnInput $ rename (fTypeContext glo) (opers glo) body
+     t <- returnInput $ renamedType (fTypeContext glo) (opers glo) body
      let [p1, p2, p3] = parsers glo
      case (operands, isInfix) of
        (Empty, False) ->

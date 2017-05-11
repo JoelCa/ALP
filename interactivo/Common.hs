@@ -14,7 +14,7 @@ import Data.Vector (Vector, ifoldl)
 
 type Parser a = ParserState UsrOpsParsers a
 
-type UsrOpsParsers = [ParserParser Type]
+type UsrOpsParsers = ParserParser Type
 
 newtype ParserParser a = PP { runParser :: Parser a }
 
@@ -32,7 +32,7 @@ data Type = B TypeV
           | Fun Type Type
           | ForAll TypeV Type
           | Exists TypeV Type
-          | RenameTy String [Type]
+          | RenameTy String Int [Type]
           deriving (Show, Eq)
   
   -- Tipos sin nombre.
@@ -92,23 +92,29 @@ type Teorems = Map String Term
 
 type FTypeVar = String
 
-  -- Secuencua de variables de tipo libres.
+  -- Secuencia de variables de tipo libres.
 type FTypeContext = [FTypeVar]
 
   --Comandos.
 data Command = Ty String Type
              | Ta Tactic
-             | Props [String]
+             | Types [String]
              | TypeDef (String, Type, Operands, Bool)
+             | TermDef String Term
              deriving (Show)
 
   -- Tácticas.
 data Tactic = Assumption | Apply Int | Intro | Intros | Split
             | Elim Int | CLeft | CRight | Print String 
-            | CExists Type | Cut Type | Exact (Either Type LamTerm)
+            | CExists Type | Cut Type | Exact Terms
             | Infer LamTerm | Unfold String (Maybe Int)
             | Absurd Type
             deriving (Show)
+
+data Terms = TypeT Type
+           | LambdaT LamTerm
+           | Applications (GenTree String)
+           deriving (Show)
 
 
   -- Excepciones.
@@ -116,29 +122,34 @@ data ProofExceptions = PNotFinished | PNotStarted | PExist String
                      | PNotExist String | SyntaxE | AssuE
                      | IntroE1 | ApplyE1 Type Type | HypoE Int
                      | Unif1 | Unif2 | Unif3 | Unif4
-                     | ElimE1 | CommandInvalid | PropRepeated1 String
-                     | PropRepeated2 String | PropNotExists String
+                     | ElimE1 | CommandInvalid | TypeRepeated1 String
+                     | TypeRepeated2 String | TypeNotExists String
                      | OpE1 String | OpE2 String | ExactE1 Type
-                     | ExactE2 Type | PSE | EmptyType | TermE String
+                     | ExactE2 Type | PSE | EmptyType | TypeE String
                      | InferE1 String | InferE2 LamTerm Type | InferE3 LamTerm String
                      | InferE4 LamTerm | DefE String | UnfoldE1 String
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
 
+  -- Arbol general.
+data GenTree a = Nil | Node a [GenTree a]
+               deriving (Show)
+
   -- Cantidad de operandos de una operación.
-data Operands = Empty
-              | Unary
-              | Binary
-              deriving (Show)
+type Operands = Int
+
+  -- Conjunto de operaciones NO "foldeables".
+notFoldeableOps :: [(String, Int, Operands)]
+notFoldeableOps = [and_, or_, bottom_]
 
   -- Operaciones por default, NO "foldeables", donde:
   -- 1. Texto de la operación.
   -- 2. Código que identifica a la operación.
   -- 3. Cantidad de operandos (a lo sumo 2).
-and_ = (['/','\\'] , -1, Binary)
-or_ = (['\\','/'], -2, Binary)
-bottom_ = ("False", -3, Empty)
+and_ = (['/','\\'] , -1, 2)
+or_ = (['\\','/'], -2, 2)
+bottom_ = ("False", -3, 0)
 
 and_text = fst3 and_
 or_text = fst3 or_
@@ -155,15 +166,11 @@ iff_text = "<->"
 iff_code = 1 :: Int
 not_code = 0 :: Int
 
-  -- Conjunto de operaciones NO "foldeables".
-notFoldeableOps :: [(String, Int, Operands)]
-notFoldeableOps = [and_, or_, bottom_]
 
   -- Operación "foldeable", donde:
   -- 1. El texto que la identifica.
   -- 2. Cuerpo de la operación.
   -- 3. Indica la cantidad de operandos.
-  -- 4. Es True sii es un operador infijo.
   -- Todas las operaciones que define el usuario son foldeables.
 type FoldeableOp = (String, (Type, TType), Operands, Bool)
 type FOperations = Vector FoldeableOp
@@ -171,13 +178,13 @@ type FOperations = Vector FoldeableOp
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState
                        , global :: ProverGlobal
+                       , infixParser :: UsrOpsParsers
                        }
 
   -- Definiciones globales.
 data ProverGlobal = PGlobal { fTypeContext :: FTypeContext
                             , teorems :: Teorems             -- Teoremas.
-                            , opers :: FOperations           -- Operaciones "foldeables".
-                            , parsers :: UsrOpsParsers
+                            , opers :: FOperations           -- Operaciones "foldeables"
                             }
                     
   -- Estado de la prueba que se está construyendo.
@@ -263,4 +270,3 @@ snd3 (_, x, _) = x
 
 getElemIndex :: (a -> Bool) -> Vector a -> Maybe (Int, a)
 getElemIndex f v = ifoldl (\r i x -> if f x then Just (i, x) else r) Nothing v
-

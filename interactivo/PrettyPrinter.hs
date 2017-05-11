@@ -329,6 +329,7 @@ getTextFromDefaultOp n = case find (\(_,x,_) -> x == n) notFoldeableOps of
 printType :: FOperations -> Type -> Doc
 printType = printType' (7,7,False)
 
+-- TERMINAR (hacer casos de RenameTy)
 printType' :: (Int, Int, Bool) -> FOperations -> Type -> Doc
 printType' _ _ (B v) =
   text v
@@ -346,7 +347,7 @@ printType' (i,j,k) op (Exists v t) =
   text v <>
   text "," <+>
   printType' (7,j,k) op t
-printType' prec@(i,j,k) op (RenameTy s [t1, t2])
+printType' prec@(i,j,k) op (RenameTy s _ [t1, t2])
   | s == and_text = printBinInfix (\x t -> printType' x op t) s prec 3 t1 t2
   | s == or_text = printBinInfix (\x t -> printType' x op t) s prec 4 t1 t2
   | s == iff_text = printBinInfix (\x t -> printType' x op t) s prec 6 t1 t2
@@ -359,11 +360,11 @@ printType' prec@(i,j,k) op (RenameTy s [t1, t2])
             text s <+> 
             printType' (2, n, False) op t2
           _ -> error "error: printType' no debería pasar."
-printType' prec op (RenameTy s [t]) =
+printType' prec op (RenameTy s _ [t]) =
   printUnaryPrefix (\x t -> printType' x op t) s prec t
-printType' _ _ (RenameTy s []) =
+printType' _ _ (RenameTy s _ []) =
   text s
-printType' _ _ (RenameTy _ _) =
+printType' _ _ (RenameTy _ _ _) =
   error "error: printType' no debería pasar."
 
 printBinPrefix :: ((Int, Int, Bool) -> a -> Doc) -> String
@@ -421,7 +422,7 @@ printLevelGoals i tp op (t:ts) =
 
 printGoal :: FOperations -> Maybe (Type, TType) -> Doc
 printGoal op (Just (ty,_)) = printType op ty
-printGoal op Nothing = text "Prop"
+printGoal op Nothing = text "*"
 
 printContext :: FOperations -> (FTypeContext, BTypeContext) -> TermContext -> Doc
 printContext op (ftc,btc) c = printFTypeContext ftc $$
@@ -434,9 +435,7 @@ printFTypeContext (x:ftc) = printFTypeVar x $$
                             printFTypeContext ftc
 
 printFTypeVar :: FTypeVar -> Doc
-printFTypeVar x = text x <+>
-                  text ":" <+>
-                  text "Prop"
+printFTypeVar x = text x
 
 printRestContext :: FOperations -> BTypeContext -> TermContext -> Doc
 printRestContext op btc c
@@ -468,9 +467,7 @@ printTermVar n op (_,_,t,_) = text (printHypothesis (n-1)) <+>
                               printType op t
 
 printBTypeVar :: BTypeVar -> Doc
-printBTypeVar (_,x) = text x <+>
-                      text ":" <+>
-                      text "Prop"
+printBTypeVar (_,x) = text x
 
 fst4 :: (a, b, c, d) -> a
 fst4 (x, _, _, _) = x

@@ -120,3 +120,6 @@ Podriamos expresar una parte de la regla de esta forma:
 \s'. \t. \y. \f:forall x, t -> y. f [s']
 Sin embargo, para cualquier instancia t0 de t, "x" NO aparece en t0 (por el renombramiento). 
 Es decir, t0 [x := w] = t0.
+
+- Los lambda términos pueden tener variables libres, las cuales solo pueden ser nombres
+de teoremas o de otros lambda términos.

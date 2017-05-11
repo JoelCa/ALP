@@ -39,12 +39,9 @@ initProverState = PSt { global = PGlobal { teorems = initialT
                                          , opers = V.fromList [ not_op
                                                               , iff_op
                                                               ]
-                                         , parsers = [ PP emptyParser        -- const
-                                                     , PP emptyParser        -- unary y binary
-                                                     , PP basicInfixParser   -- infixOps
-                                                     ]
                                          }
                       , proof = Nothing
+                      , infixParser = PP basicInfixParser   -- infixOps
                       }
 
 main :: IO ()
@@ -64,7 +61,7 @@ prover = do s <- lift get
                                  return ()
               Just "-r" -> resetProof
               Just "" -> prover
-              Just x -> catch (do command <- returnInput $ getCommand x (parsers $ global s)
+              Just x -> catch (do command <- returnInput $ getCommand x (infixParser s)
                                   checkCommand command)
                         (\e -> outputStrLn (errorMessage (opers $ global s) (e :: ProofExceptions))
                                >> prover)
@@ -79,17 +76,16 @@ checkCommand (Ty name ty) =
      when (Map.member name (teorems $ glo)) (throwIO $ PExist name)
      (tyr,tty) <- returnInput $ renamedType (fTypeContext glo) (opers glo) ty
      let p = newProof glo name tyr tty
-     lift $ put $ PSt {global=glo, proof=Just p}
+     lift $ put $ s {proof=Just p}
      outputStrLn $ renderProof $ constr p
      prover                          
-checkCommand (Props ps) =
+checkCommand (Types ps) =
   do s <- lift get
      when (isJust $ proof s) (throwIO PNotFinished)
      let gps = fTypeContext $ global s
-         pr1 = propRepeated1 ps
-         pr2 = propRepeated2 ps gps
-     when (isJust pr1) (throwIO $ PropRepeated1 $ fromJust pr1)
-     when (isJust pr2) (throwIO $ PropRepeated2 $ fromJust pr2)
+         (tr1, tr2) = typeRepeated ps gps
+     when (isJust tr1) (throwIO $ TypeRepeated1 $ fromJust tr1)
+     when (isJust tr2) (throwIO $ TypeRepeated2 $ fromJust tr2)
      lift $ put $ s {global = (global s) {teorems=teorems $ global s, fTypeContext=ps++gps}}
      prover
 checkCommand (TypeDef (op, body, operands, isInfix)) =
@@ -97,29 +93,13 @@ checkCommand (TypeDef (op, body, operands, isInfix)) =
      let glo = global s
      when (isJust $ V.find (\(x,_,_,_)-> x == op) $ opers glo) (throwIO $ DefE op)
      t <- returnInput $ renamedType (fTypeContext glo) (opers glo) body
-     let [p1, p2, p3] = parsers glo
+     let ip = infixParser s
      case (operands, isInfix) of
-       (Empty, False) ->
-         lift $ put $ s {global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix)
-                                      , parsers = [ PP $ usrConstParser op $ runParser p1
-                                                  , p2
-                                                  , p3 ] }}
-       (Unary, False) ->
-         lift $ put $ s {global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix)
-                                      , parsers = [ p1
-                                                  , PP $ usrUnaryPrefixParser op $ runParser p2
-                                                  , p3 ] }}
-       (Binary, False) ->
-         lift $ put $ s {global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix)
-                                      , parsers = [ p1
-                                                  , PP $ usrBinaryPrefixParser op $ runParser p2
-                                                  , p3 ] }}
-       (Binary, True) ->
-         lift $ put $ s {global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix)
-                                      , parsers = [ p1
-                                                  , p2
-                                                  , PP $ usrInfixParser op $ runParser p3 ] }}
-       _ -> error "error: checkCommand, no debería pasar."
+       (2, True) ->
+         lift $ put $ s { global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix) }
+                        , infixParser =  PP $ usrInfixParser op $ runParser ip }
+       _ ->
+         lift $ put $ s { global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix) } }
      prover
 checkCommand (Ta (Print x)) =
   do s <- lift get
@@ -155,19 +135,13 @@ checkCommand (Ta ta) =
        else (outputStrLn (renderProof p) >> (outputStrLn $ show $ length $ term p))
      prover
 
--- Funciones auxiliares del comando "Props".
-propRepeated2 :: [String] -> [String] -> Maybe String
-propRepeated2 _ [] = Nothing
-propRepeated2 [] _ = Nothing
-propRepeated2 (p:ps) ps'
-  | elem p ps' = return p
-  | otherwise = propRepeated2 ps ps'
-                
-propRepeated1 :: [String] -> Maybe String
-propRepeated1 [] = Nothing
-propRepeated1 (p:ps)
-  | elem p ps = return p
-  | otherwise = propRepeated1 ps
+-- Funciones auxiliares del comando "Props/Types".                
+typeRepeated :: [String] -> [String] -> (Maybe String, Maybe String)
+typeRepeated [] _ = (Nothing, Nothing)
+typeRepeated (p:ps) xs
+  | elem p ps = (return p, Nothing)
+  | elem p xs = (Nothing, return p)
+  | otherwise = typeRepeated ps xs
 
 -- Funciones auxiliares:
 -- Chequea si la prueba a terminado.
@@ -203,19 +177,19 @@ newProof pglobal name ty tty =
 -- Aborta la prueba.
 resetProof :: ProverInputState ()
 resetProof = do s <- lift get
-                lift $ put $ PSt {global=global s, proof=Nothing}
+                lift $ put $ s {proof = Nothing}
                 prover
                 
 -- Finaliza la prueba.
 reloadProver :: ProverInputState ()
 reloadProver = do s <- lift get
                   let p = fromJust $ proof s
-                  lift $ put $ PSt { global= (global s)
-                                             {teorems=Map.insert (name p)
-                                                    (getTermFromProof (constr p) (types p))
-                                                    (teorems $ global s)}
-                                   , proof = Nothing
-                                   }
+                  lift $ put $ s { global= (global s)
+                                           { teorems = Map.insert (name p)
+                                                       (getTermFromProof (constr p) (types p))
+                                                       (teorems $ global s) }
+                                 , proof = Nothing
+                                 }
 
 -- Impresión del lambda término final.
 renderFinalTerm :: FOperations -> Term -> String

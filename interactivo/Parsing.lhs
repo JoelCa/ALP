@@ -168,7 +168,10 @@ Ignoring spacing
 > vIdent1 = validSToken identifier
 >
 > vIdent2 :: [Char] -> [String] -> ParserState s String
-> vIdent2 syms = validSToken $ token $ many $ sat (\x -> (x /= ' ') && (not $ elem x syms))
+> vIdent2 syms = validSToken $ token $ many1 $ sat (\x -> (x /= ' ') && (not $ elem x syms))
+
+--OBS: vIdent2 con "many" NO anda cuando se llama en prefixOps'
+
 >
 > -- Símbolos, NO alfanuméricos.
 > vSymbol :: [Char] -> ParserState s String

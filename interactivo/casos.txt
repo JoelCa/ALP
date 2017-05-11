@@ -139,5 +139,3 @@ Para probar precedencia del "as".
 Casos de inferencia ERROR:
 1. infer \B. let {A,a} = {*B, \x:B.x} as exists C, C -> C in a.
 2. infer \a.\x:a.\a.\b.\y:a->b. y x.
-
-

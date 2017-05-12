@@ -118,6 +118,13 @@ Para probar la unificación, donde hay que ingregar un tipo mediante exact.
 - Theorem t47: forall p, forall q, p -> q -> ((forall x, x -> x) /\ (forall w, w -> w)) /\ forall k, p /\ q.
 Para chequear el comando "exact" con "as".
 Hice: intros; split; split; exact (\a. \x:a. x) as forall ww, ww -> ww; exact (\q. \y:q. y) as forall kk, kk -> kk; exact (\z. intro_and [p] [q] H0 H1) as forall mm, p /\ q.
+- Algo = forall w, w \/ w.
+  Theorem t48: forall k, ~ Algo /\ Algo -> k.
+Para probar el parser, y chequear que se efectue correctamente la transformación del tipo con nombre a uno sin nombre.
+- x x x = forall w, forall v, x /\ v.
+  jojo x x = forall w, forall v, x /\ v.
+  Theorem t49: forall m, jojo m ~m -> False.
+NO se probo. Para chequear definición de operadores. 
 
 Casos de inferencia OK:
 1. infer \A. \B. \x:A. \y:False. let {B,x} = {*B, \B.\x:False. x} as exists A, forall Q, False -> False in (\C. x [False] y) [B].

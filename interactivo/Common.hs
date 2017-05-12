@@ -99,7 +99,7 @@ type FTypeContext = [FTypeVar]
 data Command = Ty String Type
              | Ta Tactic
              | Types [String]
-             | TypeDef (String, Type, Operands, Bool)
+             | TypeDef TypeDefinition
              | TermDef String Term
              deriving (Show)
 
@@ -168,12 +168,22 @@ not_code = 0 :: Int
 
 
   -- Operación "foldeable", donde:
-  -- 1. El texto que la identifica.
-  -- 2. Cuerpo de la operación.
-  -- 3. Indica la cantidad de operandos.
+  -- 1. Identificador.
+  -- 2. Cuerpo de la operación (sin los para todos).
+  -- 3. Cantidad de operandos.
+  -- 4. Booleano. True sii es una operación binaria infija.
   -- Todas las operaciones que define el usuario son foldeables.
 type FoldeableOp = (String, (Type, TType), Operands, Bool)
+
 type FOperations = Vector FoldeableOp
+
+  -- Definición de una "operación".
+  -- 1. Identificador.
+  -- 2. Cantidad de operandos.
+  -- 3. Lista de los nombres de los argumentos.
+  -- 4. Cuerpo de la operación.
+  -- 5. Boleano. True sii es una operación binaria infija.
+type TypeDefinition = (String, Operands, [String], Type, Bool)
 
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState

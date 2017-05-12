@@ -88,18 +88,17 @@ checkCommand (Types ps) =
      when (isJust tr2) (throwIO $ TypeRepeated2 $ fromJust tr2)
      lift $ put $ s {global = (global s) {teorems=teorems $ global s, fTypeContext=ps++gps}}
      prover
-checkCommand (TypeDef (op, body, operands, isInfix)) =
+checkCommand (TypeDef (op, n, args, body, isInfix)) =
   do s <- lift get
      let glo = global s
      when (isJust $ V.find (\(x,_,_,_)-> x == op) $ opers glo) (throwIO $ DefE op)
-     t <- returnInput $ renamedType (fTypeContext glo) (opers glo) body
-     let ip = infixParser s
-     case (operands, isInfix) of
+     t <- returnInput $ renamedType3 args (fTypeContext glo) (opers glo) body
+     case (n, isInfix) of
        (2, True) ->
-         lift $ put $ s { global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix) }
-                        , infixParser =  PP $ usrInfixParser op $ runParser ip }
+         lift $ put $ s { global = glo { opers = V.snoc (opers glo) (op, t, n, isInfix) }
+                        , infixParser =  PP $ usrInfixParser op $ runParser $ infixParser s }
        _ ->
-         lift $ put $ s { global = glo { opers = V.snoc (opers glo) (op, t, operands, isInfix) } }
+         lift $ put $ s { global = glo { opers = V.snoc (opers glo) (op, t, n, isInfix) } }
      prover
 checkCommand (Ta (Print x)) =
   do s <- lift get

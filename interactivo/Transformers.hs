@@ -38,15 +38,15 @@ renamedType3 bs = typeWithoutName bs bs
 typeWithoutName :: [String] -> [String] -> FTypeContext -> FOperations
                 -> Type -> Either ProofExceptions (Type, TType)
 typeWithoutName rs bs fs op (B x) =
-  case getElemIndex (\(w,_,_,_) -> w == x) op of
-    Just (n, (_, _, args, _)) -> if args == 0
-                                 then return (RenameTy x 0 [], RenameTTy n [])
-                                 else throw $ OpE1 x
-    _ -> case x `elemIndex` bs of
-           Just n -> return (B $ rs !! n, TBound n)
-           Nothing -> if elem x fs
-                      then return (B x, TFree x)
-                      else throw $ TypeE x
+  case x `elemIndex` bs of
+    Just n -> return (B $ rs !! n, TBound n)
+    Nothing -> case getElemIndex (\(w,_,_,_) -> w == x) op of
+                 Just (n, (_, _, args, _)) -> if args == 0
+                                              then return (RenameTy x 0 [], RenameTTy n [])
+                                              else throw $ OpE1 x
+                 Nothing -> if elem x fs
+                            then return (B x, TFree x)
+                            else throw $ TypeE x
 typeWithoutName rs bs fs op (ForAll x t) =
   do let v = getRename x fs rs
      (tt,tt') <- typeWithoutName (v:rs) (x:bs) fs op t

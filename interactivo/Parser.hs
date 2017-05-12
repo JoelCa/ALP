@@ -9,7 +9,7 @@ type ProofCommand = Either ProofExceptions Command
 
 reservedWords = ["Theorem", "Definition", "forall", "False", "exists", "let", "in", "as"]
 reservedSymbols = [':', '.', '[', ']','{','}','(',')']
-reservedWords2 = ["\\", "->", and_text, or_text, bottom_text, not_text, iff_text]
+reservedWords2 = ["=", "\\", "->", and_text, or_text, bottom_text, not_text, iff_text]
 
 -- Identificadores alfa-numéricos (incluido el guión bajo), exceptuando las palabras reservados.
 validIdent1 :: Parser String
@@ -23,21 +23,27 @@ validIdent2 = vIdent2 reservedSymbols reservedWords
 validIdent3 :: Parser String
 validIdent3 = vIdent2 reservedSymbols (reservedWords ++ reservedWords2)
 
-
 -- Cualquier cadena de simbolos sin espacios ni simbolos reservados.
 validSymbol :: Parser String
 validSymbol = vSymbol reservedSymbols
+
+opArgs0 :: Parser a -> Parser (Int, [a])
+opArgs0 p = do x <- p
+               (n, xs) <- opArgs0 p
+               return (n+1, x:xs)
+            <|> return (0, [])
+
+opArgs1 :: Parser a -> Parser (Int, [a])
+opArgs1 p = do x <- p
+               (do (n, xs) <- opArgs1 p
+                   return (n+1, x:xs)
+                <|> return (1, [x]))
+
 
 getCommand :: String -> UsrOpsParsers -> ProofCommand
 getCommand s op = case parse exprTy s op of
                     [(x,[],_)] -> return x
                     _ -> throw SyntaxE
-
--- getCommand2 :: String -> Parser Type -> Type
--- getCommand2 s p = case parse p s (PP empty) of
---                     [(x,[],_)] -> x
---                     [(x,y,_)] -> error $ show x ++ " --- " ++ show y ++ "\n"
---                     _ -> error "ERRRROR"
 
 exprTy :: Parser Command
 exprTy = do symbol "Theorem"
@@ -97,12 +103,10 @@ unit4 :: Parser Type
 unit4 = do symbol not_text
            u <- unit4
            return $ RenameTy not_text 1 [u]
-        -- <|> do [_, p2, _] <- get
-        --        runParser p2   -- OJO! El nombre de la operación que se parsea puede ser
-        --                       -- tomada como un tipo/proposición.
-        --                       -- Por eso, lo ponemos antes del caso "unit5"
         <|> prefixOps
-        <|> parens typeTerm
+        <|> unit5                -- OBS: unit5 DEBE ir despues de prefixOps. De lo contrario,
+                                 -- el nombre de una operación que se parsea puede ser
+                                 -- tomada como un tipo/proposición.
         <|> quantifiers
 
 unit5 :: Parser Type
@@ -111,32 +115,11 @@ unit5 = parens typeTerm
                return $ RenameTy bottom_text 0 []
         <|> do v <- validIdent1
                return $ B v
-        -- <|> do [p1, _, _] <- get
-        --        runParser p1
 
 prefixOps :: Parser Type
-prefixOps = do symbol "False"
-               return $ RenameTy bottom_text 0 []
-            <|> do x <- validIdent1
-                   (n, xs) <- prefixOps'
-                   if n == 0
-                   then return $ B x
-                   else return $ RenameTy x n xs
-            <|> do x <- validIdent3
-                   (n, xs) <- prefixOps''
-                   return $ RenameTy x n xs
-
-prefixOps' :: Parser (Int, [Type])
-prefixOps' = do x <- unit5
-                (n, xs) <- prefixOps'
-                return (n+1, x:xs)
-             <|> return (0, [])
-
-prefixOps'' :: Parser (Int, [Type])
-prefixOps'' = do x <- unit5
-                 (do (n, xs) <- prefixOps'
-                     return (n+1, x:xs)
-                  <|> return (1, [x]))
+prefixOps = do x <- (validIdent1 <|> validIdent3)
+               (n, xs) <- opArgs1 unit5
+               return $ RenameTy x n xs
 
 
 -- Parser del lambda término con nombre.
@@ -197,30 +180,26 @@ abstraction = do char '\\'
                      return $ EUnpack v1 v2 e1 e2
 
 -- Parser de definición de tipos.
-typeDef :: Parser (String, Type, Operands, Bool)
-typeDef = do symbol "Definition"
-             (do op <- validIdent2
-                 (do a <- validIdent1
-                     (do b <- validIdent1
-                         symbol ":="
-                         t <- typeTerm
-                         symbol "."
-                         return (op, ForAll a $ ForAll b t, 2, False))
-                      <|> do symbol ":="
-                             t <- typeTerm
-                             symbol "."
-                             return (op, ForAll a t, 1, False))
-                  <|> do symbol ":="
-                         t <- typeTerm
-                         symbol "."
-                         return (op, t, 0, False))
-               <|> do a <- validIdent1
-                      op <- validSymbol
-                      b <- validIdent1
-                      symbol ":="
-                      t <- typeTerm
-                      symbol "."
-                      return (op, ForAll a $ ForAll b t, 2, True)
+typeDef :: Parser TypeDefinition
+typeDef = do op <- validIdent1
+             (n, xs) <- opArgs0 validIdent1
+             symbol "="
+             t <- typeTerm
+             symbol "."
+             return (op, n, xs, t, False)
+          <|> do op <- validIdent3
+                 (n, xs) <- opArgs1 validIdent1
+                 symbol "="
+                 t <- typeTerm
+                 symbol "."
+                 return (op, n, xs, t, False)
+          <|> do a <- validIdent1
+                 op <- validIdent3
+                 b <- validIdent1
+                 symbol "="
+                 t <- typeTerm
+                 symbol "."
+                 return (op, 2, [a,b], t, True)
 
 
 -- Parser de las tácticas.

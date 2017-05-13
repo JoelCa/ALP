@@ -118,12 +118,12 @@ data Terms = TypeT Type
 
 
   -- Excepciones.
-data ProofExceptions = PNotFinished | PNotStarted | PExist String
-                     | PNotExist String | SyntaxE | AssuE
+data ProofExceptions = PNotFinished | PNotStarted | ExistE String
+                     | NotExistE String | SyntaxE | AssuE
                      | IntroE1 | ApplyE1 Type Type | HypoE Int
                      | Unif1 | Unif2 | Unif3 | Unif4
-                     | ElimE1 | CommandInvalid | TypeRepeated1 String
-                     | TypeRepeated2 String | TypeNotExists String
+                     | ElimE1 | CommandInvalid | TypeRepeated String
+                     | TypeNotExists String
                      | OpE1 String | OpE2 String | ExactE1 Type
                      | ExactE2 Type | PSE | EmptyType | TypeE String
                      | InferE1 String | InferE2 LamTerm Type | InferE3 LamTerm String

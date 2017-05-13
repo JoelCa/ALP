@@ -73,7 +73,12 @@ checkCommand (Ty name ty) =
   do s <- lift get
      when (isJust $ proof s) (throwIO PNotFinished)
      let glo = global s
-     when (Map.member name (teorems $ glo)) (throwIO $ PExist name)
+     when ( (Map.member name $ teorems $ glo)
+            || (elem name $ fTypeContext glo)
+            || (V.any (\(x,_,_,_) -> x == name) $ opers glo)
+            || (any (\(x,_,_) -> x == name) notFoldeableOps)
+          )
+       (throwIO $ ExistE name)
      (tyr,tty) <- returnInput $ renamedType (fTypeContext glo) (opers glo) ty
      let p = newProof glo name tyr tty
      lift $ put $ s {proof=Just p}
@@ -82,16 +87,29 @@ checkCommand (Ty name ty) =
 checkCommand (Types ps) =
   do s <- lift get
      when (isJust $ proof s) (throwIO PNotFinished)
-     let gps = fTypeContext $ global s
-         (tr1, tr2) = typeRepeated ps gps
-     when (isJust tr1) (throwIO $ TypeRepeated1 $ fromJust tr1)
-     when (isJust tr2) (throwIO $ TypeRepeated2 $ fromJust tr2)
+     let glo = global s
+         gps = fTypeContext glo
+         (tr1, tr2) = typeRepeated ps
+                      (\t -> (elem t gps)
+                             || (Map.member t $ teorems $ glo)
+                             || (V.any (\(x,_,_,_) -> x == t) $ opers glo)
+                             || (any (\(x,_,_) -> x == t) notFoldeableOps)
+                      )
+     when (isJust tr1) (throwIO $ TypeRepeated $ fromJust tr1)
+     when (isJust tr2) (throwIO $ ExistE $ fromJust tr2)
      lift $ put $ s {global = (global s) {teorems=teorems $ global s, fTypeContext=ps++gps}}
      prover
 checkCommand (TypeDef (op, n, args, body, isInfix)) =
   do s <- lift get
      let glo = global s
-     when (isJust $ V.find (\(x,_,_,_)-> x == op) $ opers glo) (throwIO $ DefE op)
+     when ( (V.any (\(x,_,_,_)-> x == op) $ opers glo)
+            || (any (\(x,_,_) -> x == op) notFoldeableOps)
+          )
+       (throwIO $ DefE op)
+     when ( (elem op $ fTypeContext glo)
+            || (Map.member op $ teorems $ glo)
+          )
+       (throwIO $ ExistE op)
      t <- returnInput $ renamedType3 args (fTypeContext glo) (opers glo) body
      case (n, isInfix) of
        (2, True) ->
@@ -103,7 +121,7 @@ checkCommand (TypeDef (op, n, args, body, isInfix)) =
 checkCommand (Ta (Print x)) =
   do s <- lift get
      let ter = teorems $ global s
-     when (Map.notMember x ter) (throwIO $ PNotExist x)
+     when (Map.notMember x ter) (throwIO $ NotExistE x)
      let t = ter Map.! x
      outputStrLn $ render $ printTerm (opers $ global s) $ t
      --outputStrLn $ render $ printType (opers $ global s) $ fst $ snd t
@@ -134,13 +152,13 @@ checkCommand (Ta ta) =
        else (outputStrLn (renderProof p) >> (outputStrLn $ show $ length $ term p))
      prover
 
--- Funciones auxiliares del comando "Props/Types".                
-typeRepeated :: [String] -> [String] -> (Maybe String, Maybe String)
+-- Funciones auxiliares del comando "Props/Types".
+typeRepeated :: [String] -> (String -> Bool) -> (Maybe String, Maybe String)
 typeRepeated [] _ = (Nothing, Nothing)
-typeRepeated (p:ps) xs
+typeRepeated (p:ps) f
   | elem p ps = (return p, Nothing)
-  | elem p xs = (Nothing, return p)
-  | otherwise = typeRepeated ps xs
+  | f p = (Nothing, return p)
+  | otherwise = typeRepeated ps f
 
 -- Funciones auxiliares:
 -- Chequea si la prueba a terminado.

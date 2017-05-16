@@ -6,6 +6,7 @@ import qualified Text.PrettyPrint.HughesPJ as PP
 import Data.List
 import qualified Data.Vector as V
 import Hypothesis (printHypothesis)
+import qualified Data.IntSet as IS
 
 -----------------------
 --- pretty printer
@@ -394,10 +395,10 @@ printBinInfix f s (i,j,k) n t1 t2 =
   f (n, j, False) t2
 
 -- Pretty-printer de la prueba.
-printProof :: Int -> FOperations -> FTypeContext -> [SubProof] -> Doc
-printProof tp op ftc sb =
+printProof :: Int -> IS.IntSet -> FOperations -> FTypeContext -> [SubProof] -> Doc
+printProof tp cn op ftc sb =
   (text $ "Hay " ++ show tp ++ " sub pruebas.\n") $$
-  printContext op (ftc, bTypeContext s) (termContext s) $$
+  printContext cn op (ftc, bTypeContext s) (termContext s) $$
   printGoals tp op sb
   where s = head sb
 
@@ -424,10 +425,9 @@ printGoal :: FOperations -> Maybe (Type, TType) -> Doc
 printGoal op (Just (ty,_)) = printType op ty
 printGoal op Nothing = text "*"
 
-printContext :: FOperations -> (FTypeContext, BTypeContext) -> TermContext -> Doc
-printContext op (ftc,btc) c = printFTypeContext ftc $$
-                              printRestContext op btc c
-
+printContext :: IS.IntSet -> FOperations -> (FTypeContext, BTypeContext) -> TermContext -> Doc
+printContext cn op (ftc,btc) c = printFTypeContext ftc $$
+                                 printRestContext cn (IS.size cn + V.length c - 1) op btc c
 
 printFTypeContext :: FTypeContext -> Doc
 printFTypeContext [] = empty
@@ -437,23 +437,38 @@ printFTypeContext (x:ftc) = printFTypeVar x $$
 printFTypeVar :: FTypeVar -> Doc
 printFTypeVar x = text x
 
-printRestContext :: FOperations -> BTypeContext -> TermContext -> Doc
-printRestContext op btc c
-  | V.null btc = printRestTermC op c
+printRestContext :: IS.IntSet -> Int -> FOperations -> BTypeContext -> TermContext -> Doc
+printRestContext cn n op btc c
+  | V.null btc = printRestTermC cn n op c
   | V.null c = printRestBTypeC btc
   | otherwise = let x = V.head btc
                     y = V.head c
                 in if fst x > fst4 y
-                   then printRestContext op (V.drop 1 btc) c $$
+                   then printRestContext cn n op (V.drop 1 btc) c $$
                         printBTypeVar x
-                   else printRestContext op btc (V.drop 1 c) $$
-                        printTermVar (V.length c) op y
+                   else printRestContext cn' (n'-1) op btc (V.drop 1 c) $$
+                        printTermVar n' op y
+                        where (n', cn') = getValidName cn n
 
-printRestTermC :: FOperations -> TermContext -> Doc
-printRestTermC op c
+-- Obtiene el nombre una hipótesis.
+-- Argumentos:
+-- 1. Nombres conflictivos.
+-- 2. Nombre "candidato" (mayor a los nombres conflictivos).
+-- Resultado:
+-- Tupla donde la 1º componente es el nombre para una hipótesis,
+-- y la 2º componente es el 1º argumento, al que le extrajeron los
+-- nombres conflictivos "visitados".
+getValidName :: IS.IntSet -> Int -> (Int, IS.IntSet)
+getValidName cn n = let (cn', isMember, _) = IS.splitMember n cn
+                        n' = if isMember then n-1 else n
+                    in (n', cn')
+
+printRestTermC :: IS.IntSet -> Int -> FOperations -> TermContext -> Doc
+printRestTermC cn n op c
   | V.null c = empty
-  | otherwise = printRestTermC op (V.drop 1 c) $$
-                printTermVar (V.length c) op (V.head c)
+  | otherwise = printRestTermC cn' (n'-1) op (V.drop 1 c) $$
+                printTermVar n' op (V.head c)
+                where (n', cn') = getValidName cn n
 
 printRestBTypeC :: BTypeContext -> Doc
 printRestBTypeC btc
@@ -462,9 +477,10 @@ printRestBTypeC btc
                 printBTypeVar (V.head btc)
 
 printTermVar :: Int -> FOperations -> TermVar -> Doc
-printTermVar n op (_,_,t,_) = text (printHypothesis (n-1)) <+>
-                              text ":" <+>
-                              printType op t
+printTermVar n op (_,_,t,_) =
+  text (printHypothesis n) <+>
+  text ":" <+>
+  printType op t
 
 printBTypeVar :: BTypeVar -> Doc
 printBTypeVar (_,x) = text x

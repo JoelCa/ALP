@@ -3,7 +3,7 @@ module ProofState where
 import Common
 import Control.Monad.State.Lazy (get, modify)
 import qualified Data.Vector as V
-
+import Data.IntSet (IntSet)
 
 -- Operaciones que modifican el estado de la monada Proof.
 -- Es decir que, estas operaciones cambian la prueba.
@@ -14,6 +14,10 @@ getAttribute f = do ps <- get
                     if null x
                       then throw PSE
                       else return $ f $ head x
+
+getGlobalAttr :: (ProverGlobal -> a) -> Proof a
+getGlobalAttr f = do ps <- get
+                     return $ f $ cglobal $ ps
 
 getType :: Proof (Maybe (Type, TType))
 getType = do t <- getAttribute ty
@@ -26,16 +30,16 @@ getBTypeContext :: Proof BTypeContext
 getBTypeContext = getAttribute bTypeContext
 
 getUsrOpers :: Proof FOperations
-getUsrOpers = do ps <- get
-                 return $ opers $ cglobal $ ps
+getUsrOpers = getGlobalAttr opers
 
 getTeorems :: Proof Teorems
-getTeorems = do ps <- get
-                return $ teorems $ cglobal $ ps
+getTeorems = getGlobalAttr teorems
 
 getFTypeContext :: Proof FTypeContext
-getFTypeContext = do ps <- get
-                     return $ fTypeContext $ cglobal $ ps
+getFTypeContext = getGlobalAttr fTypeContext
+
+getConflictNames :: Proof IntSet
+getConflictNames = getGlobalAttr conflict
 
 getTVars :: Proof Int
 getTVars = getAttribute tvars

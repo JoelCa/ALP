@@ -32,7 +32,8 @@ habitar (Apply h) =
   do x <- getType
      (t,t') <- maybeToProof EmptyType x
      n <- getTTermVars
-     i <- maybeToProof (HypoE h) $ getHypoPosition n h
+     cn <- getConflictNames
+     i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
      c <- getTermContext
      q <- getTBTypeVars
      applyComm i (t,t') (getTypeVar q $ c V.! i)
@@ -40,7 +41,8 @@ habitar (Elim h) =
   do x <- getType
      (t,t') <- maybeToProof EmptyType x
      n <- getTTermVars
-     i <- maybeToProof (HypoE h) $ getHypoPosition n h
+     cn <- getConflictNames
+     i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
      c <- getTermContext
      q <- getTBTypeVars
      elimComm i (t,t') (getTypeVar q $ c V.! i)
@@ -80,9 +82,10 @@ habitar Split =
 habitar (Exact (LambdaT te)) =
   do op <- getUsrOpers
      n <- getTTermVars
+     cn <- getConflictNames
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     te' <- eitherToProof $ withoutName op ftc btc n te
+     te' <- eitherToProof $ withoutName op ftc btc (cn,n) te
      c <- getTermContext
      teo <- getTeorems
      q <- getTBTypeVars
@@ -113,7 +116,8 @@ habitar (Unfold s (Just h)) =
   do op <- getUsrOpers
      (m, (_, (tt,tt'), _, _)) <- maybeToProof (UnfoldE1 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
      n <- getTTermVars
-     i <- maybeToProof (HypoE h) $ getHypoPosition n h
+     cn <- getConflictNames
+     i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
      c <- getTermContext
      let (x,y,t,t') = c V.! i
      btc <- getBTypeContext

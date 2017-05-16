@@ -11,6 +11,8 @@ import Control.Monad (ap, liftM)
 import Control.Monad.State.Lazy
 import Parsing (ParserState)
 import Data.Vector (Vector, ifoldl)
+import Data.IntSet
+
 
 type Parser a = ParserState UsrOpsParsers a
 
@@ -195,6 +197,7 @@ data ProverState = PSt { proof :: Maybe ProofState
 data ProverGlobal = PGlobal { fTypeContext :: FTypeContext
                             , teorems :: Teorems             -- Teoremas.
                             , opers :: FOperations           -- Operaciones "foldeables"
+                            , conflict :: IntSet             -- Nombres de teoremas conflictivos.
                             }
                     
   -- Estado de la prueba que se está construyendo.

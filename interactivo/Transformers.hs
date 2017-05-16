@@ -5,6 +5,7 @@ import Data.List (findIndex, elemIndex, find)
 import RenamedVariables
 import Hypothesis
 import Parser (getHypothesisValue)
+import Data.IntSet (IntSet)
 
 -- Retorna el tipo con nombre, posiblemente renombrado, de su 3º arg.
 -- A fin de respetar la Convención 1.
@@ -87,50 +88,50 @@ typeWithoutName rs bs fs op (RenameTy s args ts) =
 -- El 1º argumento, es la tabla de operaciones "foldeables".
 -- Obs: es util generar el lambda término con nombres renombramos para imprimir mejor los errores.
 -- Se usa en el algoritmo de inferencia, y el comando exact.
-withoutName :: FOperations -> FTypeContext -> BTypeContext -> Int
+withoutName :: FOperations -> FTypeContext -> BTypeContext -> (IntSet, Int)
             -> LamTerm -> Either ProofExceptions (LamTerm, Term)
 withoutName op fs bs = let bs' = foldr (\(_,x) xs -> x : xs) [] bs
                        in withoutName' [] bs' bs' fs op
 
-withoutName' :: [String] -> [String] -> [String] -> FTypeContext -> FOperations -> Int
+withoutName' :: [String] -> [String] -> [String] -> FTypeContext -> FOperations -> (IntSet, Int)
              -> LamTerm -> Either ProofExceptions (LamTerm, Term)
-withoutName' teb _ _ _ _ n w@(LVar x) =
+withoutName' teb _ _ _ _ (cn, n) w@(LVar x) =
   case elemIndex x teb of
     Just m -> return (w, Bound m)
     Nothing -> let r = case getHypothesisValue x of
-                         Just h -> case getHypoPosition n h of
+                         Just h -> case getHypoPosition cn n h of
                                      Just i -> Bound i
                                      _ -> Free $ Global x
                          Nothing -> Free $ Global x
                in return (w, r)
-withoutName' teb rs bs fs op n (Abs x t e) =
+withoutName' teb rs bs fs op cnn (Abs x t e) =
   do t' <- typeWithoutName rs bs fs op t
-     (ee, ee') <- withoutName' (x:teb) rs bs fs op n e
+     (ee, ee') <- withoutName' (x:teb) rs bs fs op cnn e
      return (Abs x (fst t') ee, Lam t' ee')
-withoutName' teb rs bs fs op n (App e1 e2) =
-  do (ee1, ee1') <- withoutName' teb rs bs fs op n e1
-     (ee2, ee2') <- withoutName' teb rs bs fs op n e2
+withoutName' teb rs bs fs op cnn (App e1 e2) =
+  do (ee1, ee1') <- withoutName' teb rs bs fs op cnn e1
+     (ee2, ee2') <- withoutName' teb rs bs fs op cnn e2
      return (App ee1 ee2, ee1' :@: ee2')
-withoutName' teb rs bs fs op n (BAbs x e) =
+withoutName' teb rs bs fs op cnn (BAbs x e) =
   do let v = getRename x fs rs
-     (ee, ee') <- withoutName' teb (v:rs) (x:bs) fs op n e
+     (ee, ee') <- withoutName' teb (v:rs) (x:bs) fs op cnn e
      return (BAbs v ee, BLam v ee')
-withoutName' teb rs bs fs op n (BApp e t) =
-  do (ee, ee') <- withoutName' teb rs bs fs op n e
+withoutName' teb rs bs fs op cnn (BApp e t) =
+  do (ee, ee') <- withoutName' teb rs bs fs op cnn e
      t' <- typeWithoutName rs bs fs op t
      return (BApp ee (fst t'), ee' :!: t')
-withoutName' teb rs bs fs op n (EPack t e t') =
+withoutName' teb rs bs fs op cnn (EPack t e t') =
   do tt <- typeWithoutName rs bs fs op t
-     (ee, ee') <- withoutName' teb rs bs fs op n e
+     (ee, ee') <- withoutName' teb rs bs fs op cnn e
      tt' <- typeWithoutName rs bs fs op t'
      return (EPack (fst tt) ee (fst tt'), Pack tt ee' tt')
-withoutName' teb rs bs fs op n (EUnpack x y e1 e2) =
-  do (ee1, ee1') <- withoutName' teb rs bs fs op n e1
+withoutName' teb rs bs fs op cnn (EUnpack x y e1 e2) =
+  do (ee1, ee1') <- withoutName' teb rs bs fs op cnn e1
      let v = getRename x fs rs
-     (ee2, ee2') <- withoutName' (y:teb) (v:rs) (x:bs) fs op n e2
+     (ee2, ee2') <- withoutName' (y:teb) (v:rs) (x:bs) fs op cnn e2
      return (EUnpack v y ee1 ee2, Unpack v ee1' ee2')
-withoutName' teb rs bs fs op n (As e t) =
-  do (ee, ee') <- withoutName' teb rs bs fs op n e
+withoutName' teb rs bs fs op cnn (As e t) =
+  do (ee, ee') <- withoutName' teb rs bs fs op cnn e
      t' <- typeWithoutName rs bs fs op t
      return (As ee (fst t'), ee' ::: t')
 
@@ -155,9 +156,9 @@ withoutName' teb rs bs fs op n (As e t) =
 
 
 -- Identifica una variable de término.
-getTermVar :: Int -> String -> (LamTerm, Term)
-getTermVar n x = case getHypothesisValue x of
-                   Just h -> case getHypoPosition n h of
-                               Just i -> (LVar x, Bound i)
-                               _ -> (LVar x, Free $ Global x)
-                   Nothing -> (LVar x, Free $ Global x)
+-- getTermVar :: Int -> String -> (LamTerm, Term)
+-- getTermVar n x = case getHypothesisValue x of
+--                    Just h -> case getHypoPosition n h of
+--                                Just i -> (LVar x, Bound i)
+--                                _ -> (LVar x, Free $ Global x)
+--                    Nothing -> (LVar x, Free $ Global x)

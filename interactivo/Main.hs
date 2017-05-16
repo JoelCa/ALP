@@ -16,7 +16,8 @@ import qualified Data.Vector as V
 import Rules
 import Transformers
 import ErrorMsj
-  
+import qualified Data.IntSet as IS
+
 type ProverInputState a = InputT (StateT ProverState IO) a
 
 -- Teoremas iniciales.
@@ -39,6 +40,7 @@ initProverState = PSt { global = PGlobal { teorems = initialT
                                          , opers = V.fromList [ not_op
                                                               , iff_op
                                                               ]
+                                         , conflict = IS.empty
                                          }
                       , proof = Nothing
                       , infixParser = PP basicInfixParser   -- infixOps
@@ -129,7 +131,7 @@ checkCommand (Ta (Print x)) =
 checkCommand (Ta (Infer x)) =
   do s <- lift get
      let op = opers $ global s
-     (te,te') <- returnInput $ withoutName op (fTypeContext $ global s) (V.empty) 0 x
+     (te,te') <- returnInput $ withoutName op (fTypeContext $ global s) (V.empty) (IS.empty, 0) x
      outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
      (ty,ty') <- returnInput $ inferType 0 V.empty (teorems $ global s) op (te,te')
      --outputStrLn $ "Renombramiento: " ++ (render $ printTerm (opers $ global s) te')
@@ -204,9 +206,16 @@ reloadProver = do s <- lift get
                   lift $ put $ s { global= (global s)
                                            { teorems = Map.insert (name p)
                                                        (getTermFromProof (constr p) (types p))
-                                                       (teorems $ global s) }
+                                                       (teorems $ global s)
+                                           , conflict = checkNameConflict (name p) (conflict $ global s) }
                                  , proof = Nothing
                                  }
+
+checkNameConflict :: String -> IS.IntSet -> IS.IntSet
+checkNameConflict s c = case getHypothesisValue s of
+                          Just n -> IS.insert n c
+                          Nothing -> c
+                            
 
 -- Impresión del lambda término final.
 renderFinalTerm :: FOperations -> Term -> String
@@ -218,7 +227,7 @@ renderFinalTermWithoutName op t = render $ printTermTType op t
 
 -- Impresión de la prueba en construcción
 renderProof :: ProofConstruction -> String
-renderProof p = render $ printProof (tsubp p) (opers $ cglobal p) (fTypeContext $ cglobal p) (subps p)
+renderProof p = render $ printProof (tsubp p) (conflict $ cglobal p) (opers $ cglobal p) (fTypeContext $ cglobal p) (subps p)
 
 
 returnInput :: Either ProofExceptions a -> ProverInputState a

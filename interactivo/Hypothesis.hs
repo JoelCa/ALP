@@ -10,8 +10,8 @@ import qualified Data.IntSet as IS
 -- 2. Número de la hipótesis.
 getHypoPosition :: IS.IntSet -> Int -> Int -> Maybe Int
 getHypoPosition c n h
-  | IS.member n c = Nothing
-  | (h >= 0) && (h < n + IS.size c) = return $ h - IS.fold (\x k -> if k < h then succ x else x) 0 c
+  | IS.member h c = Nothing
+  | (h >= 0) && (h < n + IS.size c) = return $ h - IS.foldr (\k x -> if k < h then succ x else x) 0 c
   | otherwise = Nothing
 
 printHypothesis :: Int -> String

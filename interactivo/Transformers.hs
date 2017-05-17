@@ -16,7 +16,7 @@ import Data.IntSet (IntSet)
 -- 3. Tipo a procesar.
 -- OBS: Utilizamos esta función sobre tipos que NO requieren del contexto de tipos "ligados".
 renamedType :: FTypeContext -> FOperations -> Type -> Either ProofExceptions (Type, TType)
-renamedType = typeWithoutName [] []
+renamedType ftc op = typeWithoutName [] [] (ftc ++ foldr (\(x,_,_,_) xs -> x : xs) [] op) op
 
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
 -- por el 4º argumento.
@@ -24,9 +24,11 @@ renamedType = typeWithoutName [] []
 -- OBS: Utilizamos esta función sobre tipos que requieren del contexto de tipos "ligados".
 renamedType2 :: BTypeContext -> FTypeContext ->  FOperations
              -> Type -> Either ProofExceptions (Type, TType)
-renamedType2 bs = let bs' = foldr (\(_,x) xs -> x : xs) [] bs
-                  in typeWithoutName bs' bs'
+renamedType2 bs ftc op = let bs' = foldr (\(_,x) xs -> x : xs) [] bs
+                         in typeWithoutName bs' bs' (ftc ++ foldr (\(x,_,_,_) xs -> x : xs) [] op) op
 
+
+--TERMINAR
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
 -- por el 4º argumento.
 -- El renombramiento se realiza de modo tal que se respete la Convención 1.
@@ -36,7 +38,7 @@ renamedType3 :: [String] -> FTypeContext ->  FOperations
 renamedType3 bs = typeWithoutName bs bs
 
 
-typeWithoutName :: [String] -> [String] -> FTypeContext -> FOperations
+typeWithoutName :: [String] -> [String] -> [String] -> FOperations
                 -> Type -> Either ProofExceptions (Type, TType)
 typeWithoutName rs bs fs op (B x) =
   case x `elemIndex` bs of

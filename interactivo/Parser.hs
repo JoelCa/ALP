@@ -271,6 +271,7 @@ unfoldP = do symbol "unfold"
               <|> do symbol "."
                      return $ Unfold op Nothing)
 
+-- ARREGLAR
 exactP :: Parser Tactic
 exactP = do symbol "exact"
             parens $

@@ -424,6 +424,18 @@ Consideramos que todos los operadores binarios infijos asocian a derecha.
   \item Permitimos definir un teorema cuyo nombre sea el nombre de una hipótesis del contexto de
   su prueba. De todas formas, esto no sería un problema.
   
+  \item Consideramos dos espacios de nombres para las variables.
+  \begin{itemize}
+    \item $v.términos = v.ligadas_{te} \cup v.libres_{te}$
+    \item $v.libres_{te} = teoremas$
+    \item $v.tipos = v.ligadas_{ti} \cup v.libres_{ti}$
+    \item $v.libres_{ti} = proposiciones \cup operadores$
+  \end{itemize}
+  
+  Donde, $v.ligadas_{ti} \cap v.libres_{ti} = \emptyset$, para satisfacer la \textbf{Convención 1}.
+  Además, $v.libres_{te} \cap v.libres_{ti} = \emptyset$, para desambiguar las aplicaciones de variables.
+  
+  También, consideramos para cada prueba, $hipótesis \cap teoremas = \emptyset$. De lo contrario, tendríamos conflictos de nombres.
 
 \end{itemize}
 

@@ -1,10 +1,18 @@
-Dependencias (Viejo)
+Dependencias
+------------
 
 cabal install mtl
 cabal install exceptions
+cabal install vector
+
+Dato de la instalación de la libreria ncurses en Debian:
+Una vez instalada ncurses, tuve que crear un enlace simbólico: libtinfo.so -> libtinfo.so.5
+root@joel:/lib/x86_64-linux-gnu# ln -s libtinfo.so.5 libtinfo.so
+Para ejecutar mi programa, sin ello daba error.
 
 
 Observaciones
+-------------
 
 - El caracter "\", se identifica con el char '\\'.
 CUIDADO!. Si se quiere probar el parser por el interprete hacer "\\" en lugar de "\".
@@ -123,3 +131,4 @@ Es decir, t0 [x := w] = t0.
 
 - Los lambda términos pueden tener variables libres, las cuales solo pueden ser nombres
 de teoremas o de otros lambda términos.
+

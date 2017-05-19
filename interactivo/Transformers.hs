@@ -27,15 +27,13 @@ renamedType2 :: BTypeContext -> FTypeContext ->  FOperations
 renamedType2 bs ftc op = let bs' = foldr (\(_,x) xs -> x : xs) [] bs
                          in typeWithoutName bs' bs' (ftc ++ foldr (\(x,_,_,_) xs -> x : xs) [] op) op
 
-
---TERMINAR
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
 -- por el 4º argumento.
 -- El renombramiento se realiza de modo tal que se respete la Convención 1.
 -- OBS: Solo la utilizamos en el renombramiento del cuerpo de una operación.
 renamedType3 :: [String] -> FTypeContext ->  FOperations
              -> Type -> Either ProofExceptions (Type, TType)
-renamedType3 bs = typeWithoutName bs bs
+renamedType3 bs ftc op = typeWithoutName bs bs (ftc ++ foldr (\(x,_,_,_) xs -> x : xs) [] op) op
 
 
 typeWithoutName :: [String] -> [String] -> [String] -> FOperations

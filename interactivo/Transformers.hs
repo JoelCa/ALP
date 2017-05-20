@@ -16,7 +16,8 @@ import Data.IntSet (IntSet)
 -- 3. Tipo a procesar.
 -- OBS: Utilizamos esta función sobre tipos que NO requieren del contexto de tipos "ligados".
 renamedType :: FTypeContext -> FOperations -> Type -> Either ProofExceptions (Type, TType)
-renamedType ftc op = typeWithoutName [] [] (ftc ++ foldr (\(x,_,_,_) xs -> x : xs) [] op) op
+renamedType ftc op = let op' = foldr (\(x,_,_,_) xs -> x : xs) [] op
+                     in typeWithoutName [] [] ftc (op' ++ ftc)  op
 
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
 -- por el 4º argumento.
@@ -25,7 +26,8 @@ renamedType ftc op = typeWithoutName [] [] (ftc ++ foldr (\(x,_,_,_) xs -> x : x
 renamedType2 :: BTypeContext -> FTypeContext ->  FOperations
              -> Type -> Either ProofExceptions (Type, TType)
 renamedType2 bs ftc op = let bs' = foldr (\(_,x) xs -> x : xs) [] bs
-                         in typeWithoutName bs' bs' (ftc ++ foldr (\(x,_,_,_) xs -> x : xs) [] op) op
+                             op' = foldr (\(x,_,_,_) xs -> x : xs) [] op
+                         in typeWithoutName bs' bs' ftc (op' ++ ftc) op
 
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
 -- por el 4º argumento.
@@ -33,12 +35,13 @@ renamedType2 bs ftc op = let bs' = foldr (\(_,x) xs -> x : xs) [] bs
 -- OBS: Solo la utilizamos en el renombramiento del cuerpo de una operación.
 renamedType3 :: [String] -> FTypeContext ->  FOperations
              -> Type -> Either ProofExceptions (Type, TType)
-renamedType3 bs ftc op = typeWithoutName bs bs (ftc ++ foldr (\(x,_,_,_) xs -> x : xs) [] op) op
+renamedType3 bs ftc op = let op' = foldr (\(x,_,_,_) xs -> x : xs) [] op
+                         in typeWithoutName bs bs ftc (op' ++ ftc) op
 
 
-typeWithoutName :: [String] -> [String] -> [String] -> FOperations
+typeWithoutName :: [String] -> [String] -> [String] -> [String] -> FOperations
                 -> Type -> Either ProofExceptions (Type, TType)
-typeWithoutName rs bs fs op (B x) =
+typeWithoutName rs bs fs _ op (B x) =
   case x `elemIndex` bs of
     Just n -> return (B $ rs !! n, TBound n)
     Nothing -> case getElemIndex (\(w,_,_,_) -> w == x) op of
@@ -48,30 +51,30 @@ typeWithoutName rs bs fs op (B x) =
                  Nothing -> if elem x fs
                             then return (B x, TFree x)
                             else throw $ TypeE x
-typeWithoutName rs bs fs op (ForAll x t) =
-  do let v = getRename x fs rs
-     (tt,tt') <- typeWithoutName (v:rs) (x:bs) fs op t
+typeWithoutName rs bs fs ofs op (ForAll x t) =
+  do let v = getRename x ofs rs
+     (tt,tt') <- typeWithoutName (v:rs) (x:bs) ofs fs op t
      return (ForAll v tt, TForAll tt')
-typeWithoutName rs bs fs op (Exists x t) =
-  do let v = getRename x fs rs
-     (tt,tt') <- typeWithoutName (v:rs) (x:bs) fs op t
+typeWithoutName rs bs fs ofs op (Exists x t) =
+  do let v = getRename x ofs rs
+     (tt,tt') <- typeWithoutName (v:rs) (x:bs) ofs fs op t
      return (Exists v tt, TExists tt')
-typeWithoutName rs bs fs op (Fun t1 t2) =
-  do (tt1, tt1') <- typeWithoutName rs bs fs op t1
-     (tt2, tt2') <- typeWithoutName rs bs fs op t2
+typeWithoutName rs bs fs ofs op (Fun t1 t2) =
+  do (tt1, tt1') <- typeWithoutName rs bs fs ofs op t1
+     (tt2, tt2') <- typeWithoutName rs bs fs ofs op t2
      return (Fun tt1 tt2, TFun tt1' tt2')
-typeWithoutName rs bs fs op (RenameTy s args ts) =
+typeWithoutName rs bs fs ofs op (RenameTy s args ts) =
   case find (\(x,_,_) -> x == s) notFoldeableOps of
     Just (_,n,args') ->
       if args' == args
-      then do rs <- sequence $ map (typeWithoutName rs bs fs op) ts
+      then do rs <- sequence $ map (typeWithoutName rs bs fs ofs op) ts
               let (tt, tt') = unzip rs
               return (RenameTy s args tt, RenameTTy n tt')
       else throw $ OpE1 s
     Nothing ->
       do (m, (_,_,args',_)) <- maybeToEither (OpE2 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
          if args' == args
-           then do rs <- sequence $ map (typeWithoutName rs bs fs op) ts
+           then do rs <- sequence $ map (typeWithoutName rs bs fs ofs op) ts
                    let (tt, tt') = unzip rs
                    return (RenameTy s args tt, RenameTTy m tt')
            else throw $ OpE1 s
@@ -79,6 +82,7 @@ typeWithoutName rs bs fs op (RenameTy s args ts) =
 ----------------------------------------------------------------------------------------------------------------------
 -- Trasformadores de lambda términos: Se pasa de un lambda término con nombre, al equivalente sin nombre.
 
+-- ARREGLAR: hacer renombre de tipos.
 -- Genera el lambda término con renombre de variables de tipo, y el lambda término sin nombre.
 -- Chequea que las variables de tipo sean válidas de acuerdo a los contexto de tipos
 -- dados por 2º y 3º arg. En caso de ser necesario renombra las variables de tipo "ligadas".
@@ -91,11 +95,12 @@ typeWithoutName rs bs fs op (RenameTy s args ts) =
 withoutName :: FOperations -> FTypeContext -> BTypeContext -> (IntSet, Int)
             -> LamTerm -> Either ProofExceptions (LamTerm, Term)
 withoutName op fs bs = let bs' = foldr (\(_,x) xs -> x : xs) [] bs
-                       in withoutName' [] bs' bs' fs op
+                           op' = foldr (\(x,_,_,_) xs -> x : xs) [] op
+                       in withoutName' [] bs' bs' fs (op' ++ fs) op
 
-withoutName' :: [String] -> [String] -> [String] -> FTypeContext -> FOperations -> (IntSet, Int)
+withoutName' :: [String] -> [String] -> [String] -> FTypeContext -> [String] -> FOperations -> (IntSet, Int)
              -> LamTerm -> Either ProofExceptions (LamTerm, Term)
-withoutName' teb _ _ _ _ (cn, n) w@(LVar x) =
+withoutName' teb _ _ _ _ _ (cn, n) w@(LVar x) =
   case elemIndex x teb of
     Just m -> return (w, Bound m)
     Nothing -> let r = case getHypothesisValue x of
@@ -104,35 +109,35 @@ withoutName' teb _ _ _ _ (cn, n) w@(LVar x) =
                                      _ -> Free $ Global x
                          Nothing -> Free $ Global x
                in return (w, r)
-withoutName' teb rs bs fs op cnn (Abs x t e) =
-  do t' <- typeWithoutName rs bs fs op t
-     (ee, ee') <- withoutName' (x:teb) rs bs fs op cnn e
+withoutName' teb rs bs fs ofs op cnn (Abs x t e) =
+  do t' <- typeWithoutName rs bs fs ofs op t
+     (ee, ee') <- withoutName' (x:teb) rs bs fs ofs op cnn e
      return (Abs x (fst t') ee, Lam t' ee')
-withoutName' teb rs bs fs op cnn (App e1 e2) =
-  do (ee1, ee1') <- withoutName' teb rs bs fs op cnn e1
-     (ee2, ee2') <- withoutName' teb rs bs fs op cnn e2
+withoutName' teb rs bs fs ofs op cnn (App e1 e2) =
+  do (ee1, ee1') <- withoutName' teb rs bs fs ofs op cnn e1
+     (ee2, ee2') <- withoutName' teb rs bs fs ofs op cnn e2
      return (App ee1 ee2, ee1' :@: ee2')
-withoutName' teb rs bs fs op cnn (BAbs x e) =
-  do let v = getRename x fs rs
-     (ee, ee') <- withoutName' teb (v:rs) (x:bs) fs op cnn e
+withoutName' teb rs bs fs ofs op cnn (BAbs x e) =
+  do let v = getRename x ofs rs
+     (ee, ee') <- withoutName' teb (v:rs) (x:bs) fs ofs op cnn e
      return (BAbs v ee, BLam v ee')
-withoutName' teb rs bs fs op cnn (BApp e t) =
-  do (ee, ee') <- withoutName' teb rs bs fs op cnn e
-     t' <- typeWithoutName rs bs fs op t
+withoutName' teb rs bs fs ofs op cnn (BApp e t) =
+  do (ee, ee') <- withoutName' teb rs bs fs ofs op cnn e
+     t' <- typeWithoutName rs bs fs ofs op t
      return (BApp ee (fst t'), ee' :!: t')
-withoutName' teb rs bs fs op cnn (EPack t e t') =
-  do tt <- typeWithoutName rs bs fs op t
-     (ee, ee') <- withoutName' teb rs bs fs op cnn e
-     tt' <- typeWithoutName rs bs fs op t'
+withoutName' teb rs bs fs ofs op cnn (EPack t e t') =
+  do tt <- typeWithoutName rs bs fs ofs op t
+     (ee, ee') <- withoutName' teb rs bs fs ofs op cnn e
+     tt' <- typeWithoutName rs bs fs ofs op t'
      return (EPack (fst tt) ee (fst tt'), Pack tt ee' tt')
-withoutName' teb rs bs fs op cnn (EUnpack x y e1 e2) =
-  do (ee1, ee1') <- withoutName' teb rs bs fs op cnn e1
-     let v = getRename x fs rs
-     (ee2, ee2') <- withoutName' (y:teb) (v:rs) (x:bs) fs op cnn e2
+withoutName' teb rs bs fs ofs op cnn (EUnpack x y e1 e2) =
+  do (ee1, ee1') <- withoutName' teb rs bs fs ofs op cnn e1
+     let v = getRename x ofs rs
+     (ee2, ee2') <- withoutName' (y:teb) (v:rs) (x:bs) fs ofs op cnn e2
      return (EUnpack v y ee1 ee2, Unpack v ee1' ee2')
-withoutName' teb rs bs fs op cnn (As e t) =
-  do (ee, ee') <- withoutName' teb rs bs fs op cnn e
-     t' <- typeWithoutName rs bs fs op t
+withoutName' teb rs bs fs ofs op cnn (As e t) =
+  do (ee, ee') <- withoutName' teb rs bs fs ofs op cnn e
+     t' <- typeWithoutName rs bs fs ofs op t
      return (As ee (fst t'), ee' ::: t')
 
 

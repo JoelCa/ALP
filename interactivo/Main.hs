@@ -82,7 +82,7 @@ checkCommand (Ty name ty) =
           )
        (throwIO $ ExistE name)
      (tyr,tty) <- returnInput $ renamedType (fTypeContext glo) (opers glo) ty
-     let p = newProof glo name tyr tty
+     let p = newProof glo name ty tyr tty
      lift $ put $ s {proof=Just p}
      outputStrLn $ renderProof $ constr p
      prover                          
@@ -175,13 +175,13 @@ getTermFromProof _ _ = error "getTermFromProof: no debería pasar"
 
 
 -- Crea una prueba.
-newProof :: ProverGlobal -> String -> Type -> TType -> ProofState
-newProof pglobal name ty tty =
+newProof :: ProverGlobal -> String -> Type -> Type -> TType -> ProofState
+newProof pglobal name ty tyr tty =
   let s = SP { termContext = V.empty
              , bTypeContext = V.empty
              , lsubp = 1
              , tvars = length $ fTypeContext $ pglobal
-             , ty = [Just (ty, tty)]
+             , ty = [Just (tyr, tty)]
              }
       c = PConstruction { tsubp = 1
                         , subps = [s]

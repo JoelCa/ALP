@@ -132,3 +132,7 @@ Es decir, t0 [x := w] = t0.
 - Los lambda términos pueden tener variables libres, las cuales solo pueden ser nombres
 de teoremas o de otros lambda términos.
 
+FALTA:
+Añadir renombre de var. de términos, para el lambda término del usuario.
+Crea una estructura de tipos de términos, con y sin nombre.
+

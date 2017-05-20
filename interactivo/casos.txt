@@ -125,6 +125,9 @@ Para probar el parser, y chequear que se efectue correctamente la transformació
   jojo x x = forall w, forall v, x /\ v.
   Theorem t49: forall m, jojo m ~m -> False.
 NO se probo. Para chequear definición de operadores. 
+- op = forall w, w -> w.
+  Theorem t50: op -> forall op, op -> op.
+Para chequear el renombre de variables ligadas.
 
 Casos de inferencia OK:
 1. infer \A. \B. \x:A. \y:False. let {B,x} = {*B, \B.\x:False. x} as exists A, forall Q, False -> False in (\C. x [False] y) [B].
@@ -146,3 +149,10 @@ Para probar precedencia del "as".
 Casos de inferencia ERROR:
 1. infer \B. let {A,a} = {*B, \x:B.x} as exists C, C -> C in a.
 2. infer \a.\x:a.\a.\b.\y:a->b. y x.
+
+ARREGLAR:
+op = forall w, w -> w.
+infer \x:op.\op.\y:op.x.
+Debería tener el tipo renombrado: op -> (forall op0, op0 -> op)
+
+Ver caso de CBool y CBool2, en test.f

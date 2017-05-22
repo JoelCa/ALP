@@ -37,18 +37,29 @@ errorMessage op (ExactE2 ty) =
   render (printType op ty) ++ "\". "
 errorMessage _ PSE = "error: operación sobre el estado interno inválida"
 errorMessage _ (TypeE x) =  "error: el tipo \"" ++ x ++ "\" no fue declarado."
-errorMessage _ (InferE1 x) = "error: la variable de término \"" ++ x ++ "\" no fue declarada."
-errorMessage op (InferE2 te ty) = errorInferPrintTerm op te $ render (printType op ty)
-errorMessage op (InferE3 te s) = errorInferPrintTerm op te s
-errorMessage op (InferE4 te) =
-  "error: tipo inesperado, en el término \""
-  ++ render (printLamTerm op te) ++ "\"."
+errorMessage op (InferE te e) =
+  "error: en el término \"" ++
+  render (printLamTerm op te) ++
+  "\"." ++
+  errorInfer op e
 errorMessage op (DefE s) = "error: " ++ s ++ " es un operador que ya existe."
 errorMessage _ (UnfoldE1 s) =  "error: " ++ s ++ " no es un operador foldeable."
 errorMessage _ (HypoE i) = "error: la hipótesis " ++ printHypothesis i ++ " no existe."
+  
 
-errorInferPrintTerm :: FOperations -> LamTerm -> String -> String
-errorInferPrintTerm op te s =
-  "error: se esperaba el tipo \"" ++ s ++
+errorInfer :: FOperations -> InferExceptions -> String
+errorInfer _ (InferE1 x) =
+  "La variable de término \"" ++ x ++ "\" no fue declarada."
+errorInfer op (InferE2 te ty) =
+  errorInfer' op te $ render $ printType op ty
+errorInfer op (InferE3 te s) =
+  errorInfer' op te s
+errorInfer op (InferE4 te) =
+  "error: tipo inesperado, en el término \""
+  ++ render (printLamTerm op te) ++ "\"."
+
+errorInfer' :: FOperations -> LamTerm -> String -> String
+errorInfer' op te s =
+  "Se esperaba el tipo \"" ++ s ++
   "\", en el término \"" ++
   render (printLamTerm op te) ++ "\"."

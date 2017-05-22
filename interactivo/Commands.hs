@@ -555,52 +555,58 @@ substitution' m n (Exists v t, TExists t') =
 -- 5. Lambda término con y sin nombre, al que se le quiere inferir su tipo.
 inferType :: Int -> TermContext -> Teorems -> FOperations
           -> (LamTerm, Term) -> Either ProofExceptions (Type, TType)
-inferType n _ te _ (_, Free (Global x)) =
+inferType n c te op t = case inferType' n c te op t of
+                          Right r -> return r
+                          Left e -> throw $ InferE (fst t) e
+
+inferType' :: Int -> TermContext -> Teorems -> FOperations
+          -> (LamTerm, Term) -> Either InferExceptions (Type, TType)
+inferType' n _ te _ (_, Free (Global x)) =
   case M.lookup x te of
     Just (_ ::: t) -> return t
     Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean teoremas.
-    _ -> error "error: inferType, no debería pasar."
-inferType n c te _ (_, Bound x) =
+    _ -> error "error: inferType', no debería pasar."
+inferType' n c te _ (_, Bound x) =
   let (_,m,t,t') = c V.! x
   in return (t,renameTType (n-m) t')
-inferType n c te op (Abs _ _ e, Lam (t,t') e') =
-  do (tt,tt') <- inferType n (V.cons (0,n,t,t') c) te op (e,e')
+inferType' n c te op (Abs _ _ e, Lam (t,t') e') =
+  do (tt,tt') <- inferType' n (V.cons (0,n,t,t') c) te op (e,e')
      return (Fun t tt, TFun t' tt')
-inferType n c te op (App e1 e2, e1' :@: e2') =
-  do tt1 <- inferType n c te op (e1, e1')
+inferType' n c te op (App e1 e2, e1' :@: e2') =
+  do tt1 <- inferType' n c te op (e1, e1')
      case tt1 of
        (Fun t1 t2, TFun t1' t2') ->
-         do (tt2, tt2') <- inferType n c te op (e2, e2')
+         do (tt2, tt2') <- inferType' n c te op (e2, e2')
             if compareTTypes op tt2' t1'
               then return (t2, t2')
               else throw $ InferE2 e2 t1
        _ -> throw $ InferE3 e1 "* -> *"
-inferType n c te op (BAbs _ e, BLam v e') =
-  do (t,t') <- inferType (n+1) c te op (e, e')
+inferType' n c te op (BAbs _ e, BLam v e') =
+  do (t,t') <- inferType' (n+1) c te op (e, e')
      return (ForAll v t, TForAll t')
-inferType n c te op (BApp e _, e' :!: (t,t')) =
-  do tt <- inferType n c te op (e, e')
+inferType' n c te op (BApp e _, e' :!: (t,t')) =
+  do tt <- inferType' n c te op (e, e')
      case tt of
        (ForAll _ t1, TForAll t1') ->
          return $ inferReplaceType (t1,t1') (t,t')
        _ -> throw $ InferE3 e "forall *"
-inferType n c te op (EPack _ e _, Pack t1 e' t@(Exists _ t2 , TExists t2')) =
-  do (_,tt1') <- inferType n c te op (e, e')
+inferType' n c te op (EPack _ e _, Pack t1 e' t@(Exists _ t2 , TExists t2')) =
+  do (_,tt1') <- inferType' n c te op (e, e')
      let (tt2, tt2') = inferReplaceType (t2,t2') t1
      if compareTTypes op tt1' tt2'
        then return t
        else throw $ InferE2 e tt2
-inferType n c te op (EUnpack _ _ e1 e2, Unpack _ e1' e2') =
-  do t1 <- inferType n c te op (e1, e1')
+inferType' n c te op (EUnpack _ _ e1 e2, Unpack _ e1' e2') =
+  do t1 <- inferType' n c te op (e1, e1')
      case t1 of
        (Exists _ tt1, TExists tt1') -> 
-         do t2 <- inferType (n+1) (V.cons (0,n+1,tt1,tt1') c) te op (e2, e2')
+         do t2 <- inferType' (n+1) (V.cons (0,n+1,tt1,tt1') c) te op (e2, e2')
             case substitution 1 t2 of
               Just t2' -> return t2'
               Nothing -> throw $ InferE4 e2
        _ -> throw $ InferE3 e1 "exists *"
-inferType n c te op (As e _, e' ::: t@(tt,tt')) =
-  do (_, t1') <- inferType n c te op (e, e')
+inferType' n c te op (As e _, e' ::: t@(tt,tt')) =
+  do (_, t1') <- inferType' n c te op (e, e')
      if compareTTypes op t1' tt'
        then return t
        else throw $ InferE2 e tt

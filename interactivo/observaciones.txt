@@ -130,9 +130,11 @@ Sin embargo, para cualquier instancia t0 de t, "x" NO aparece en t0 (por el reno
 Es decir, t0 [x := w] = t0.
 
 - Los lambda términos pueden tener variables libres, las cuales solo pueden ser nombres
-de teoremas o de otros lambda términos.
+de teoremas.
+
+- Consideramos que en el lambda término ingresado por el usuario, los nombres de las variables de términos
+pueden coincidir con los teoremas. Es decir, que en este caso NO la renombramos.
 
 FALTA:
-Añadir renombre de var. de términos, para el lambda término del usuario.
 Crea una estructura de tipos de términos, con y sin nombre.
 

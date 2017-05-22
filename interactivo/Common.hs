@@ -128,8 +128,11 @@ data ProofExceptions = PNotFinished | PNotStarted | ExistE String
                      | TypeNotExists String
                      | OpE1 String | OpE2 String | ExactE1 Type
                      | ExactE2 Type | PSE | EmptyType | TypeE String
-                     | InferE1 String | InferE2 LamTerm Type | InferE3 LamTerm String
-                     | InferE4 LamTerm | DefE String | UnfoldE1 String
+                     | InferE LamTerm InferExceptions | DefE String | UnfoldE1 String
+                     deriving (Show, Typeable)
+
+data InferExceptions = InferE1 String | InferE2 LamTerm Type
+                     | InferE3 LamTerm String | InferE4 LamTerm
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions

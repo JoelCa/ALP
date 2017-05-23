@@ -271,15 +271,17 @@ unfoldP = do symbol "unfold"
               <|> do symbol "."
                      return $ Unfold op Nothing)
 
--- ARREGLAR
 exactP :: Parser Tactic
 exactP = do symbol "exact"
             parens $
-              do te <- lambTerm
-                 char '.'
-                 return $ Exact $ LambdaT te
+              do xs <- apps
+                 symbol "."
+                 return $ Exact $ Applications xs
+              <|> do te <- lambTerm
+                     symbol "."
+                     return $ Exact $ LambdaT te
               <|> do ty <- typeTerm
-                     char '.'
+                     symbol "."
                      return $ Exact $ TypeT ty
 
 tacticZeroArg :: String -> Tactic -> Parser Tactic
@@ -321,6 +323,7 @@ basicInfixParser = unit4
 
 --------------------------------------------------------------------------------------
 
+-- Función auxiliar de exactP
 apps :: Parser (GenTree String)
 apps = do x <- validIdent1
           xs <- apps'

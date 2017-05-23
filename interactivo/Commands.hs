@@ -86,15 +86,7 @@ habitar (Exact (LambdaT te)) =
      btc <- getBTypeContext
      ftc <- getFTypeContext
      te' <- eitherToProof $ withoutName op ftc btc (cn,n) te
-     c <- getTermContext
-     teo <- getTeorems
-     q <- getTBTypeVars
-     (_,t') <- eitherToProof $ inferType q c teo op te'
-     x <- getType
-     (tt,tt') <- maybeToProof EmptyType x
-     unless (t' == tt') $ throw $ ExactE1 tt
-     endSubProof
-     modifyTerm $ simplify (snd te')
+     exactTerm te'     
 habitar (Exact (TypeT ty)) =
   do x <- getType
      when (isJust x) $ throw $ ExactE2 $ fst $ fromJust x
@@ -102,8 +94,13 @@ habitar (Exact (TypeT ty)) =
      btc <- getBTypeContext
      ftc <- getFTypeContext
      ty' <- eitherToProof $ renamedType2 btc ftc op ty
-     endSubProof
-     modifyTerm $ simplifyTypeInTerm ty'
+     exactType ty'     
+habitar (Exact (Applications aps)) =
+  do op <- getUsrOpers
+     btc <- getBTypeContext
+     ftc <- getFTypeContext
+     ty <- maybeToProof EmptyType $ disambiguate1 btc ftc op aps
+     exactType ty
 habitar (Unfold s Nothing) =
   do x <- getType
      (t,t') <- maybeToProof EmptyType x
@@ -324,6 +321,55 @@ termForAll' n m t sust
                 in if n == m
                    then tt
                    else termForAll' (n+1) m tt sust
+
+----------------------------------------------------------------------------------------------------------------------
+-- Comando EXACT
+exactType :: (Type, TType) -> Proof ()
+exactType ty =
+  endSubProof >>
+  (modifyTerm $ simplifyTypeInTerm ty)
+
+exactTerm :: (LamTerm, Term) -> Proof ()
+exactTerm te =
+  do c <- getTermContext
+     teo <- getTeorems
+     q <- getTBTypeVars
+     op <- getUsrOpers
+     (_,t') <- eitherToProof $ inferType q c teo op te
+     x <- getType
+     (tt,tt') <- maybeToProof EmptyType x
+     unless (t' == tt') $ throw $ ExactE1 tt
+     endSubProof
+     modifyTerm $ simplify (snd te)
+
+disambiguate1 :: BTypeContext -> FTypeContext ->  FOperations
+              -> GenTree String -> Maybe (Type, TType)
+disambiguate1 btc ftc op (Node x []) =
+  case V.findIndex (\(_,w) -> x == w) btc of
+    Just n -> return (B x, TBound n)
+    Nothing -> case getElemIndex (\(w,_,_,_) -> w == x) op of
+                 Just (n, (_, _, args, _)) -> if args == 0
+                                              then return (RenameTy x 0 [], RenameTTy n [])
+                                              else Nothing
+                 Nothing -> if elem x ftc
+                            then return (B x, TFree x)
+                            else Nothing
+disambiguate1 btc ftc op (Node x xs) =
+  case find (\(w,_,_) -> x == w) notFoldeableOps of
+    Just (_,n,args') ->
+      if args' == args
+      then do rs <- sequence $ map (disambiguate1 btc ftc op) xs
+              let (tt, tt') = unzip rs
+              return (RenameTy x args tt, RenameTTy n tt')
+      else Nothing
+    Nothing ->
+      do (m, (_,_,args',_)) <- getElemIndex (\(w,_,_,_) -> w == x) op
+         if args' == args
+           then do rs <- sequence $ map (disambiguate1 btc ftc op) xs
+                   let (tt, tt') = unzip rs
+                   return (RenameTy x args tt, RenameTTy m tt')
+           else Nothing
+  where args = length xs
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando UNFOLD

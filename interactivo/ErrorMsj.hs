@@ -40,7 +40,7 @@ errorMessage _ (TypeE x) =  "error: el tipo \"" ++ x ++ "\" no fue declarado."
 errorMessage op (InferE te e) =
   "error: en el término \"" ++
   render (printLamTerm op te) ++
-  "\"." ++
+  "\". " ++
   errorInfer op e
 errorMessage op (DefE s) = "error: " ++ s ++ " es un operador que ya existe."
 errorMessage _ (UnfoldE1 s) =  "error: " ++ s ++ " no es un operador foldeable."

@@ -34,8 +34,10 @@ errorMessage op (ExactE1 ty) =
   render (printType op ty) ++ "\". "
 errorMessage op (ExactE2 ty) =
   "error: debe ingresar una prueba de \"" ++
-  render (printType op ty) ++ "\". "
-errorMessage _ PSE = "error: operación sobre el estado interno inválida"
+  render (printType op ty) ++ "\"."
+errorMessage _ ExactE3 =
+  "error: lo ingresado no es válido."
+errorMessage _ PSE = "error: operación sobre el estado interno inválida."
 errorMessage _ (TypeE x) =  "error: el tipo \"" ++ x ++ "\" no fue declarado."
 errorMessage op (InferE te e) =
   "error: en el término \"" ++

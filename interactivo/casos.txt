@@ -128,6 +128,9 @@ NO se probo. Para chequear definición de operadores.
 - op = forall w, w -> w.
   Theorem t50: op -> forall op, op -> op.
 Para chequear el renombre de variables ligadas.
+- Theorem t51: forall w, forall w, w -> w.
+Lo resuelvo con: intro; exact (\h.\x:h.x).
+Para probar el exact, y el inferidor.
 
 Casos de inferencia OK:
 1. infer \A. \B. \x:A. \y:False. let {B,x} = {*B, \B.\x:False. x} as exists A, forall Q, False -> False in (\C. x [False] y) [B].
@@ -151,8 +154,4 @@ Casos de inferencia ERROR:
 2. infer \a.\x:a.\a.\b.\y:a->b. y x.
 
 ARREGLAR:
-op = forall w, w -> w.
-infer \x:op.\op.\y:op.x.
-Debería tener el tipo renombrado: op -> (forall op0, op0 -> op)
-
 Ver caso de CBool y CBool2, en test.f

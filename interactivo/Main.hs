@@ -151,7 +151,7 @@ checkCommand (Ta ta) =
        then ((outputStrLn $ "Prueba completa.\n"
               ++ renderFinalTerm (opers $ cglobal p) (getTermFromProof p (types pr))  ++ "\n")
              >> reloadProver)
-       else (outputStrLn (renderProof p) >> (outputStrLn $ show $ length $ term p))
+       else outputStrLn $ renderProof p
      prover
 
 -- Funciones auxiliares del comando "Props/Types".

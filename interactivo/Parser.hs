@@ -273,16 +273,14 @@ unfoldP = do symbol "unfold"
 
 exactP :: Parser Tactic
 exactP = do symbol "exact"
-            parens $
-              do xs <- apps
-                 symbol "."
-                 return $ Exact $ Applications xs
-              <|> do te <- lambTerm
-                     symbol "."
-                     return $ Exact $ LambdaT te
-              <|> do ty <- typeTerm
-                     symbol "."
-                     return $ Exact $ TypeT ty
+            r <- do xs <- apps <|> parens apps
+                    return $ Applications xs
+                 <|> do te <- lambTerm
+                        return $ LambdaT te
+                 <|> do ty <- typeTerm
+                        return $ TypeT ty
+            char '.'
+            return $ Exact r
 
 tacticZeroArg :: String -> Tactic -> Parser Tactic
 tacticZeroArg s tac = do symbol s

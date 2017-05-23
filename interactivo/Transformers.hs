@@ -6,6 +6,7 @@ import RenamedVariables
 import Hypothesis
 import Parser (getHypothesisValue)
 import Data.IntSet (IntSet)
+import qualified Data.Vector as V
 
 -- Retorna el tipo con nombre, posiblemente renombrado, de su 3º arg.
 -- A fin de respetar la Convención 1.
@@ -142,30 +143,51 @@ withoutName' ters tebs tyrs tybs fs ofs op cnn (As e t) =
      t' <- typeWithoutName tyrs tybs fs ofs op t
      return (As ee (fst t'), ee' ::: t')
 
+----------------------------------------------------------------------------------------------------------------------
+-- Transformadores para aplicaciones ambiguas.
 
--- TERMINAR
--- recognize :: BTypeContext -> FTypeContext -> FOperations -> Int
---           -> [String] -> Either ProofExceptions (Either (Type, TType) (LamTerm, Term))
--- recognize = undefined
+-- Convierte una aplicacion en una aplicación de tipos, si es posible.
+disambiguatedType :: BTypeContext -> FTypeContext ->  FOperations
+                  -> GenTree String -> Maybe (Type, TType)
+disambiguatedType btc ftc op (Node x []) =
+  case V.findIndex (\(_,w) -> x == w) btc of
+    Just n -> return (B x, TBound n)
+    Nothing -> case getElemIndex (\(w,_,_,_) -> w == x) op of
+                 Just (n, (_, _, args, _)) -> if args == 0
+                                              then return (RenameTy x 0 [], RenameTTy n [])
+                                              else Nothing
+                 Nothing -> if elem x ftc
+                            then return (B x, TFree x)
+                            else Nothing
+disambiguatedType btc ftc op (Node x xs) =
+  case find (\(w,_,_) -> x == w) notFoldeableOps of
+    Just (_,n,args') ->
+      if args' == args
+      then do rs <- sequence $ map (disambiguatedType btc ftc op) xs
+              let (tt, tt') = unzip rs
+              return (RenameTy x args tt, RenameTTy n tt')
+      else Nothing
+    Nothing ->
+      do (m, (_,_,args',_)) <- getElemIndex (\(w,_,_,_) -> w == x) op
+         if args' == args
+           then do rs <- sequence $ map (disambiguatedType btc ftc op) xs
+                   let (tt, tt') = unzip rs
+                   return (RenameTy x args tt, RenameTTy m tt')
+           else Nothing
+  where args = length xs
 
-
--- recognizeType :: BTypeContext -> FTypeContext -> FOperations
---               -> [String] -> Maybe (Type, TType)
--- recognizeType bs fs op [v]
---   | elem v fs = return (B v, TFree v)
---   | otherwise = case getElemIndex (\(_,x) -> x == v) bs of
---                   Just (i, _) -> return (B $ bs ! i, TBound i)
---                   Nothing -> undefined
-
--- recognizeLam :: Int -> [String] -> Either ProofExceptions ((LamTerm, Term) -> (LamTerm, Term))
--- recognizeLam n [] = return id
--- recognizeLam n (x:xs) = do maybeToEither $ getTermVar x
-
-
--- Identifica una variable de término.
--- getTermVar :: Int -> String -> (LamTerm, Term)
--- getTermVar n x = case getHypothesisValue x of
---                    Just h -> case getHypoPosition n h of
---                                Just i -> (LVar x, Bound i)
---                                _ -> (LVar x, Free $ Global x)
---                    Nothing -> (LVar x, Free $ Global x)
+-- Convierte una aplicacion en una aplicación de lambda términos, si es posible.
+disambiguatedLTerm :: (IntSet, Int) -> GenTree String -> Maybe (LamTerm, Term)
+disambiguatedLTerm cnn@(cn,n) (Node x xs) =
+  let y = case getHypothesisValue x of
+            Just h -> case getHypoPosition cn n h of
+                        Just i -> Bound i
+                        _ -> Free $ Global x
+            Nothing -> Free $ Global x
+  in foldl (\r node ->
+               do (t,t') <- disambiguatedLTerm cnn node
+                  (tt,tt') <- r
+                  return (App tt t, tt' :@: t')
+           )
+     (return (LVar x, y)) xs
+disambiguatedLTerm _ Nil = Nothing

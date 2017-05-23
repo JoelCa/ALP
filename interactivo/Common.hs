@@ -125,9 +125,8 @@ data ProofExceptions = PNotFinished | PNotStarted | ExistE String
                      | IntroE1 | ApplyE1 Type Type | HypoE Int
                      | Unif1 | Unif2 | Unif3 | Unif4
                      | ElimE1 | CommandInvalid | TypeRepeated String
-                     | TypeNotExists String
-                     | OpE1 String | OpE2 String | ExactE1 Type
-                     | ExactE2 Type | PSE | EmptyType | TypeE String
+                     | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 Type
+                     | ExactE2 Type | ExactE3 | PSE | EmptyType | TypeE String
                      | InferE LamTerm InferExceptions | DefE String | UnfoldE1 String
                      deriving (Show, Typeable)
 

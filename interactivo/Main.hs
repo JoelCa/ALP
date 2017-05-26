@@ -101,24 +101,25 @@ checkCommand (Types ps) =
      when (isJust tr2) (throwIO $ ExistE $ fromJust tr2)
      lift $ put $ s {global = (global s) {teorems=teorems $ global s, fTypeContext=ps++gps}}
      prover
-checkCommand (TypeDef (op, n, args, body, isInfix)) =
+-- TERMINAR
+checkCommand (Definition name (Type (body, n, args, isInfix))) =
   do s <- lift get
      let glo = global s
-     when ( (V.any (\(x,_,_,_)-> x == op) $ opers glo)
-            || (any (\(x,_,_) -> x == op) notFoldeableOps)
+     when ( (V.any (\(x,_,_,_)-> x == name) $ opers glo)
+            || (any (\(x,_,_) -> x == name) notFoldeableOps)
           )
-       (throwIO $ DefE op)
-     when ( (elem op $ fTypeContext glo)
-            || (Map.member op $ teorems $ glo)
+       (throwIO $ DefE name)
+     when ( (elem name $ fTypeContext glo)
+            || (Map.member name $ teorems $ glo)
           )
-       (throwIO $ ExistE op)
+       (throwIO $ ExistE name)
      t <- returnInput $ renamedType3 args (fTypeContext glo) (opers glo) body
      case (n, isInfix) of
        (2, True) ->
-         lift $ put $ s { global = glo { opers = V.snoc (opers glo) (op, t, n, isInfix) }
-                        , infixParser =  PP $ usrInfixParser op $ runParser $ infixParser s }
+         lift $ put $ s { global = glo { opers = V.snoc (opers glo) (name, t, n, isInfix) }
+                        , infixParser =  PP $ usrInfixParser name $ runParser $ infixParser s }
        _ ->
-         lift $ put $ s { global = glo { opers = V.snoc (opers glo) (op, t, n, isInfix) } }
+         lift $ put $ s { global = glo { opers = V.snoc (opers glo) (name, t, n, isInfix) } }
      prover
 checkCommand (Ta (Print x)) =
   do s <- lift get

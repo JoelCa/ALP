@@ -79,7 +79,7 @@ habitar Split =
                                               :@: x :@: y)
          else throw CommandInvalid
        _ -> throw CommandInvalid
-habitar (Exact (LambdaT te)) =
+habitar (Exact (LamT te)) =
   do op <- getUsrOpers
      n <- getTTermVars
      cn <- getConflictNames
@@ -87,7 +87,7 @@ habitar (Exact (LambdaT te)) =
      ftc <- getFTypeContext
      te' <- eitherToProof $ withoutName op ftc btc (cn,n) te
      exactTerm te'  
-habitar (Exact (TypeT ty)) =
+habitar (Exact (T ty)) =
   do x <- getType
      when (isJust x) $ throw $ ExactE2 $ fst $ fromJust x
      op <- getUsrOpers
@@ -95,16 +95,16 @@ habitar (Exact (TypeT ty)) =
      ftc <- getFTypeContext
      ty' <- eitherToProof $ renamedType2 btc ftc op ty
      exactType ty'     
-habitar (Exact (Applications aps)) =
+habitar (Exact (Appl aps)) =
   do op <- getUsrOpers
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     case disambiguatedType btc ftc op aps of
-       Just ty -> exactType ty
-       Nothing -> do n <- getTTermVars
-                     cn <- getConflictNames
-                     te <- maybeToProof ExactE3 $ disambiguatedLTerm (cn,n) aps
-                     exactTerm te
+     n <- getTTermVars
+     cn <- getConflictNames
+     t <- maybeToProof ExactE3 $ disambiguatedTerm btc ftc op (cn,n) aps
+     case t of
+       Right te -> exactTerm te
+       Left ty -> exactType ty
 habitar (Unfold s Nothing) =
   do x <- getType
      (t,t') <- maybeToProof EmptyType x

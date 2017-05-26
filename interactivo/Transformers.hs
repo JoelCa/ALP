@@ -147,6 +147,15 @@ withoutName' ters tebs tyrs tybs fs ofs op cnn (As e t) =
 -- Transformadores para aplicaciones ambiguas.
 
 -- Convierte una aplicacion en una aplicación de tipos, si es posible.
+disambiguatedTerm :: BTypeContext -> FTypeContext ->  FOperations
+                  -> (IntSet, Int) -> GenTree String -> Maybe (Either (Type, TType) (LamTerm, Term))
+disambiguatedTerm btc ftc op cnn t =
+  case disambiguatedType btc ftc op t of
+    Just ty -> return $ Left ty
+    Nothing -> case disambiguatedLTerm cnn t of
+                 Just te -> return $ Right te
+                 Nothing -> Nothing
+
 disambiguatedType :: BTypeContext -> FTypeContext ->  FOperations
                   -> GenTree String -> Maybe (Type, TType)
 disambiguatedType btc ftc op (Node x []) =

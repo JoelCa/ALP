@@ -58,8 +58,9 @@ exprTy = do symbol "Theorem"
                 return $ Types ps
          <|> do tac <- termTac
                 return $ Ta tac
-         <|> do def <- typeDef
-                return $ TypeDef def
+         <|> do name <- validIdent1
+                def <- bodyDef
+                return $ Definition name def
          
 -- Parser de los tipos (o fórmulas lógicas).
 typeTerm :: Parser Type
@@ -180,26 +181,26 @@ abstraction = do char '\\'
                      return $ EUnpack v1 v2 e1 e2
 
 -- Parser de definición de tipos.
-typeDef :: Parser TypeDefinition
-typeDef = do op <- validIdent1
-             (n, xs) <- opArgs0 validIdent1
+-- TERMINAR
+bodyDef :: Parser BodyDef
+bodyDef = do (n, xs) <- opArgs0 validIdent1
              symbol "="
              t <- typeTerm
              symbol "."
-             return (op, n, xs, t, False)
+             return $ Type (t, n, xs, False)
           <|> do op <- validIdent3
                  (n, xs) <- opArgs1 validIdent1
                  symbol "="
                  t <- typeTerm
                  symbol "."
-                 return (op, n, xs, t, False)
+                 return $ Type (t, n, xs, False)
           <|> do a <- validIdent1
                  op <- validIdent3
                  b <- validIdent1
                  symbol "="
                  t <- typeTerm
                  symbol "."
-                 return (op, 2, [a,b], t, True)
+                 return $ Type (t, 2, [a,b], True)
 
 
 -- Parser de las tácticas.
@@ -274,11 +275,11 @@ unfoldP = do symbol "unfold"
 exactP :: Parser Tactic
 exactP = do symbol "exact"
             r <- do xs <- apps <|> parens apps
-                    return $ Applications xs
+                    return $ Appl xs
                  <|> do te <- lambTerm
-                        return $ LambdaT te
+                        return $ LamT te
                  <|> do ty <- typeTerm
-                        return $ TypeT ty
+                        return $ T ty
             char '.'
             return $ Exact r
 

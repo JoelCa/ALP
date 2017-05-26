@@ -101,23 +101,26 @@ type FTypeContext = [FTypeVar]
 data Command = Ty String Type
              | Ta Tactic
              | Types [String]
-             | TypeDef TypeDefinition
-             | TermDef String Term
+             | Definition String BodyDef
              deriving (Show)
 
+data BodyDef = LTerm LamTerm
+             | Type TypeDefinition
+             | Ambiguous (GenTree String)
+             deriving (Show)
+             
   -- Tácticas.
 data Tactic = Assumption | Apply Int | Intro | Intros | Split
             | Elim Int | CLeft | CRight | Print String 
-            | CExists Type | Cut Type | Exact Terms
+            | CExists Type | Cut Type | Exact ExactB
             | Infer LamTerm | Unfold String (Maybe Int)
             | Absurd Type
             deriving (Show)
 
-data Terms = TypeT Type
-           | LambdaT LamTerm
-           | Applications (GenTree String)
-           deriving (Show)
-
+data ExactB = LamT LamTerm
+            | T Type
+            | Appl (GenTree String)
+            deriving (Show)
 
   -- Excepciones.
 data ProofExceptions = PNotFinished | PNotStarted | ExistE String
@@ -182,12 +185,11 @@ type FoldeableOp = (String, (Type, TType), Operands, Bool)
 type FOperations = Vector FoldeableOp
 
   -- Definición de una "operación".
-  -- 1. Identificador.
+  -- 1. Cuerpo de la operación.
   -- 2. Cantidad de operandos.
   -- 3. Lista de los nombres de los argumentos.
-  -- 4. Cuerpo de la operación.
-  -- 5. Boleano. True sii es una operación binaria infija.
-type TypeDefinition = (String, Operands, [String], Type, Bool)
+  -- 4. Boleano. True sii es una operación binaria infija.
+type TypeDefinition = (Type, Operands, [String], Bool)
 
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState

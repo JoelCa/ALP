@@ -58,8 +58,7 @@ exprTy = do symbol "Theorem"
                 return $ Types ps
          <|> do tac <- termTac
                 return $ Ta tac
-         <|> do name <- validIdent1
-                def <- bodyDef
+         <|> do (name, def) <- definition
                 return $ Definition name def
          
 -- Parser de los tipos (o fórmulas lógicas).
@@ -118,9 +117,18 @@ unit5 = parens typeTerm
                return $ B v
 
 prefixOps :: Parser Type
-prefixOps = do x <- (validIdent1 <|> validIdent3)
+prefixOps = do op <- parcialOp
                (n, xs) <- opArgs1 unit5
-               return $ RenameTy x n xs
+               return $ addArgs op n xs
+
+parcialOp :: Parser Type
+parcialOp = do v <- validIdent1 <|> validIdent3
+               return $ B v
+            <|> parens prefixOps
+
+addArgs :: Type -> Int -> [Type] -> Type
+addArgs (B op) n xs = RenameTy op n xs
+addArgs (RenameTy op m ys) n xs = RenameTy op (m + n) (ys ++ xs)
 
 
 -- Parser del lambda término con nombre.
@@ -180,27 +188,28 @@ abstraction = do char '\\'
                      e2 <- lambTerm
                      return $ EUnpack v1 v2 e1 e2
 
--- Parser de definición de tipos.
+-- Parser de una definición.
 -- TERMINAR
-bodyDef :: Parser BodyDef
-bodyDef = do (n, xs) <- opArgs0 validIdent1
-             symbol "="
-             t <- typeTerm
-             symbol "."
-             return $ Type (t, n, xs, False)
-          <|> do op <- validIdent3
-                 (n, xs) <- opArgs1 validIdent1
-                 symbol "="
-                 t <- typeTerm
-                 symbol "."
-                 return $ Type (t, n, xs, False)
-          <|> do a <- validIdent1
-                 op <- validIdent3
-                 b <- validIdent1
-                 symbol "="
-                 t <- typeTerm
-                 symbol "."
-                 return $ Type (t, 2, [a,b], True)
+definition :: Parser (String, BodyDef)
+definition = do name <- validIdent1
+                (n, xs) <- opArgs0 validIdent1
+                symbol "="
+                t <- typeTerm
+                symbol "."
+                return  (name, Type (t, n, reverse xs, False))
+             <|> do name <- validIdent3
+                    (n, xs) <- opArgs1 validIdent1
+                    symbol "="
+                    t <- typeTerm
+                    symbol "."
+                    return (name, Type (t, n, reverse xs, False))
+             <|> do a <- validIdent1
+                    name <- validIdent3
+                    b <- validIdent1
+                    symbol "="
+                    t <- typeTerm
+                    symbol "."
+                    return (name, Type (t, 2, [b, a], True))
 
 
 -- Parser de las tácticas.
@@ -324,15 +333,20 @@ basicInfixParser = unit4
 
 -- Función auxiliar de exactP
 apps :: Parser (GenTree String)
-apps = do x <- validIdent1
+apps = do par <- parcialApp
           xs <- apps'
-          return $ Node x xs
+          return $ appendApp par xs
+
+appendApp :: (GenTree String) -> [GenTree String] -> (GenTree String)
+appendApp (Node x xs) ys = Node x (xs ++ ys)
+
+parcialApp :: Parser (GenTree String)
+parcialApp = do v <- validIdent1
+                return $ Node v []
+             <|> parens apps
 
 apps' :: Parser [GenTree String]
-apps' = do x <- validIdent1
-           xs <- apps'
-           return $ (Node x []) : xs
-        <|> do t <- parens apps
-               xs <- apps'
-               return $ t : xs
+apps' = do a <- parcialApp
+           as <- apps'
+           return $ a : as
         <|> return []

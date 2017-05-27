@@ -136,5 +136,5 @@ de teoremas.
 pueden coincidir con los teoremas. Es decir, que en este caso NO la renombramos.
 
 FALTA:
-Crea una estructura de tipos de términos, con y sin nombre.
-
+- Hacer que los operadores prefijos asocien a izquierda.
+- Crea una estructura de tipos de términos, con y sin nombre.

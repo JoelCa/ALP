@@ -82,6 +82,7 @@ checkCommand (Ty name ty) =
           )
        (throwIO $ ExistE name)
      (tyr,tty) <- returnInput $ renamedType (fTypeContext glo) (opers glo) ty
+     outputStrLn $ show (tyr,tty) ++ "\n"
      let p = newProof glo name ty tyr tty
      lift $ put $ s {proof=Just p}
      outputStrLn $ renderProof $ constr p
@@ -114,6 +115,7 @@ checkCommand (Definition name (Type (body, n, args, isInfix))) =
           )
        (throwIO $ ExistE name)
      t <- returnInput $ renamedType3 args (fTypeContext glo) (opers glo) body
+     outputStrLn $ show t ++ "\n"
      case (n, isInfix) of
        (2, True) ->
          lift $ put $ s { global = glo { opers = V.snoc (opers glo) (name, t, n, isInfix) }

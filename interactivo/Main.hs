@@ -102,14 +102,20 @@ checkCommand (Types ps) =
      when (isJust tr2) (throwIO $ ExistE $ fromJust tr2)
      lift $ put $ s {global = (global s) {teorems=teorems $ global s, fTypeContext=ps++gps}}
      prover
--- TERMINAR
+checkCommand (Definition name (Ambiguous ap)) =
+  do s <- lift get
+     let glo = global s
+     case disambiguatedTerm V.empty (fTypeContext glo) (opers glo) (conflict glo, 0) ap of
+       Just (Left ty) -> undefined
+       Just (Right te) -> undefined
+       Nothing -> throwIO $ DefE2
 checkCommand (Definition name (Type (body, n, args, isInfix))) =
   do s <- lift get
      let glo = global s
      when ( (V.any (\(x,_,_,_)-> x == name) $ opers glo)
             || (any (\(x,_,_) -> x == name) notFoldeableOps)
           )
-       (throwIO $ DefE name)
+       (throwIO $ DefE1 name)
      when ( (elem name $ fTypeContext glo)
             || (Map.member name $ teorems $ glo)
           )

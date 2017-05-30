@@ -11,7 +11,7 @@ import qualified Data.IntSet as IS
 -- 3. Número de la hipótesis.
 getHypoPosition :: IS.IntSet -> Int -> Int -> Maybe Int
 getHypoPosition c n h
-  | IS.member h c = Nothing
+  | (n == 0) || IS.member h c = Nothing
   | (h >= 0) && (h < n + IS.size c) = return $ n - 1 - h + IS.foldr (\k x -> if k < h then succ x else x) 0 c
   | otherwise = Nothing
 

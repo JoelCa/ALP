@@ -308,14 +308,10 @@ printTType' op prec@(i,j,k) bs fs (RenameTTy n [t1,t2])
                         printTType' op (2, n, True) bs fs t1 <+>
                         text s <+> 
                         printTType' op (2, n, False) bs fs t2
-                   else printBinPrefix (\x t -> printTType' op x bs fs t) s prec t1 t2
-printTType' op prec bs fs (RenameTTy n [t]) =
-  printUnaryPrefix (\x t -> printTType' op x bs fs t) (fst4 $ op V.! n) prec t
-printTType' op i bs fs (RenameTTy n [])
-  | n == bottom_code = text $ bottom_text
-  | otherwise = text (fst4 $ op V.! n)
-printTType' _ _ _ _ (RenameTTy _ _) =
-  error "error: printTType', no debería pasar."
+                   else printPrefix (\x t -> printTType' op x bs fs t) s prec [t1,t2]
+printTType' op prec bs fs (RenameTTy n ts) =
+  printPrefix (\x t -> printTType' op x bs fs t) (fst4 $ op V.! n) prec ts
+
 
 getTextFromDefaultOp :: Int -> String
 getTextFromDefaultOp n = case find (\(_,x,_) -> x == n) notFoldeableOps of
@@ -330,7 +326,7 @@ getTextFromDefaultOp n = case find (\(_,x,_) -> x == n) notFoldeableOps of
 printType :: FOperations -> Type -> Doc
 printType = printType' (7,7,False)
 
--- TERMINAR (hacer casos de RenameTy)
+
 printType' :: (Int, Int, Bool) -> FOperations -> Type -> Doc
 printType' _ _ (B v) =
   text v
@@ -354,37 +350,16 @@ printType' prec@(i,j,k) op (RenameTy s _ [t1, t2])
   | s == iff_text = printBinInfix (\x t -> printType' x op t) s prec 6 t1 t2
   | otherwise = case getElemIndex (\(x,_,_,_) -> x == s) op of
           Just (_, (_,_,_,False)) ->
-            printBinPrefix (\x t -> printType' x op t) s prec t1 t2
+            printPrefix (\x t -> printType' x op t) s prec [t1,t2]
           Just (n, (_,_,_,True)) ->
             parenIf ( i < 2 || ( i == 2 && ( j < n || ( j == n && k )))) $
             printType' (2, n, True) op t1 <+>
             text s <+> 
             printType' (2, n, False) op t2
           _ -> error "error: printType' no debería pasar."
-printType' prec op (RenameTy s _ [t]) =
-  printUnaryPrefix (\x t -> printType' x op t) s prec t
-printType' _ _ (RenameTy s _ []) =
-  text s
-printType' _ _ (RenameTy _ _ _) =
-  error "error: printType' no debería pasar."
+printType' prec op (RenameTy s _ ts) =
+  printPrefix (\x t -> printType' x op t) s prec ts
 
-printBinPrefix :: ((Int, Int, Bool) -> a -> Doc) -> String
-               -> (Int, Int, Bool) -> a -> a -> Doc
-printBinPrefix f s (i, j, k) t1 t2 =
-  parenIf (i == 0) $
-  text s <+>
-  f (0, j, k) t1 <+>
-  f (0, j, k) t2
-
-printUnaryPrefix :: ((Int, Int, Bool) -> a -> Doc) -> String
-                 -> (Int, Int, Bool) -> a -> Doc
-printUnaryPrefix f s (i, j, k) t
-  | s == not_text = parenIf (i < 1) $
-                    text s <+>
-                    f (1, j, k) t
-  | otherwise = parenIf (i == 0) $
-                text s <+>
-                f (0, j, k) t
 
 printBinInfix :: ((Int, Int, Bool) -> a -> Doc) -> String
               -> (Int, Int, Bool) -> Int -> a -> a -> Doc              
@@ -394,6 +369,24 @@ printBinInfix f s (i,j,k) n t1 t2 =
   text s <+> 
   f (n, j, False) t2
 
+
+printPrefix :: ((Int, Int, Bool) -> a -> Doc) -> String
+            -> (Int, Int, Bool) -> [a] -> Doc
+printPrefix f s _ [] 
+  | s == bottom_text = text $ bottom_text
+  | otherwise = text s
+printPrefix f s (i, j, k) [t]
+  | s == not_text = parenIf (i < 1) $
+                    text s <+>
+                    f (1, j, k) t
+  | otherwise = parenIf (i == 0) $
+                text s <+>
+                f (0, j, k) t
+printPrefix f s (i, j, k) ts =
+  parenIf (i == 0) $
+  text s <+>
+  foldl (\r t -> r <+> f (0,j,k) t) empty ts
+  
 -- Pretty-printer de la prueba.
 printProof :: Int -> IS.IntSet -> FOperations -> FTypeContext -> [SubProof] -> Doc
 printProof tp cn op ftc sb =

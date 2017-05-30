@@ -189,27 +189,33 @@ abstraction = do char '\\'
                      return $ EUnpack v1 v2 e1 e2
 
 -- Parser de una definición.
--- TERMINAR
 definition :: Parser (String, BodyDef)
-definition = do name <- validIdent1
-                (n, xs) <- opArgs0 validIdent1
-                symbol "="
-                t <- typeTerm
-                symbol "."
-                return  (name, Type (t, n, reverse xs, False))
+definition = do x <- validIdent1
+                (do symbol "="
+                    ap <- apps
+                    symbol "."
+                    return (x, Ambiguous ap)
+                 <|> do (n, xs) <- opArgs0 validIdent1
+                        symbol "="
+                        t <- typeTerm
+                        symbol "."
+                        return (x, Type (t, n, reverse xs, False))
+                 <|> do symbol "="
+                        lt <- lambTerm
+                        symbol "."
+                        return (x, LTerm lt)
+                 <|> do y <- validIdent3
+                        z <- validIdent1
+                        symbol "="
+                        t <- typeTerm
+                        symbol "."
+                        return (y, Type (t, 2, [z, x], True)))
              <|> do name <- validIdent3
                     (n, xs) <- opArgs1 validIdent1
                     symbol "="
                     t <- typeTerm
                     symbol "."
                     return (name, Type (t, n, reverse xs, False))
-             <|> do a <- validIdent1
-                    name <- validIdent3
-                    b <- validIdent1
-                    symbol "="
-                    t <- typeTerm
-                    symbol "."
-                    return (name, Type (t, 2, [b, a], True))
 
 
 -- Parser de las tácticas.
@@ -331,7 +337,7 @@ basicInfixParser = unit4
 
 --------------------------------------------------------------------------------------
 
--- Función auxiliar de exactP
+-- Parser para aplicaciones "ambiguas".
 apps :: Parser (GenTree String)
 apps = do par <- parcialApp
           xs <- apps'

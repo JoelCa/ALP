@@ -43,15 +43,7 @@ renamedType3 bs ftc op = let op' = foldr (\(x,_,_,_) xs -> x : xs) [] op
 typeWithoutName :: [String] -> [String] -> [String] -> [String] -> FOperations
                 -> Type -> Either ProofExceptions (Type, TType)
 typeWithoutName rs bs fs _ op (B x) =
-  case x `elemIndex` bs of
-    Just n -> return (B $ rs !! n, TBound n)
-    Nothing -> case getElemIndex (\(w,_,_,_) -> w == x) op of
-                 Just (n, (_, _, args, _)) -> if args == 0
-                                              then return (RenameTy x 0 [], RenameTTy n [])
-                                              else throw $ OpE1 x
-                 Nothing -> if elem x fs
-                            then return (B x, TFree x)
-                            else throw $ TypeE x
+  getVarType (\_ zs m -> zs !! m) rs bs fs op x
 typeWithoutName rs bs fs ofs op (ForAll x t) =
   do let v = getRename x ofs rs
      (tt,tt') <- typeWithoutName (v:rs) (x:bs) ofs fs op t
@@ -65,20 +57,7 @@ typeWithoutName rs bs fs ofs op (Fun t1 t2) =
      (tt2, tt2') <- typeWithoutName rs bs fs ofs op t2
      return (Fun tt1 tt2, TFun tt1' tt2')
 typeWithoutName rs bs fs ofs op (RenameTy s args ts) =
-  case find (\(x,_,_) -> x == s) notFoldeableOps of
-    Just (_,n,args') ->
-      if args' == args
-      then do rs <- sequence $ map (typeWithoutName rs bs fs ofs op) ts
-              let (tt, tt') = unzip rs
-              return (RenameTy s args tt, RenameTTy n tt')
-      else throw $ OpE1 s
-    Nothing ->
-      do (m, (_,_,args',_)) <- maybeToEither (OpE2 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
-         if args' == args
-           then do rs <- sequence $ map (typeWithoutName rs bs fs ofs op) ts
-                   let (tt, tt') = unzip rs
-                   return (RenameTy s args tt, RenameTTy m tt')
-           else throw $ OpE1 s
+  getOpType op s args ts $ typeWithoutName rs bs fs ofs op
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Trasformadores de lambda términos: Se pasa de un lambda término con nombre, al equivalente sin nombre.
@@ -101,15 +80,10 @@ withoutName op fs bs = let bs' = foldr (\(_,x) xs -> x : xs) [] bs
 
 withoutName' :: [String] -> [String] -> [String] -> [String] -> FTypeContext -> [String] -> FOperations -> (IntSet, Int)
              -> LamTerm -> Either ProofExceptions (LamTerm, Term)
-withoutName' ters tebs _ _ _ _ _ (cn, n) w@(LVar x) =
+withoutName' ters tebs _ _ _ _ _ cnn w@(LVar x) =
   case elemIndex x tebs of
     Just m -> return (LVar $ ters !! m, Bound m)
-    Nothing -> let r = case getHypothesisValue x of
-                         Just h -> case getHypoPosition cn n h of
-                                     Just i -> Bound i
-                                     _ -> Free $ Global x       --Probable teorema
-                         Nothing -> Free $ Global x
-               in return (w, r)
+    Nothing -> return (w, getTermVar x cnn)
 withoutName' ters tebs tyrs tybs fs ofs op cnn (Abs x t e) =
   do let h = getRename x [] ters
      t' <- typeWithoutName tyrs tybs fs ofs op t
@@ -148,55 +122,76 @@ withoutName' ters tebs tyrs tybs fs ofs op cnn (As e t) =
 
 -- Convierte a una aplicacion ambigua en una aplicación de tipos, o en una aplicación de lambda términos.
 disambiguatedTerm :: BTypeContext -> FTypeContext ->  FOperations
-                  -> (IntSet, Int) -> GenTree String -> Maybe (Either (Type, TType) (LamTerm, Term))
+                  -> (IntSet, Int) -> GenTree String -> Either ProofExceptions (Either (Type, TType) (LamTerm, Term))
 disambiguatedTerm btc ftc op cnn t =
   case disambiguatedType btc ftc op t of
-    Just ty -> return $ Left ty
-    Nothing -> case disambiguatedLTerm cnn t of
-                 Just te -> return $ Right te
-                 Nothing -> Nothing
+    Left (TypeE _) -> return $ Right $ disambiguatedLTerm cnn t
+    Left e -> throw e
+    Right ty -> return $ Left ty
+    
 
-disambiguatedType :: BTypeContext -> FTypeContext ->  FOperations
-                  -> GenTree String -> Maybe (Type, TType)
-disambiguatedType btc ftc op (Node x []) =
-  case V.findIndex (\(_,w) -> x == w) btc of
-    Just n -> return (B x, TBound n)
+disambiguatedType :: BTypeContext -> FTypeContext -> FOperations
+                  -> GenTree String -> Either ProofExceptions (Type, TType)
+disambiguatedType bs = disambiguatedType' (foldr (\(_,x) xs -> x : xs) [] bs)
+
+
+disambiguatedType' :: [String] -> [String] -> FOperations
+                   -> GenTree String -> Either ProofExceptions (Type, TType)
+disambiguatedType' bs fs op (Node x []) =
+  getVarType (\w _ _ -> w) [] bs fs op x
+disambiguatedType' bs fs op (Node x xs) =
+  getOpType op x (length xs) xs $ disambiguatedType' bs fs op
+
+
+getVarType :: (String -> [String] -> Int -> String) -> [String] -> [String] -> [String] -> FOperations -> String
+           -> Either ProofExceptions (Type, TType)
+getVarType f rs bs fs op x =
+  case x `elemIndex` bs of
+    Just n -> return (B $ f x rs n, TBound n)
     Nothing -> case getElemIndex (\(w,_,_,_) -> w == x) op of
                  Just (n, (_, _, args, _)) -> if args == 0
                                               then return (RenameTy x 0 [], RenameTTy n [])
-                                              else Nothing
-                 Nothing -> if elem x ftc
+                                              else throw $ OpE1 x
+                 Nothing -> if elem x fs
                             then return (B x, TFree x)
-                            else Nothing
-disambiguatedType btc ftc op (Node x xs) =
-  case find (\(w,_,_) -> x == w) notFoldeableOps of
+                            else throw $ TypeE x
+
+getOpType :: FOperations -> String -> Int -> [a]
+          -> (a -> Either ProofExceptions (Type, TType))
+          -> Either ProofExceptions (Type, TType)
+getOpType op s args ts f =
+  case find (\(x,_,_) -> x == s) notFoldeableOps of
     Just (_,n,args') ->
       if args' == args
-      then do rs <- sequence $ map (disambiguatedType btc ftc op) xs
+      then do rs <- sequence $ map f ts
               let (tt, tt') = unzip rs
-              return (RenameTy x args tt, RenameTTy n tt')
-      else Nothing
+              return (RenameTy s args tt, RenameTTy n tt')
+      else throw $ OpE1 s
     Nothing ->
-      do (m, (_,_,args',_)) <- getElemIndex (\(w,_,_,_) -> w == x) op
+      do (m, (_,_,args',_)) <- maybeToEither (OpE2 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
          if args' == args
-           then do rs <- sequence $ map (disambiguatedType btc ftc op) xs
+           then do rs <- sequence $ map f ts
                    let (tt, tt') = unzip rs
-                   return (RenameTy x args tt, RenameTTy m tt')
-           else Nothing
-  where args = length xs
+                   return (RenameTy s args tt, RenameTTy m tt')
+           else throw $ OpE1 s
+
+
+getTermVar :: String -> (IntSet, Int) -> Term
+getTermVar x (cn, n) =
+  case getHypothesisValue x of
+    Just h -> case getHypoPosition cn n h of
+                Just i -> Bound i
+                _ -> Free $ Global x       --Probable teorema
+    Nothing -> Free $ Global x
+
 
 -- Convierte una aplicacion en una aplicación de lambda términos, si es posible.
-disambiguatedLTerm :: (IntSet, Int) -> GenTree String -> Maybe (LamTerm, Term)
+disambiguatedLTerm :: (IntSet, Int) -> GenTree String -> (LamTerm, Term)
 disambiguatedLTerm cnn@(cn,n) (Node x xs) =
-  let y = case getHypothesisValue x of
-            Just h -> case getHypoPosition cn n h of
-                        Just i -> Bound i
-                        _ -> Free $ Global x
-            Nothing -> Free $ Global x
-  in foldl (\r node ->
-               do (t,t') <- disambiguatedLTerm cnn node
-                  (tt,tt') <- r
-                  return (App tt t, tt' :@: t')
-           )
-     (return (LVar x, y)) xs
-disambiguatedLTerm _ Nil = Nothing
+  foldl (\r node ->
+            let (t,t') = disambiguatedLTerm cnn node
+                (tt,tt') = r
+            in (App tt t, tt' :@: t')
+        )
+  (LVar x, getTermVar x cnn) xs
+disambiguatedLTerm _ Nil = error "error: disambiguatedLTerm, no debería pasar."

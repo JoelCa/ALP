@@ -101,7 +101,7 @@ habitar (Exact (Appl aps)) =
      ftc <- getFTypeContext
      n <- getTTermVars
      cn <- getConflictNames
-     t <- maybeToProof ExactE3 $ disambiguatedTerm btc ftc op (cn,n) aps
+     t <- eitherToProof $ disambiguatedTerm btc ftc op (cn,n) aps
      case t of
        Right te -> exactTerm te
        Left ty -> exactType ty

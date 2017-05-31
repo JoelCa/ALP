@@ -130,7 +130,7 @@ data ProofExceptions = PNotFinished | PNotStarted | ExistE String
                      | ElimE1 | CommandInvalid | TypeRepeated String
                      | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 Type
                      | ExactE2 Type | ExactE3 | PSE | EmptyType | TypeE String
-                     | InferE LamTerm InferExceptions | DefE1 String | DefE2 | UnfoldE1 String
+                     | InferE LamTerm InferExceptions | DefE String | UnfoldE1 String
                      deriving (Show, Typeable)
 
 data InferExceptions = InferE1 String | InferE2 LamTerm Type

@@ -84,7 +84,7 @@ checkCommand (Ty name ty) =
      (tyr,tty) <- returnInput $ renamedType (fTypeContext glo) (opers glo) ty
      outputStrLn $ show (tyr,tty) ++ "\n"
      let p = newProof glo name ty tyr tty
-     lift $ put $ s {proof=Just p}
+     lift $ put $ s { proof = Just p }
      outputStrLn $ renderProof $ constr p
      prover                          
 checkCommand (Types ps) =
@@ -102,32 +102,18 @@ checkCommand (Types ps) =
      when (isJust tr2) (throwIO $ ExistE $ fromJust tr2)
      lift $ put $ s {global = (global s) {teorems=teorems $ global s, fTypeContext=ps++gps}}
      prover
-checkCommand (Definition name (Ambiguous ap)) =
-  do s <- lift get
-     let glo = global s
-     case disambiguatedTerm V.empty (fTypeContext glo) (opers glo) (conflict glo, 0) ap of
-       Just (Left ty) -> undefined
-       Just (Right te) -> undefined
-       Nothing -> throwIO $ DefE2
-checkCommand (Definition name (Type (body, n, args, isInfix))) =
+checkCommand (Definition name body) =
   do s <- lift get
      let glo = global s
      when ( (V.any (\(x,_,_,_)-> x == name) $ opers glo)
             || (any (\(x,_,_) -> x == name) notFoldeableOps)
           )
-       (throwIO $ DefE1 name)
+       (throwIO $ DefE name)
      when ( (elem name $ fTypeContext glo)
             || (Map.member name $ teorems $ glo)
           )
        (throwIO $ ExistE name)
-     t <- returnInput $ renamedType3 args (fTypeContext glo) (opers glo) body
-     outputStrLn $ show t ++ "\n"
-     case (n, isInfix) of
-       (2, True) ->
-         lift $ put $ s { global = glo { opers = V.snoc (opers glo) (name, t, n, isInfix) }
-                        , infixParser =  PP $ usrInfixParser name $ runParser $ infixParser s }
-       _ ->
-         lift $ put $ s { global = glo { opers = V.snoc (opers glo) (name, t, n, isInfix) } }
+     defCommand name body
      prover
 checkCommand (Ta (Print x)) =
   do s <- lift get
@@ -162,6 +148,49 @@ checkCommand (Ta ta) =
              >> reloadProver)
        else outputStrLn $ renderProof p
      prover
+
+-- Define el término dado por el 2º argumento.
+defCommand :: String -> BodyDef -> ProverInputState ()
+defCommand name (Type (body, n, args, isInfix)) =
+  do s <- lift get
+     let glo = global s   
+     t <- returnInput $ renamedType3 args (fTypeContext glo) (opers glo) body
+     outputStrLn $ render $ printType (opers glo) $ fst t
+     typeDefinition name t n isInfix
+defCommand name (LTerm body) =
+  do s <- lift get
+     let glo = global s
+     te  <- returnInput $ withoutName (opers glo) (fTypeContext glo) (V.empty) (IS.empty, 0) body
+     outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers glo) $ fst te)
+     lamTermDefinition name te
+defCommand name (Ambiguous ap) =
+  do s <- lift get
+     let glo = global s
+     t <- returnInput $ disambiguatedTerm V.empty (fTypeContext glo) (opers glo) (conflict glo, 0) ap
+     case t of
+       Left ty ->
+         do outputStrLn $ render $ printType (opers glo) $ fst ty
+            typeDefinition name ty 0 False
+       Right te ->
+         do outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers glo) $ fst te)
+            lamTermDefinition name te
+
+
+typeDefinition :: String -> (Type, TType) -> Int -> Bool -> ProverInputState ()
+typeDefinition name t n isInfix =
+  do lift $ modify $
+       \s ->  s { global = (global s) { opers = V.snoc (opers $ global s) (name, t, n, isInfix) }}
+     when isInfix $ lift $ modify $
+       \s' -> s' {infixParser =  PP $ usrInfixParser name $ runParser $ infixParser s' }
+
+lamTermDefinition :: String -> (LamTerm, Term) -> ProverInputState ()
+lamTermDefinition name te =
+  do s <- lift get
+     let glo = global s
+     ty <- returnInput $ inferType 0 V.empty (teorems glo) (opers glo) te
+     lift $ put $ s { global = glo { teorems = Map.insert name (snd te ::: ty) $ teorems $ glo
+                                   , conflict = checkNameConflict name $ conflict $ glo } }
+
 
 -- Funciones auxiliares del comando "Props/Types".
 typeRepeated :: [String] -> (String -> Bool) -> (Maybe String, Maybe String)
@@ -212,13 +241,12 @@ resetProof = do s <- lift get
 reloadProver :: ProverInputState ()
 reloadProver = do s <- lift get
                   let p = fromJust $ proof s
-                  lift $ put $ s { global= (global s)
-                                           { teorems = Map.insert (name p)
-                                                       (getTermFromProof (constr p) (types p))
-                                                       (teorems $ global s)
-                                           , conflict = checkNameConflict (name p) (conflict $ global s) }
-                                 , proof = Nothing
-                                 }
+                  lift $ put $ s { global = (global s)
+                                            { teorems = Map.insert (name p)
+                                                        (getTermFromProof (constr p) (types p))
+                                                        (teorems $ global s)
+                                            , conflict = checkNameConflict (name p) (conflict $ global s) }
+                                 , proof = Nothing }
 
 checkNameConflict :: String -> IS.IntSet -> IS.IntSet
 checkNameConflict s c = case getHypothesisValue s of

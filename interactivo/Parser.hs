@@ -11,40 +11,17 @@ reservedWords = ["Theorem", "Definition", "forall", "False", "exists", "let", "i
 reservedSymbols = [':', '.', '[', ']','{','}','(',')']
 reservedWords2 = ["=", "\\", "->", and_text, or_text, bottom_text, not_text, iff_text]
 
--- Identificadores alfa-numéricos (incluido el guión bajo), exceptuando las palabras reservados.
-validIdent1 :: Parser String
-validIdent1 = vIdent1 reservedWords
-
--- Cualquier cadena de simbolos sin espacios ni simbolos reservados.
--- Tampoco puede ser una palabra reservada.
-validIdent2 :: Parser String
-validIdent2 = vIdent2 reservedSymbols reservedWords
-
-validIdent3 :: Parser String
-validIdent3 = vIdent2 reservedSymbols (reservedWords ++ reservedWords2)
-
--- Cualquier cadena de simbolos sin espacios ni simbolos reservados.
-validSymbol :: Parser String
-validSymbol = vSymbol reservedSymbols
-
-opArgs0 :: Parser a -> Parser (Int, [a])
-opArgs0 p = do x <- p
-               (n, xs) <- opArgs0 p
-               return (n+1, x:xs)
-            <|> return (0, [])
-
-opArgs1 :: Parser a -> Parser (Int, [a])
-opArgs1 p = do x <- p
-               (do (n, xs) <- opArgs1 p
-                   return (n+1, x:xs)
-                <|> return (1, [x]))
-
-
+-- Realiza el parseo.
+-- Argumentos:
+-- 1. La string a parsear.
+-- 2. El parser de las operaciones definidas por el usuario.
 getCommand :: String -> UsrOpsParsers -> ProofCommand
 getCommand s op = case parse exprTy s op of
                     [(x,[],_)] -> return x
                     _ -> throw SyntaxE
 
+--------------------------------------------------------------------------------------
+-- Parser de los comandos.
 exprTy :: Parser Command
 exprTy = do symbol "Theorem"
             name <- validIdent1
@@ -54,40 +31,21 @@ exprTy = do symbol "Theorem"
             return $ Ty name t
          <|> do symbol "Props" <|> symbol "Types"
                 ps <- sepBy (validIdent1) space
-                char '.'
+                symbol "."
                 return $ Types ps
-         <|> do tac <- termTac
+         <|> do tac <- tactic
                 return $ Ta tac
          <|> do (name, def) <- definition
                 return $ Definition name def
-         
+
+--------------------------------------------------------------------------------------
 -- Parser de los tipos (o fórmulas lógicas).
 typeTerm :: Parser Type
-typeTerm = do u <- unit1                                   -- OBS: los unit primados DEBEN ir antes que unit1,
-              (do symbol iff_text                          -- pues unit1 NO falla cuando no puede parsear más.
+typeTerm = do u <- unit1
+              (do symbol iff_text
                   t <- typeTerm
                   return $ RenameTy iff_text 2 [u, t]
                <|> return u)
-
-infixP :: String -> (Type -> Type -> Type)
-       -> Parser Type -> Parser Type
-infixP s c p = do u <- p
-                  (do symbol s
-                      t <- infixP s c p
-                      return $ c u t
-                   <|> return u)
-
-quantifiers :: Parser Type
-quantifiers = do symbol "forall"
-                 v <- validIdent1
-                 symbol ","
-                 t <- typeTerm
-                 return $ ForAll v t
-              <|> do symbol "exists"
-                     v <- validIdent1
-                     symbol ","
-                     t <- typeTerm
-                     return $ Exists v t
   
 unit1 :: Parser Type
 unit1 = infixP "->" Fun unit2
@@ -116,21 +74,36 @@ unit5 = parens typeTerm
         <|> do v <- validIdent1
                return $ B v
 
+quantifiers :: Parser Type
+quantifiers = do symbol "forall"
+                 v <- validIdent1
+                 symbol ","
+                 t <- typeTerm
+                 return $ ForAll v t
+              <|> do symbol "exists"
+                     v <- validIdent1
+                     symbol ","
+                     t <- typeTerm
+                     return $ Exists v t
+
 prefixOps :: Parser Type
-prefixOps = do op <- parcialOp
-               (n, xs) <- opArgs1 unit5
-               return $ addArgs op n xs
+prefixOps = applications (\_ -> opArgs1 unit5) (validIdent1 <|> validIdent3) B addArgs
 
-parcialOp :: Parser Type
-parcialOp = do v <- validIdent1 <|> validIdent3
-               return $ B v
-            <|> parens prefixOps
+-- prefixOps :: Parser Type
+-- prefixOps = do op <- parcialOp
+--                (n, xs) <- opArgs1 unit5
+--                return $ addArgs op n xs
 
-addArgs :: Type -> Int -> [Type] -> Type
-addArgs (B op) n xs = RenameTy op n xs
-addArgs (RenameTy op m ys) n xs = RenameTy op (m + n) (ys ++ xs)
+-- parcialOp :: Parser Type
+-- parcialOp = do v <- validIdent1 <|> validIdent3
+--                return $ B v
+--             <|> parens prefixOps
 
+addArgs :: Type -> (Int, [Type]) -> Type
+addArgs (B op) (n,xs) = RenameTy op n xs
+addArgs (RenameTy op m ys) (n,xs) = RenameTy op (m + n) (ys ++ xs)
 
+--------------------------------------------------------------------------------------
 -- Parser del lambda término con nombre.
 lambTerm :: Parser LamTerm
 lambTerm = abstraction
@@ -188,39 +161,10 @@ abstraction = do char '\\'
                      e2 <- lambTerm
                      return $ EUnpack v1 v2 e1 e2
 
--- Parser de una definición.
-definition :: Parser (String, BodyDef)
-definition = do x <- validIdent1
-                (do symbol "="
-                    ap <- apps
-                    symbol "."
-                    return (x, Ambiguous ap)
-                 <|> do (n, xs) <- opArgs0 validIdent1
-                        symbol "="
-                        t <- typeTerm
-                        symbol "."
-                        return (x, Type (t, n, reverse xs, False))
-                 <|> do symbol "="
-                        lt <- lambTerm
-                        symbol "."
-                        return (x, LTerm lt)
-                 <|> do y <- validIdent3
-                        z <- validIdent1
-                        symbol "="
-                        t <- typeTerm
-                        symbol "."
-                        return (y, Type (t, 2, [z, x], True)))
-             <|> do name <- validIdent3
-                    (n, xs) <- opArgs1 validIdent1
-                    symbol "="
-                    t <- typeTerm
-                    symbol "."
-                    return (name, Type (t, n, reverse xs, False))
-
-
+--------------------------------------------------------------------------------------
 -- Parser de las tácticas.
-termTac :: Parser Tactic
-termTac = assumptionP
+tactic :: Parser Tactic
+tactic = assumptionP
           <|> applyP
           <|> elimP
           <|> introP
@@ -235,7 +179,6 @@ termTac = assumptionP
           <|> unfoldP
           <|> absurdP
           <|> cutP
-
 
 assumptionP :: Parser Tactic
 assumptionP = tacticZeroArg "assumption" Assumption
@@ -289,15 +232,149 @@ unfoldP = do symbol "unfold"
 
 exactP :: Parser Tactic
 exactP = do symbol "exact"
-            r <- do xs <- apps <|> parens apps
+            r <- do xs <- ambiguousApp <|> parens ambiguousApp
                     return $ Appl xs
                  <|> do te <- lambTerm
                         return $ LamT te
                  <|> do ty <- typeTerm
                         return $ T ty
-            char '.'
+            symbol "."
             return $ Exact r
 
+--------------------------------------------------------------------------------------
+-- Parser de una definición.
+definition :: Parser (String, BodyDef)
+definition = do x <- validIdent1
+                (do symbol "="
+                    ap <- ambiguousApp
+                    symbol "."
+                    return (x, Ambiguous ap)
+                 <|> do (n, xs) <- opArgs0 validIdent1
+                        symbol "="
+                        t <- typeTerm
+                        symbol "."
+                        return (x, Type (t, n, reverse xs, False))
+                 <|> do symbol "="
+                        lt <- lambTerm
+                        symbol "."
+                        return (x, LTerm lt)
+                 <|> do y <- validIdent3
+                        z <- validIdent1
+                        symbol "="
+                        t <- typeTerm
+                        symbol "."
+                        return (y, Type (t, 2, [z, x], True)))
+             <|> do name <- validIdent3
+                    (n, xs) <- opArgs1 validIdent1
+                    symbol "="
+                    t <- typeTerm
+                    symbol "."
+                    return (name, Type (t, n, reverse xs, False))
+
+
+--------------------------------------------------------------------------------------
+-- Parser de aplicaciones (genérico).
+applications :: (Parser a -> Parser b) -> Parser u -> (u -> a) -> (a -> b -> a) -> Parser a
+applications args unit c appendApp =
+  do par <- app
+     x <- args app
+     return $ appendApp par x
+     where
+       app =
+         do v <- unit
+            return $ c v
+         <|> (parens $ applications args unit c appendApp)
+
+
+--------------------------------------------------------------------------------------
+-- Parser de aplicaciones "ambiguas".                            
+ambiguousApp :: Parser (GenTree String)
+ambiguousApp = applications ambiguousArgs validIdent1 (\x -> Node x []) appendApp
+  
+-- apps :: Parser (GenTree String)
+-- apps = do par <- parcialApp
+--           xs <- apps'
+--           return $ appendApp par xs
+
+-- parcialApp :: Parser (GenTree String)
+-- parcialApp = do v <- validIdent1
+--                 return $ Node v []
+--              <|> parens apps
+
+appendApp :: (GenTree String) -> [GenTree String] -> (GenTree String)
+appendApp (Node x xs) ys = Node x (xs ++ ys)
+
+ambiguousArgs :: Parser (GenTree String) -> Parser [GenTree String]
+ambiguousArgs p = do a <- p
+                     as <- ambiguousArgs p
+                     return $ a : as
+                  <|> return []
+
+--------------------------------------------------------------------------------------
+-- Parser del nombre de una hipótesis.
+getHypothesisValue :: String -> Maybe Int
+getHypothesisValue s = case parse (char 'H' >> nat) s [] of
+                         [(x,[],_)] -> return x
+                         _ -> Nothing
+
+--------------------------------------------------------------------------------------
+-- Construcción del parser de las operaciones del usuario.
+
+-- Genera el parser de la operaciones infijas definidas por el usuario.
+-- Argumentos:
+-- 1º La nueva operación infija.
+-- 2º El parser de operaciones infijas (con más precedencia),
+usrInfixParser :: String -> Parser Type -> Parser Type
+usrInfixParser s p = infixP s (\x y -> RenameTy s 2 [x, y]) p
+
+basicInfixParser :: Parser Type
+basicInfixParser = unit4
+
+--------------------------------------------------------------------------------------
+-- Funciones auxiliares.
+
+-- Parser de identificadores.
+-- Identificadores alfa-numéricos (incluido el guión bajo), exceptuando las palabras reservados.
+validIdent1 :: Parser String
+validIdent1 = vIdent1 reservedWords
+
+-- Cualquier cadena de simbolos sin espacios ni simbolos reservados.
+-- Tampoco puede ser una palabra reservada.
+validIdent2 :: Parser String
+validIdent2 = vIdent2 reservedSymbols reservedWords
+
+validIdent3 :: Parser String
+validIdent3 = vIdent2 reservedSymbols (reservedWords ++ reservedWords2)
+
+-- Cualquier cadena de simbolos sin espacios ni simbolos reservados.
+validSymbol :: Parser String
+validSymbol = vSymbol reservedSymbols
+
+-- Parser de los argumentos de una operación.
+-- Cero, o más argumentos.
+opArgs0 :: Parser a -> Parser (Int, [a])
+opArgs0 p = do x <- p
+               (n, xs) <- opArgs0 p
+               return (n+1, x:xs)
+            <|> return (0, [])
+
+-- Uno, o más argumentos.
+opArgs1 :: Parser a -> Parser (Int, [a])
+opArgs1 p = do x <- p
+               (do (n, xs) <- opArgs1 p
+                   return (n+1, x:xs)
+                <|> return (1, [x]))
+
+-- Añade el parser de una operación infija.
+infixP :: String -> (Type -> Type -> Type)
+       -> Parser Type -> Parser Type
+infixP s c p = do u <- p
+                  (do symbol s
+                      t <- infixP s c p
+                      return $ c u t
+                   <|> return u)
+
+-- Funciones auxiliares para el parser de las tácticas.
 tacticZeroArg :: String -> Tactic -> Parser Tactic
 tacticZeroArg s tac = do symbol s
                          char '.'
@@ -317,42 +394,3 @@ tacticTypeArg = tacticOneArg typeTerm
 
 tacticIndexArg :: String -> (Int -> Tactic) -> Parser Tactic
 tacticIndexArg = tacticOneArg (char 'H' >> nat)
-
-getHypothesisValue :: String -> Maybe Int
-getHypothesisValue s = case parse (char 'H' >> nat) s [] of
-                         [(x,[],_)] -> return x
-                         _ -> Nothing
-
---------------------------------------------------------------------------------------
-
--- Genera el parser de la operaciones infijas definidas por el usuario.
--- Argumentos:
--- 1º La nueva operación infija.
--- 2º El parser de operaciones infijas (con más precedencia),
-usrInfixParser :: String -> Parser Type -> Parser Type
-usrInfixParser s p = infixP s (\x y -> RenameTy s 2 [x, y]) p
-
-basicInfixParser :: Parser Type
-basicInfixParser = unit4
-
---------------------------------------------------------------------------------------
-
--- Parser para aplicaciones "ambiguas".
-apps :: Parser (GenTree String)
-apps = do par <- parcialApp
-          xs <- apps'
-          return $ appendApp par xs
-
-appendApp :: (GenTree String) -> [GenTree String] -> (GenTree String)
-appendApp (Node x xs) ys = Node x (xs ++ ys)
-
-parcialApp :: Parser (GenTree String)
-parcialApp = do v <- validIdent1
-                return $ Node v []
-             <|> parens apps
-
-apps' :: Parser [GenTree String]
-apps' = do a <- parcialApp
-           as <- apps'
-           return $ a : as
-        <|> return []

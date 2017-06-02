@@ -121,8 +121,8 @@ withoutName' ters tebs tyrs tybs fs ofs op cnn (As e t) =
 -- Transformadores para aplicaciones ambiguas.
 
 -- Convierte a una aplicacion ambigua en una aplicación de tipos, o en una aplicación de lambda términos.
-disambiguatedTerm :: BTypeContext -> FTypeContext ->  FOperations
-                  -> (IntSet, Int) -> GenTree String -> Either ProofExceptions (Either (Type, TType) (LamTerm, Term))
+disambiguatedTerm :: BTypeContext -> FTypeContext ->  FOperations -> (IntSet, Int)
+                  -> GenTree String -> Either ProofExceptions (Either (Type, TType) (LamTerm, Term))
 disambiguatedTerm btc ftc op cnn t =
   case disambiguatedType btc ftc op t of
     Left (TypeE _) -> return $ Right $ disambiguatedLTerm cnn t
@@ -143,8 +143,8 @@ disambiguatedType' bs fs op (Node x xs) =
   getOpType op x (length xs) xs $ disambiguatedType' bs fs op
 
 
-getVarType :: (String -> [String] -> Int -> String) -> [String] -> [String] -> [String] -> FOperations -> String
-           -> Either ProofExceptions (Type, TType)
+getVarType :: (String -> [String] -> Int -> String) -> [String] -> [String] -> [String]
+           -> FOperations -> String -> Either ProofExceptions (Type, TType)
 getVarType f rs bs fs op x =
   case x `elemIndex` bs of
     Just n -> return (B $ f x rs n, TBound n)
@@ -175,16 +175,6 @@ getOpType op s args ts f =
                    return (RenameTy s args tt, RenameTTy m tt')
            else throw $ OpE1 s
 
-
-getTermVar :: String -> (IntSet, Int) -> Term
-getTermVar x (cn, n) =
-  case getHypothesisValue x of
-    Just h -> case getHypoPosition cn n h of
-                Just i -> Bound i
-                _ -> Free $ Global x       --Probable teorema
-    Nothing -> Free $ Global x
-
-
 -- Convierte una aplicacion en una aplicación de lambda términos, si es posible.
 disambiguatedLTerm :: (IntSet, Int) -> GenTree String -> (LamTerm, Term)
 disambiguatedLTerm cnn@(cn,n) (Node x xs) =
@@ -195,3 +185,11 @@ disambiguatedLTerm cnn@(cn,n) (Node x xs) =
         )
   (LVar x, getTermVar x cnn) xs
 disambiguatedLTerm _ Nil = error "error: disambiguatedLTerm, no debería pasar."
+
+getTermVar :: String -> (IntSet, Int) -> Term
+getTermVar x (cn, n) =
+  case getHypothesisValue x of
+    Just h -> case getHypoPosition cn n h of
+                Just i -> Bound i
+                _ -> Free $ Global x       --Probable teorema
+    Nothing -> Free $ Global x

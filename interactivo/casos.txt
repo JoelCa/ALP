@@ -149,9 +149,17 @@ Para probar precedencia del "as".
 Para probar precedencia del "as".
 
 
+Definiciones:
+1. CBool = forall X. X -> X -> X.
+   CBool2 = forall X, X -> X -> X.
+   tru = (\X. \t:X. \f:X. t) as CBool.
+   tutu = (\X. \t:X. \f:X. f) as CBool2.
+   t1 = \f:CBool -> CBool -> CBool2. f tru tutu.
+
+
 Casos de inferencia ERROR:
 1. infer \B. let {A,a} = {*B, \x:B.x} as exists C, C -> C in a.
 2. infer \a.\x:a.\a.\b.\y:a->b. y x.
 
-ARREGLAR:
+TERMINAR de ver:
 Ver caso de CBool y CBool2, en test.f

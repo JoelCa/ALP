@@ -32,6 +32,47 @@ initialT' = [ ("intro_and", intro_and),
 
 initialT = Map.fromList initialT'
 
+-- Crea una prueba.
+newProof :: ProverGlobal -> String -> Type -> Type -> TType -> ProofState
+newProof pglobal name ty tyr tty =
+  let s = SP { termContext = V.empty
+             , bTypeContext = V.empty
+             , lsubp = 1
+             , tvars = length $ fTypeContext $ pglobal
+             , ty = [Just (tyr, tty)]
+             }
+      c = PConstruction { tsubp = 1
+                        , subps = [s]
+                        , cglobal = pglobal
+                        , term = [HoleT id]
+                        }
+  in PState { name = name
+            , types = (ty, tty)
+            , constr = c
+            }
+
+-- Aborta la prueba.
+resetProof :: ProverInputState ()
+resetProof = do s <- lift get
+                lift $ put $ s {proof = Nothing}
+                prover
+                
+-- Finaliza la prueba.
+reloadProver :: ProverInputState ()
+reloadProver = do s <- lift get
+                  let p = fromJust $ proof s
+                  lift $ put $ s { global = (global s)
+                                            { teorems = Map.insert (name p)
+                                                        (getTermFromProof (constr p) (types p))
+                                                        (teorems $ global s)
+                                            , conflict = checkNameConflict (name p) (conflict $ global s) }
+                                 , proof = Nothing }
+
+checkNameConflict :: String -> IS.IntSet -> IS.IntSet
+checkNameConflict s c = case getHypothesisValue s of
+                          Just n -> IS.insert n c
+                          Nothing -> c
+
 
 -- Estado inicial.
 initProverState :: ProverState
@@ -69,7 +110,7 @@ prover = do s <- lift get
                                >> prover)
 
 
--- Aplicación de los comandos.
+-- Tratamiento de los comandos.
 checkCommand :: Command -> ProverInputState ()
 checkCommand (Ty name ty) =
   do s <- lift get
@@ -131,9 +172,6 @@ checkCommand (Ta (Infer x)) =
      (ty,ty') <- returnInput $ inferType 0 V.empty (teorems $ global s) op (te,te')
      --outputStrLn $ "Renombramiento: " ++ (render $ printTerm (opers $ global s) te')
      outputStrLn $ render $ printType op ty
-     --outputStrLn $ show x ++ "\n"
-     --outputStrLn $ show te ++ "\n"
-     --outputStrLn $ render $ printTermTType (opers $ global s) te
      outputStrLn $ render $ printTType op ty'
      prover                            
 checkCommand (Ta ta) =
@@ -149,6 +187,7 @@ checkCommand (Ta ta) =
        else outputStrLn $ renderProof p
      prover
 
+-- Trata el comando de definición.
 -- Define el término dado por el 2º argumento.
 defCommand :: String -> BodyDef -> ProverInputState ()
 defCommand name (Type (body, n, args, isInfix)) =
@@ -175,7 +214,7 @@ defCommand name (Ambiguous ap) =
          do outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers glo) $ fst te)
             lamTermDefinition name te
 
-
+-- Función auxiliar de defCommand
 typeDefinition :: String -> (Type, TType) -> Int -> Bool -> ProverInputState ()
 typeDefinition name t n isInfix =
   do lift $ modify $
@@ -183,6 +222,7 @@ typeDefinition name t n isInfix =
      when isInfix $ lift $ modify $
        \s' -> s' {infixParser =  PP $ usrInfixParser name $ runParser $ infixParser s' }
 
+-- Función auxiliar de defCommand
 lamTermDefinition :: String -> (LamTerm, Term) -> ProverInputState ()
 lamTermDefinition name te =
   do s <- lift get
@@ -190,7 +230,6 @@ lamTermDefinition name te =
      ty <- returnInput $ inferType 0 V.empty (teorems glo) (opers glo) te
      lift $ put $ s { global = glo { teorems = Map.insert name (snd te ::: ty) $ teorems $ glo
                                    , conflict = checkNameConflict name $ conflict $ glo } }
-
 
 -- Funciones auxiliares del comando "Props/Types".
 typeRepeated :: [String] -> (String -> Bool) -> (Maybe String, Maybe String)
@@ -200,7 +239,7 @@ typeRepeated (p:ps) f
   | f p = (Nothing, return p)
   | otherwise = typeRepeated ps f
 
--- Funciones auxiliares:
+-- Funciones auxiliares.
 -- Chequea si la prueba a terminado.
 isFinalTerm :: ProofConstruction -> Bool
 isFinalTerm (PConstruction {term=[Term _]}) = True
@@ -210,48 +249,6 @@ isFinalTerm _ = False
 getTermFromProof :: ProofConstruction -> (Type, TType) -> Term
 getTermFromProof (PConstruction {term=[Term t]}) ty = t ::: ty
 getTermFromProof _ _ = error "getTermFromProof: no debería pasar"
-
-
--- Crea una prueba.
-newProof :: ProverGlobal -> String -> Type -> Type -> TType -> ProofState
-newProof pglobal name ty tyr tty =
-  let s = SP { termContext = V.empty
-             , bTypeContext = V.empty
-             , lsubp = 1
-             , tvars = length $ fTypeContext $ pglobal
-             , ty = [Just (tyr, tty)]
-             }
-      c = PConstruction { tsubp = 1
-                        , subps = [s]
-                        , cglobal = pglobal
-                        , term = [HoleT id]
-                        }
-  in PState { name = name
-            , types = (ty, tty)
-            , constr = c
-            }
-
--- Aborta la prueba.
-resetProof :: ProverInputState ()
-resetProof = do s <- lift get
-                lift $ put $ s {proof = Nothing}
-                prover
-                
--- Finaliza la prueba.
-reloadProver :: ProverInputState ()
-reloadProver = do s <- lift get
-                  let p = fromJust $ proof s
-                  lift $ put $ s { global = (global s)
-                                            { teorems = Map.insert (name p)
-                                                        (getTermFromProof (constr p) (types p))
-                                                        (teorems $ global s)
-                                            , conflict = checkNameConflict (name p) (conflict $ global s) }
-                                 , proof = Nothing }
-
-checkNameConflict :: String -> IS.IntSet -> IS.IntSet
-checkNameConflict s c = case getHypothesisValue s of
-                          Just n -> IS.insert n c
-                          Nothing -> c
                             
 
 -- Impresión del lambda término final.

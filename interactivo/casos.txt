@@ -1,6 +1,6 @@
 Casos probados:
 
-Props p q.
+Props p, q.
 
 Casos con existenciales:
 - Theorem t1: (forall x, x -> x) -> (exists x, x -> x) -> (exists w, w -> w).
@@ -131,6 +131,11 @@ Para chequear el renombre de variables ligadas.
 - Theorem t51: forall w, forall w, w -> w.
 Lo resuelvo con: intro; exact (\h.\x:h.x).
 Para probar el exact, y el inferidor.
+- (Props p, q.)
+  op x = forall q, x -> q.
+  Theorem t52: forall q, op q.
+Para chequear el renombramiento cuando se hace "unfold op".
+
 
 Casos de inferencia OK:
 1. infer \A. \B. \x:A. \y:False. let {B,x} = {*B, \B.\x:False. x} as exists A, forall Q, False -> False in (\C. x [False] y) [B].
@@ -150,7 +155,7 @@ Para probar precedencia del "as".
 
 
 Definiciones:
-1. CBool = forall X. X -> X -> X.
+1. CBool = forall X, X -> X -> X.
    CBool2 = forall X, X -> X -> X.
    tru = (\X. \t:X. \f:X. t) as CBool.
    tutu = (\X. \t:X. \f:X. f) as CBool2.
@@ -163,3 +168,6 @@ Casos de inferencia ERROR:
 
 TERMINAR de ver:
 Ver caso de CBool y CBool2, en test.f
+
+HACER:
+- Al menos los casos 1 y 7 de inferencias OK, DAN ERROR.

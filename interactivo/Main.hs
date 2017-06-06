@@ -220,7 +220,7 @@ typeDefinition name t n isInfix =
   do lift $ modify $
        \s ->  s { global = (global s) { opers = V.snoc (opers $ global s) (name, t, n, isInfix) }}
      when isInfix $ lift $ modify $
-       \s' -> s' {infixParser =  PP $ usrInfixParser name $ runParser $ infixParser s' }
+       \s' -> s' {infixParser =  PP $ usrInfixParser name $ getParser $ infixParser s' }
 
 -- Función auxiliar de defCommand
 lamTermDefinition :: String -> (LamTerm, Term) -> ProverInputState ()

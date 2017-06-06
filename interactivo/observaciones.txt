@@ -135,6 +135,9 @@ de teoremas.
 - Consideramos que en el lambda término ingresado por el usuario, los nombres de las variables de términos
 pueden coincidir con los teoremas. Es decir, que en este caso NO la renombramos.
 
+- Consideramos que ninguna definición (de tipo o de lambda término), puede ser recursiva.
+
+
 FALTA:
-- Hacer que los operadores prefijos asocien a izquierda.
+- Reveer el uso de Vector. Ver todos los "foldr".
 - Crea una estructura de tipos de términos, con y sin nombre.

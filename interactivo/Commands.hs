@@ -112,7 +112,7 @@ habitar (Unfold s Nothing) =
      (m, (_, (tt,tt'), _, _)) <- maybeToProof (UnfoldE1 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     replaceType $ unfoldComm (t,t') (tt,tt') m btc ftc
+     replaceType $ unfoldComm btc ftc m (t,t') (tt,tt')
 habitar (Unfold s (Just h)) =
   do op <- getUsrOpers
      (m, (_, (tt,tt'), _, _)) <- maybeToProof (UnfoldE1 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
@@ -123,7 +123,7 @@ habitar (Unfold s (Just h)) =
      let (x,y,t,t') = c V.! i
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     let (r,r') = unfoldComm (t,t') (tt,tt') m btc ftc
+     let (r,r') = unfoldComm btc ftc m (t,t') (tt,tt')
      updateTermContext i (x,y,r,r')
 habitar (Absurd ty) =
   do x <- getType
@@ -149,7 +149,7 @@ habitar (CExists ty) =
             btc <- getBTypeContext
             ftc <- getFTypeContext
             ty' <- eitherToProof $ renamedType2 btc ftc op ty
-            replaceType $ applyTypes 1 ftc btc (t,t') [ty']
+            replaceType $ applyTypes 1 ftc (foldr (\(_,x) xs -> x : xs) [] btc) (t,t') [ty']
             modifyTerm $ addHT (\x -> Pack ty' x tt)
        _ -> throw CommandInvalid
 habitar (Cut ty) =
@@ -351,27 +351,30 @@ exactTerm te =
 -- Comando UNFOLD
 
 -- Argumentos:
--- 1. Tipo (con y sin nombre) sobre el que se aplica el unfold.
--- 2. Tipo (con y sin nombre) que define al operador foldeado (sin los para todos).
+-- 1. Conjunto de variables de tipos ligadas.
+-- 2. Conjunto de variables de tipos libres.
 -- 3. Código de la operación a "unfoldear".
--- 4. Conjunto de variables de tipos ligadas.
--- 5. Conjunto de variables de tipos libres.
-unfoldComm :: (Type, TType) -> (Type, TType) -> Int -> BTypeContext -> FTypeContext -> (Type, TType)
-unfoldComm t@(B _, _) _ _ _ _ = t
-unfoldComm (RenameTy s l ts, RenameTTy m ts') body n btc ftc
-  | m == n = applyTypes l ftc btc body mapUnfoldComm
-  | otherwise = let (xs, ys) = unzip mapUnfoldComm
+-- 4. Tipo (con y sin nombre) sobre el que se aplica el unfold.
+-- 5. Tipo (con y sin nombre) que define al operador foldeado (sin los para todos).
+unfoldComm :: BTypeContext -> FTypeContext -> Int -> (Type, TType) -> (Type, TType) -> (Type, TType)
+unfoldComm bs = unfoldComm' (foldr (\(_,x) xs -> x : xs) [] bs)
+
+unfoldComm' :: [String] -> [String] -> Int -> (Type, TType) -> (Type, TType) -> (Type, TType)
+unfoldComm' _ _ _ t@(B _, _) _ = t
+unfoldComm' btc ftc code (RenameTy s l ts, RenameTTy m ts') body
+  | m == code = applyTypes l ftc btc body mapUnfoldComm'
+  | otherwise = let (xs, ys) = unzip mapUnfoldComm'
                 in (RenameTy s l xs, RenameTTy m ys)
-    where mapUnfoldComm = map (\x -> unfoldComm x body n btc ftc) $ zip ts ts'
-unfoldComm (Fun t t', TFun tt tt') body n btc ftc =
-  let (t1,t1') = unfoldComm (t,tt) body n btc ftc
-      (t2,t2') = unfoldComm (t',tt') body n btc ftc
+    where mapUnfoldComm' = map (\x -> unfoldComm' btc ftc code x body) $ zip ts ts'
+unfoldComm' btc ftc code (Fun t t', TFun tt tt') body =
+  let (t1,t1') = unfoldComm' btc ftc code (t,tt) body 
+      (t2,t2') = unfoldComm' btc ftc code (t',tt') body
   in (Fun t1 t2, TFun t1' t2')
-unfoldComm (ForAll v t, TForAll t') body n btc ftc =
-  let (t1, t1') = unfoldComm (t,t') body n btc ftc
+unfoldComm' btc ftc code (ForAll v t, TForAll t') body =
+  let (t1, t1') = unfoldComm' (v:btc) ftc code (t,t') body
   in (ForAll v t1, TForAll t1')
-unfoldComm (Exists v t, TExists t') body n btc ftc =
-  let (t1, t1') = unfoldComm (t,t') body n btc ftc
+unfoldComm' btc ftc code (Exists v t, TExists t') body =
+  let (t1, t1') = unfoldComm' (v:btc) ftc code (t,t') body
   in (Exists v t1, TExists t1')
 
 
@@ -388,9 +391,9 @@ unfoldComm (Exists v t, TExists t') body n btc ftc =
 -- 3. Conjunto de variables de tipo ligadas (con nombres), del contexto.
 -- 4. Tipo (con nombres y sin nombres), sobre el que se realiza la sust.
 -- 5. Tipos T1,..,Tn.
-applyTypes :: Int -> FTypeContext -> BTypeContext -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
+applyTypes :: Int -> [String] -> [String] -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
 applyTypes _ _ _ t [] = t
-applyTypes l fs bs t xs = applyTypes' 0 l fs [] (foldr (\(_,x) xs -> x : xs) [] bs) t xs
+applyTypes l fs bs t xs = applyTypes' 0 l fs bs bs t xs
 
 -- Realiza la sust. de tipos.
 -- 1. Profundidad ("para todos"), procesados.

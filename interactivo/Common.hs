@@ -12,13 +12,15 @@ import Control.Monad.State.Lazy
 import Parsing (ParserState)
 import Data.Vector (Vector, ifoldl)
 import Data.IntSet
+import Text.Megaparsec
+import Control.Monad.Reader (Reader)
 
+type UsrParser = ParserParser Type
 
-type Parser a = ParserState UsrOpsParsers a
+type Parser = ParsecT Dec String (Reader UsrParser)
 
-type UsrOpsParsers = ParserParser Type
+newtype ParserParser a = PP { getParser :: Parser a }
 
-newtype ParserParser a = PP { runParser :: Parser a }
 
   -- Nombres.
 data Name
@@ -124,7 +126,7 @@ data ExactB = LamT LamTerm
 
   -- Excepciones.
 data ProofExceptions = PNotFinished | PNotStarted | ExistE String
-                     | NotExistE String | SyntaxE | AssuE
+                     | NotExistE String | SyntaxE String | AssuE
                      | IntroE1 | ApplyE1 Type Type | HypoE Int
                      | Unif1 | Unif2 | Unif3 | Unif4
                      | ElimE1 | CommandInvalid | TypeRepeated String
@@ -194,7 +196,7 @@ type TypeDefinition = (Type, Operands, [String], Bool)
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState
                        , global :: ProverGlobal
-                       , infixParser :: UsrOpsParsers
+                       , infixParser :: UsrParser
                        }
 
   -- Definiciones globales.

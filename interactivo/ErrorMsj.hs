@@ -7,7 +7,7 @@ import Hypothesis (printHypothesis)
 
 -- Mensajes de error.
 errorMessage :: FOperations -> ProofExceptions -> String
-errorMessage _ SyntaxE = "error de sintaxis."
+errorMessage _ (SyntaxE e) = "error de sintaxis.\n" ++ e
 errorMessage _ PNotFinished = "error: prueba no terminada."
 errorMessage _ PNotStarted = "error: prueba no comenzada."
 errorMessage _ (ExistE s) = "error: \""++ s ++"\" ya existe."

@@ -148,7 +148,7 @@ Para chequear el pretty printer.
 Para chequear el pretty printer.
 7. infer \x:forall w, False -> w.\a.\b.{*forall a0, forall b0, forall c, c -> a0, \c.x [forall a0, forall b0, forall c0, c0 -> a0]} as exists x, forall c, False -> x.
 8. infer \p.{*p, \w.\x:p.x} as exists x, forall w, p -> x.
-9. infer (\A. \x:A. \y: A -> forall B, A. y as A -> forall W, A x as A [A]) as forall B, B -> (B -> forall C, B) -> B.
+9. infer (\A. \x:A. \y: A -> forall B, A. y as (A -> forall W, A) x as A [A]) as forall B, B -> (B -> forall C, B) -> B.
 Para probar precedencia del "as".
 10. infer (\A. \x:forall B, A. \y: A -> A. y as (A -> A) (x as (forall C, A) [A])) as forall B, (forall C, B) -> (B -> B) -> B.
 Para probar precedencia del "as".
@@ -168,6 +168,3 @@ Casos de inferencia ERROR:
 
 TERMINAR de ver:
 Ver caso de CBool y CBool2, en test.f
-
-HACER:
-- Al menos los casos 1 y 7 de inferencias OK, DAN ERROR.

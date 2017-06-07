@@ -415,11 +415,11 @@ Consideramos que todos los operadores binarios infijos asocian a derecha.
   El tipo $T$ lo calcula la función \texttt{applyTypes}. Para ello, realiza la sustitución $T_{2}[X:=U]$, más un renombramiento que respete la \textbf{Convención 1}.
   Ver Ejemplo 7, en los casos de inferencia OK.
   
-  \item El comando \texttt{exact} puede recibir un tipo cuando la unificación no puede precisar
-  una instancia de tipo.
-  Decidimos utilizar la palabra reservada $type$, para identificar que \texttt{exact} toma un tipo.
-  Si no hiciésemos esto, en ciertos casos no podríamos determinar si lo que recibe \texttt{exact} es un
-  tipo o un lambda término.
+%   \item El comando \texttt{exact} puede recibir un tipo cuando la unificación no puede precisar
+%   una instancia de tipo.
+%   Decidimos utilizar la palabra reservada $type$, para identificar que \texttt{exact} toma un tipo.
+%   Si no hiciésemos esto, en ciertos casos no podríamos determinar si lo que recibe \texttt{exact} es un
+%   tipo o un lambda término.
   
   \item Permitimos definir un teorema cuyo nombre sea el nombre de una hipótesis del contexto de
   su prueba. De todas formas, esto no sería un problema.
@@ -436,16 +436,20 @@ Consideramos que todos los operadores binarios infijos asocian a derecha.
   Además, $v.libres_{te} \cap v.libres_{ti} = \emptyset$, para desambiguar las aplicaciones de variables.
   
   También, consideramos para cada prueba, $hipótesis \cap teoremas = \emptyset$. De lo contrario, tendríamos conflictos de nombres.
+  
+  \item Cuando se incluye un tipo en un lambda término mediante el constructor $as$, se puede producir un error de parseo, si no se lo
+  incluye entre paréntesis. Por ejemplo, aplicaciones de variables de lambda términos documentadas mediante $as$, pueden entenderse
+  como un tipo. Ejemplo: $\lambda a.\lambda x:a. \lambda y:a \rightarrow a. y \; as \; a \rightarrow a \; x \; as \; a$,
+  es incorrecto. Lo correcto es: $\lambda a.\lambda x:a. \lambda y:a \rightarrow a. y \; as \; (a \rightarrow a) \; x \; as \; a$
+  
 
 \end{itemize}
 
 \section{Lo que falta}
 \begin{itemize}
-  \item Hacer el comando \texttt{infer} completo. Es decir, que funcione cuando en el lambda término aparecen operaciones foldeables.
-  Ver \texttt{Theorem t34}, \texttt{Theorem t35}, en \texttt{casos.txt}.
-  
-  \item NO usar el \textit{kind} \texttt{Prop}.
-  
+%   \item Hacer el comando \texttt{infer} completo. Es decir, que funcione cuando en el lambda término aparecen operaciones foldeables.
+%   Ver \texttt{Theorem t34}, \texttt{Theorem t35}, en \texttt{casos.txt}.
+%   
   \item Añadir constantes (creo que serían axiomas).
   
   \item Simplificar código.

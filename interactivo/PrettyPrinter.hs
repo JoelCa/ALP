@@ -211,7 +211,7 @@ printTerm' op (i,j) bs fs (t ::: (ty, _)) =
   parenIf (i == pAs) $
   printTerm' op (pAs, j) bs fs t <+>
   text "as" <+>
-  printType op ty
+  PP.parens (printType op ty)
 printTerm' _ _ _ [] (Lam _ _) =
   error "prinTerm': no hay nombres para elegir"
 
@@ -270,7 +270,7 @@ printLamTerm' op (i, j) (As t ty) =
   parenIf (i == pAs) $
   printLamTerm' op (pAs, j) t <+>
   text "as" <+>
-  printType op ty
+  PP.parens (printType op ty)
 
 
 -- Pretty-printer de tipos sin nombres.
@@ -310,7 +310,7 @@ printTType' op prec@(i,j,k) bs fs (RenameTTy n [t1,t2])
                         printTType' op (2, n, False) bs fs t2
                    else printPrefix (\x t -> printTType' op x bs fs t) s prec [t1,t2]
 printTType' op prec bs fs (RenameTTy n ts) =
-  printPrefix (\x t -> printTType' op x bs fs t) (fst4 $ op V.! n) prec ts
+  printPrefix (\x t -> printTType' op x bs fs t) (if n < 0 then getTextFromDefaultOp n else fst4 $ op V.! n) prec ts
 
 
 getTextFromDefaultOp :: Int -> String

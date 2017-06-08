@@ -10,7 +10,9 @@ import Control.Monad.Reader
 
 type ProofCommand = Either ProofExceptions Command
 
-reservedWords = ["Theorem", "Definition", "forall", "False", "exists", "let", "in", "as"]
+reservedWords = ["Propositions", "Types", "Theorem", "Print", "forall", "exists", "let", "in",
+                 "as", "False", "assumption", "intro", "intros", "split", "left",
+                 "right", "apply", "elim", "absurd", "cut", "unfold", "exact"]
 
 reservedSymbols = ["=", "~"]
 
@@ -37,12 +39,24 @@ braces2 p1 p2 = do symbol "{"
                    y <- p2
                    symbol "}"
                    return (x,y)
+                   
+comma :: Parser String
+comma = symbol ","
+
+colon :: Parser String
+colon = symbol ":"
+
+dot :: Parser String
+dot = symbol "."
+
+equal :: Parser String
+equal = symbol "="
 
 nat :: Parser Int
 nat = fromInteger <$> lexeme L.integer
 
 rword :: String -> Parser ()
-rword w = string w *> notFollowedBy alphaNumChar *> sc
+rword w = try $ string w *> notFollowedBy alphaNumChar *> sc
 
 identifier :: Parser String
 identifier = (lexeme . try) (p >>= check)
@@ -55,7 +69,7 @@ identifier = (lexeme . try) (p >>= check)
 symbolIdent :: Parser String
 symbolIdent = (lexeme . try) (p >>= check)
   where
-    p       = symbolChar *> many symbolChar
+    p       = (:) <$> symbolChar <*> many symbolChar
     check x = if x `elem` reservedSymbols
                 then fail $ "keyword " ++ show x ++ " cannot be an symbolic identifier"
                 else return x
@@ -71,20 +85,18 @@ testeo p s = case runReader (runParserT p "" s) (PP unit4) of
                Left e -> putStrLn $ parseErrorPretty e
                Right x -> putStrLn $ show x
 
-
-
 --------------------------------------------------------------------------------------
 -- Parser de los comandos.
 exprTy :: Parser Command
-exprTy = do symbol "Theorem"
+exprTy = do rword "Theorem"
             name <- identifier
-            symbol ":"
+            colon
             t <- typeTerm
-            symbol "."
+            dot
             return $ Ty name t
-         <|> do symbol "Props" <|> symbol "Types"
-                ps <- identifier `sepBy` (char ',' *> space)
-                symbol "."
+         <|> do rword "Propositions" <|> rword "Types"
+                ps <- identifier `sepBy` comma
+                dot
                 return $ Types ps
          <|> do tac <- tactic
                 return $ Ta tac
@@ -116,7 +128,7 @@ app' = do t <- brackets typeTerm
 
 unitTerm :: Parser LamTerm
 unitTerm = do u <- unitaryTerm
-              (do symbol "as"
+              (do rword "as"
                   t <- typeTerm
                   return $ As u t
                <|> return u)
@@ -127,25 +139,25 @@ unitaryTerm = do x <- identifier
               <|> parens lambTerm
 
 abstraction :: Parser LamTerm
-abstraction = do char '\\'
+abstraction = do symbol "\\"
                  v <- identifier
-                 (do symbol ":"
+                 (do colon
                      t <- typeTerm
-                     symbol "."
+                     dot
                      e <- lambTerm
                      return $ Abs v t e
-                  <|> do symbol "."
+                  <|> do dot
                          e <- lambTerm
                          return $ BAbs v e)
               <|> do (t, e) <- braces2 (symbol "*" *> typeTerm) lambTerm
-                     symbol "as"
+                     rword "as"
                      t' <- typeTerm
                      return $ EPack t e t'
-              <|> do symbol "let"
+              <|> do rword "let"
                      (v1, v2) <- braces2 identifier identifier
-                     symbol "="
+                     equal
                      e1 <- lambTerm
-                     symbol "in"
+                     rword "in"
                      e2 <- lambTerm
                      return $ EUnpack v1 v2 e1 e2
 
@@ -182,20 +194,20 @@ unit4 = do symbol not_text
 
 unit5 :: Parser Type
 unit5 = parens typeTerm
-        <|> do symbol "False"
+        <|> do rword "False"
                return $ RenameTy bottom_text 0 []
         <|> do v <- identifier
                return $ B v
 
 quantifiers :: Parser Type
-quantifiers = do symbol "forall"
+quantifiers = do rword "forall"
                  v <- identifier
-                 symbol ","
+                 comma
                  t <- typeTerm
                  return $ ForAll v t
-              <|> do symbol "exists"
+              <|> do rword "exists"
                      v <- identifier
-                     symbol ","
+                     comma
                      t <- typeTerm
                      return $ Exists v t
 
@@ -250,7 +262,7 @@ tactic :: Parser Tactic
 tactic = assumptionP
          <|> applyP
          <|> elimP
-         <|> try introP
+         <|> introP
          <|> introsP
          <|> splitP
          <|> leftP
@@ -288,7 +300,7 @@ elimP :: Parser Tactic
 elimP = tacticIndexArg "elim" Elim
 
 printP :: Parser Tactic
-printP = tacticIdentArg "print" Print
+printP = tacticIdentArg "Print" Print
 
 inferP :: Parser Tactic
 inferP = tacticOneArg lambTerm "infer" Infer
@@ -303,37 +315,37 @@ existsP :: Parser Tactic
 existsP = tacticTypeArg "exists" CExists
 
 unfoldP :: Parser Tactic
-unfoldP = do symbol "unfold"
+unfoldP = do rword "unfold"
              op <- identifier <|> symbolIdent
-             (do symbol "in"
+             (do rword "in"
                  char 'H'
                  h <- nat
-                 symbol "."
+                 dot
                  return $ Unfold op $ Just h
-              <|> do symbol "."
+              <|> do dot
                      return $ Unfold op Nothing)
 
 exactP :: Parser Tactic
-exactP = do symbol "exact"
+exactP = do rword "exact"
             r <- do xs <- ambiguousApp <|> parens ambiguousApp
                     return $ Appl xs
                  <|> do te <- lambTerm
                         return $ LamT te
                  <|> do ty <- typeTerm
                         return $ T ty
-            symbol "."
+            dot
             return $ Exact r
 
 -- Funciones auxiliares para el parser de las tácticas.
 tacticZeroArg :: String -> Tactic -> Parser Tactic
-tacticZeroArg s tac = do symbol s
-                         char '.'
+tacticZeroArg s tac = do rword s
+                         dot
                          return tac
 
 tacticOneArg :: Parser a -> String -> (a -> Tactic) -> Parser Tactic
-tacticOneArg p s tac = do symbol s
+tacticOneArg p s tac = do rword s
                           arg <- p
-                          char '.'
+                          dot
                           return $ tac arg
 
 tacticIdentArg :: String -> (String -> Tactic) -> Parser Tactic
@@ -348,33 +360,31 @@ tacticIndexArg = tacticOneArg (char 'H' >> nat)
 --------------------------------------------------------------------------------------
 -- Parser de una definición.
 
--- TERMINAR DE CHEQUEAR los trys
 definition :: Parser (String, BodyDef)
 definition = do x <- identifier
-                (try (do symbol "="
-                         ap <- ambiguousApp
-                         symbol "."
-                         return (x, Ambiguous ap))
-                 <|> try ( do (n, xs) <- opArgs0 identifier
-                              symbol "="
-                              t <- typeTerm
-                              symbol "."
-                              return (x, Type (t, n, reverse xs, False)))
-                 <|> do symbol "="
-                        lt <- lambTerm
-                        symbol "."
-                        return (x, LTerm lt)
+                (try (equal >>
+                       (do ap <- ambiguousApp
+                           dot
+                           return (x, Ambiguous ap))
+                        <|> do lt <- lambTerm
+                               dot
+                               return (x, LTerm lt))
+                 <|> try (do (n, xs) <- opArgs0 identifier
+                             equal
+                             t <- typeTerm
+                             dot
+                             return (x, Type (t, n, reverse xs, False)))
                  <|> do y <- symbolIdent
                         z <- identifier
-                        symbol "="
+                        equal
                         t <- typeTerm
-                        symbol "."
+                        dot
                         return (y, Type (t, 2, [z, x], True)))
              <|> do name <- symbolIdent
                     (n, xs) <- opArgs1 identifier
-                    symbol "="
+                    equal
                     t <- typeTerm
-                    symbol "."
+                    dot
                     return (name, Type (t, n, reverse xs, False))
 
 --------------------------------------------------------------------------------------

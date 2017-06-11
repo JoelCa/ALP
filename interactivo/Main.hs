@@ -146,6 +146,7 @@ checkCommand (Types ps) =
 checkCommand (Definition name body) =
   do s <- lift get
      let glo = global s
+     when (isJust $ proof s) (throwIO PNotFinished)
      when ( (V.any (\(x,_,_,_)-> x == name) $ opers glo)
             || (any (\(x,_,_) -> x == name) notFoldeableOps)
           )

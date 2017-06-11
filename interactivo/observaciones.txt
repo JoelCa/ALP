@@ -4,6 +4,7 @@ Dependencias
 cabal install mtl
 cabal install exceptions
 cabal install vector
+cabal install megaparsec
 
 Dato de la instalación de la libreria ncurses en Debian:
 Una vez instalada ncurses, tuve que crear un enlace simbólico: libtinfo.so -> libtinfo.so.5
@@ -143,7 +144,16 @@ prueba = p1 <|> p2 <|> p3
 Si "prueba" falla, y p2 es el parser que tuvo más exito (alcanzo a parser más que los otros),
 entonces, veremos el error asociado a p2.
 
+- Podemos escribir la entrada utilizando la mínima cantidad de espacios necesarios.
+Lo mismo ocurre en Coq.
+Por ejemplo, Theorem t:forall w, w\/w.
+
+- Una vez que una prueba comienza, NO es posible aplicar el comando de definición de tipos,
+ni de términos, ni tampoco se puede declarar variables de tipos. En Coq es posible
+Cuando no se construye una prueba, NO se pueden invocar tácticas. En Coq sí se puede.
 
 FALTA:
+- Ver constantes.
+- Mejorar Print (Print All, Print de tipos)
 - Reveer el uso de Vector. Ver todos los "foldr".
 - Crea una estructura de tipos de términos, con y sin nombre.

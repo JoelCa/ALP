@@ -10,9 +10,9 @@ import Control.Monad.Reader
 
 type ProofCommand = Either ProofExceptions Command
 
-reservedWords = ["Propositions", "Types", "Theorem", "Print", "forall", "exists", "let", "in",
-                 "as", "False", "assumption", "intro", "intros", "split", "left",
-                 "right", "apply", "elim", "absurd", "cut", "unfold", "exact"]
+reservedWords = ["Propositions", "Types", "Theorem", "Print", "Check", "forall", "exists",
+                 "let", "in", "as", "False", "assumption", "intro", "intros", "split",
+                 "left", "right", "apply", "elim", "absurd", "cut", "unfold", "exact"]
 
 reservedSymbols = ["=", "~"]
 
@@ -33,13 +33,12 @@ brackets :: Parser a -> Parser a
 brackets = between (symbol "[") (symbol "]")
 
 braces2 :: Parser a -> Parser b -> Parser (a, b)
-braces2 p1 p2 = do symbol "{"
-                   x <- p1
-                   symbol ","
-                   y <- p2
-                   symbol "}"
-                   return (x,y)
-                   
+braces2 p1 p2 = between (symbol "{") (symbol "}")
+                (do x <- p1
+                    symbol ","
+                    y <- p2
+                    return (x,y))
+
 comma :: Parser String
 comma = symbol ","
 
@@ -270,7 +269,7 @@ tactic = assumptionP
          <|> printP
          <|> exactP
          <|> existsP
-         <|> inferP
+         <|> checkP
          <|> unfoldP
          <|> absurdP
          <|> cutP
@@ -302,8 +301,8 @@ elimP = tacticIndexArg "elim" Elim
 printP :: Parser Tactic
 printP = tacticIdentArg "Print" Print
 
-inferP :: Parser Tactic
-inferP = tacticOneArg lambTerm "infer" Infer
+checkP :: Parser Tactic
+checkP = tacticOneArg lambTerm "Check" Infer
 
 absurdP :: Parser Tactic
 absurdP = tacticTypeArg "absurd" Absurd
@@ -414,6 +413,9 @@ nat2 = fromInteger <$> lexeme2 L.integer
 
 getHypothesisValue :: String -> Maybe Int
 getHypothesisValue s = parseMaybe (char 'H' >> nat2) s
+
+getInt :: String -> Maybe Int
+getInt s = parseMaybe nat2 s
 
 --------------------------------------------------------------------------------------
 -- Construcción del parser de las operaciones del usuario.

@@ -11,6 +11,8 @@ Una vez instalada ncurses, tuve que crear un enlace simbólico: libtinfo.so -> l
 root@joel:/lib/x86_64-linux-gnu# ln -s libtinfo.so.5 libtinfo.so
 Para ejecutar mi programa, sin ello daba error.
 
+Además es necesario tener el paquete containers con una versión superior o igual a la 0.5.8 
+
 
 Observaciones
 -------------

@@ -9,11 +9,10 @@ import System.Console.Haskeline.MonadException (Exception)
 import Data.Map (Map)
 import Control.Monad (ap, liftM)
 import Control.Monad.State.Lazy
-import Parsing (ParserState)
-import Data.Vector (Vector, ifoldl)
 import Data.IntSet
 import Text.Megaparsec
 import Control.Monad.Reader (Reader)
+import Data.Sequence (Seq, foldlWithIndex)
 
 type UsrParser = ParserParser Type
 
@@ -79,7 +78,7 @@ data Term  = Bound Int
 type TermVar = (Int,Int,Type,TType)
 
   -- Secuencia de variables de términos. 
-type TermContext = Vector TermVar
+type TermContext = Seq TermVar
 
   -- Para cada variable de tipo ligada, tenemos (por posición en la tupla):
   -- 1. Su posición en el contexto. Útil a la hora de imprimirlo.
@@ -87,7 +86,7 @@ type TermContext = Vector TermVar
 type BTypeVar = (Int, String)
 
   -- Secuencia de variables de tipo ligadas.
-type BTypeContext = Vector BTypeVar
+type BTypeContext = Seq BTypeVar
 
   -- Tabla de teoremas.
   -- Clave: Nombre del teorema.
@@ -97,7 +96,7 @@ type Teorems = Map String Term
 type FTypeVar = String
 
   -- Secuencia de variables de tipo libres.
-type FTypeContext = [FTypeVar]
+type FTypeContext = Seq FTypeVar
 
   --Comandos.
 data Command = Ty String Type
@@ -184,7 +183,7 @@ not_code = 0 :: Int
   -- Todas las operaciones que define el usuario son foldeables.
 type FoldeableOp = (String, (Type, TType), Operands, Bool)
 
-type FOperations = Vector FoldeableOp
+type FOperations = Seq FoldeableOp
 
   -- Definición de una "operación".
   -- 1. Cuerpo de la operación.
@@ -287,5 +286,5 @@ fst3 (x, _, _) = x
 snd3 :: (a, b, c) -> b
 snd3 (_, x, _) = x
 
-getElemIndex :: (a -> Bool) -> Vector a -> Maybe (Int, a)
-getElemIndex f v = ifoldl (\r i x -> if f x then Just (i, x) else r) Nothing v
+getElemIndex :: (a -> Bool) -> Seq a -> Maybe (Int, a)
+getElemIndex f xs = foldlWithIndex (\r i x -> if f x then Just (i, x) else r) Nothing xs

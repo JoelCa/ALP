@@ -6,7 +6,7 @@ import Data.List (findIndex, elemIndex, find)
 import Control.Monad (unless, when)
 import qualified Data.Map as M (Map, lookup, insert, empty, size)
 import Data.Maybe (fromJust, isJust)
-import qualified Data.Vector as V
+import qualified Data.Sequence as S
 import ProofState
 import EmptyTerms
 import RenamedVariables
@@ -20,7 +20,7 @@ habitar Assumption =
      (_,tw) <- maybeToProof EmptyType x 
      c <- getTermContext
      q <- getTBTypeVars
-     i <- maybeToProof AssuE $ V.findIndex (\(_,p,_,t) -> renameTType (q - p) t == tw) c
+     i <- maybeToProof AssuE $ S.findIndexL (\(_,p,_,t) -> renameTType (q - p) t == tw) c
      endSubProof
      modifyTerm $ simplify $ Bound i
 habitar Intro =
@@ -36,7 +36,7 @@ habitar (Apply h) =
      i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
      c <- getTermContext
      q <- getTBTypeVars
-     applyComm i (t,t') (getTypeVar q $ c V.! i)
+     applyComm i (t,t') (getTypeVar q $ index c i)
 habitar (Elim h) =
   do x <- getType
      (t,t') <- maybeToProof EmptyType x
@@ -45,7 +45,7 @@ habitar (Elim h) =
      i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
      c <- getTermContext
      q <- getTBTypeVars
-     elimComm i (t,t') (getTypeVar q $ c V.! i)
+     elimComm i (t,t') (getTypeVar q $ S.index c i)
 habitar CLeft =
   do x <- getType
      case x of
@@ -120,7 +120,7 @@ habitar (Unfold s (Just h)) =
      cn <- getConflictNames
      i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
      c <- getTermContext
-     let (x,y,t,t') = c V.! i
+     let (x,y,t,t') = S.index c i
      btc <- getBTypeContext
      ftc <- getFTypeContext
      let (r,r') = unfoldComm btc ftc m (t,t') (tt,tt')
@@ -592,10 +592,10 @@ inferType' n _ te _ (_, Free (Global x)) =
     Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean teoremas.
     _ -> error "error: inferType', no debería pasar."
 inferType' n c te _ (_, Bound x) =
-  let (_,m,t,t') = c V.! x
+  let (_,m,t,t') = S.index c x
   in return (t,renameTType (n-m) t')
 inferType' n c te op (Abs _ _ e, Lam (t,t') e') =
-  do (tt,tt') <- inferType' n (V.cons (0,n,t,t') c) te op (e,e')
+  do (tt,tt') <- inferType' n ((0,n,t,t') S.<| c) te op (e,e')
      return (Fun t tt, TFun t' tt')
 inferType' n c te op (App e1 e2, e1' :@: e2') =
   do tt1 <- inferType' n c te op (e1, e1')
@@ -625,7 +625,7 @@ inferType' n c te op (EUnpack _ _ e1 e2, Unpack _ e1' e2') =
   do t1 <- inferType' n c te op (e1, e1')
      case t1 of
        (Exists _ tt1, TExists tt1') -> 
-         do t2 <- inferType' (n+1) (V.cons (0,n+1,tt1,tt1') c) te op (e2, e2')
+         do t2 <- inferType' (n+1) ((0,n+1,tt1,tt1') S.<| c) te op (e2, e2')
             case substitution 1 t2 of
               Just t2' -> return t2'
               Nothing -> throw $ InferE4 e2
@@ -648,7 +648,7 @@ basicTType op (TFun t t') = TFun (basicTType op t) (basicTType op t')
 basicTType op (TForAll t) = TForAll (basicTType op t)
 basicTType op (TExists t) = TExists (basicTType op t)
 basicTType op (RenameTTy n xs) =
-  case op V.!? n of
+  case S.lookup n op of
     Just (_, (_, t), args, _) ->
       applyTTypes args (basicTType op t) basics
       --in error $ show t ++ "\n\n" ++ show (applyTTypes l t basics)

@@ -6,7 +6,7 @@ import RenamedVariables
 import Hypothesis
 import Parser (getHypothesisValue)
 import Data.IntSet (IntSet)
-import qualified Data.Vector as V
+import qualified Data.Sequence as S
 
 -- Retorna el tipo con nombre, posiblemente renombrado, de su 3º arg.
 -- A fin de respetar la Convención 1.
@@ -17,8 +17,7 @@ import qualified Data.Vector as V
 -- 3. Tipo a procesar.
 -- OBS: Utilizamos esta función sobre tipos que NO requieren del contexto de tipos "ligados".
 renamedType :: FTypeContext -> FOperations -> Type -> Either ProofExceptions (Type, TType)
-renamedType ftc op = let op' = foldr (\(x,_,_,_) xs -> x : xs) [] op
-                     in typeWithoutName [] [] ftc (op' ++ ftc)  op
+renamedType ftc op = typeWithoutName S.empty S.empty ftc (map (\(x,_,_,_) -> x) op)  op
 
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
 -- por el 4º argumento.
@@ -40,24 +39,24 @@ renamedType3 bs ftc op = let op' = foldr (\(x,_,_,_) xs -> x : xs) [] op
                          in typeWithoutName bs bs ftc (op' ++ ftc) op
 
 
-typeWithoutName :: [String] -> [String] -> [String] -> [String] -> FOperations
-                -> Type -> Either ProofExceptions (Type, TType)
+typeWithoutName :: S.Seq String -> S.Seq String -> S.Seq String -> S.Seq String
+                -> FOperations -> Type -> Either ProofExceptions (Type, TType)
 typeWithoutName rs bs fs _ op (B x) =
-  getVarType (\_ zs m -> zs !! m) rs bs fs op x
-typeWithoutName rs bs fs ofs op (ForAll x t) =
-  do let v = getRename x ofs rs
-     (tt,tt') <- typeWithoutName (v:rs) (x:bs) ofs fs op t
+  getVarType (\_ zs m -> S.index zs m) rs bs fs op x
+typeWithoutName rs bs fs on op (ForAll x t) =
+  do let v = getRename x [fs, rs, on]
+     (tt,tt') <- typeWithoutName (v S.<| rs) (x S.<| bs) on fs op t
      return (ForAll v tt, TForAll tt')
-typeWithoutName rs bs fs ofs op (Exists x t) =
-  do let v = getRename x ofs rs
-     (tt,tt') <- typeWithoutName (v:rs) (x:bs) ofs fs op t
+typeWithoutName rs bs fs on op (Exists x t) =
+  do let v = getRename x [fs, rs, on]
+     (tt,tt') <- typeWithoutName (v S.<| rs) (x S.<| bs) on fs op t
      return (Exists v tt, TExists tt')
-typeWithoutName rs bs fs ofs op (Fun t1 t2) =
-  do (tt1, tt1') <- typeWithoutName rs bs fs ofs op t1
-     (tt2, tt2') <- typeWithoutName rs bs fs ofs op t2
+typeWithoutName rs bs fs ofs on (Fun t1 t2) =
+  do (tt1, tt1') <- typeWithoutName rs bs fs on op t1
+     (tt2, tt2') <- typeWithoutName rs bs fs on op t2
      return (Fun tt1 tt2, TFun tt1' tt2')
-typeWithoutName rs bs fs ofs op (RenameTy s args ts) =
-  getOpType op s args ts $ typeWithoutName rs bs fs ofs op
+typeWithoutName rs bs fs on op (RenameTy s args ts) =
+  getOpType op s args ts $ typeWithoutName rs bs fs on op
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Trasformadores de lambda términos: Se pasa de un lambda término con nombre, al equivalente sin nombre.
@@ -143,10 +142,10 @@ disambiguatedType' bs fs op (Node x xs) =
   getOpType op x (length xs) xs $ disambiguatedType' bs fs op
 
 
-getVarType :: (String -> [String] -> Int -> String) -> [String] -> [String] -> [String]
+getVarType :: (String -> S.Seq String -> Int -> String) -> S.Seq String -> S.Seq String -> S.Seq String
            -> FOperations -> String -> Either ProofExceptions (Type, TType)
 getVarType f rs bs fs op x =
-  case x `elemIndex` bs of
+  case S.elemIndexL x bs of
     Just n -> return (B $ f x rs n, TBound n)
     Nothing -> case getElemIndex (\(w,_,_,_) -> w == x) op of
                  Just (n, (_, _, args, _)) -> if args == 0

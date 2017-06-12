@@ -23,11 +23,14 @@ import Data.Char (intToDigit)
 --                 else v
 
 -- Crea una string, que no está en ninguna de las listas dadas por el 2º argumento.
-getRename :: Foldable t => String -> [t String] -> String
-getRename s xs = s ++ [intToDigit (foldr (\x n -> succ (posfix s x) `max` n) 0 xs)]
+getRename :: (Foldable t1, Foldable t2, Foldable t3) => String -> (a -> String, t1 a)
+          -> (b -> String, t2 b) -> (c -> String, t3 c) -> String
+getRename s (f,xs) (g,ys) (h,zs) = s ++ [ intToDigit (succ (posfix s f xs)
+                                                      `max` succ (posfix s g ys)
+                                                      `max` succ (posfix s h zs)) ]
 
-posfix :: Foldable t => String -> t String -> Int
-posfix s xs = foldr (\x i -> maybe i (\n -> max n i) $ getIntPosfix s x) (-1) xs
+posfix :: Foldable t => String -> (a -> String) -> t a -> Int
+posfix s f xs = foldr (\x i -> maybe i (max i) $ getIntPosfix s $ f x) (-1) xs
                      
 getIntPosfix :: String -> String -> Maybe Int
 getIntPosfix x y = do posf <- stripPrefix x y

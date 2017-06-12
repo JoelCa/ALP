@@ -70,20 +70,24 @@ data Term  = Bound Int
            | Term ::: (Type,TType)
            deriving (Show, Eq)
 
-  -- Para cada variable de término, tenemos (por posición en la 4-tupla):
+type TypeVar = String
+
+type TermVar = String
+
+-- Para cada variable de término, tenemos (por posición en la 4-tupla):
   -- 1. Su posición en el contexto, a la hora de imprimirlo.
   -- 2. La profundidad con la que se añadio al contexto,
   -- (la profundidad se refiere a la cantidad de cuantificadores construidos).
   -- 3-4. Su tipo con y sin nombres, respectivamente.
-type TermVar = (Int,Int,Type,TType)
+type TermVarWithType = (Int,Int,Type,TType)
 
   -- Secuencia de variables de términos. 
-type TermContext = Seq TermVar
+type TermContext = Seq TermVarWithType
 
   -- Para cada variable de tipo ligada, tenemos (por posición en la tupla):
   -- 1. Su posición en el contexto. Útil a la hora de imprimirlo.
   -- 2. El nombre.
-type BTypeVar = (Int, String)
+type BTypeVar = (Int, TypeVar)
 
   -- Secuencia de variables de tipo ligadas.
 type BTypeContext = Seq BTypeVar
@@ -93,7 +97,7 @@ type BTypeContext = Seq BTypeVar
   -- Valor: El lambda término de la prueba.
 type Teorems = Map String Term
 
-type FTypeVar = String
+type FTypeVar = TypeVar
 
   -- Secuencia de variables de tipo libres.
 type FTypeContext = Seq FTypeVar
@@ -147,6 +151,12 @@ data GenTree a = Nil | Node a [GenTree a]
   -- Cantidad de operandos de una operación.
 type Operands = Int
 
+fst3 :: (a, b, c) -> a
+fst3 (x, _, _) = x
+
+snd3 :: (a, b, c) -> b
+snd3 (_, x, _) = x
+
   -- Conjunto de operaciones NO "foldeables".
 notFoldeableOps :: [(String, Int, Operands)]
 notFoldeableOps = [and_, or_, bottom_]
@@ -182,6 +192,9 @@ not_code = 0 :: Int
   -- 4. Booleano. True sii es una operación binaria infija.
   -- Todas las operaciones que define el usuario son foldeables.
 type FoldeableOp = (String, (Type, TType), Operands, Bool)
+
+getArgs :: FoldeableOp -> Operands
+getArgs (_,_,n,_) = n
 
 type FOperations = Seq FoldeableOp
 
@@ -280,11 +293,8 @@ maybeToEither :: e -> Maybe a -> Either e a
 maybeToEither errorval Nothing = throw errorval
 maybeToEither _ (Just normalval) = return normalval
 
-fst3 :: (a, b, c) -> a
-fst3 (x, _, _) = x
-
-snd3 :: (a, b, c) -> b
-snd3 (_, x, _) = x
+fst4 :: (a, b, c, d) -> a
+fst4 (x, _, _, _) = x
 
 getElemIndex :: (a -> Bool) -> Seq a -> Maybe (Int, a)
 getElemIndex f xs = foldlWithIndex (\r i x -> if f x then Just (i, x) else r) Nothing xs

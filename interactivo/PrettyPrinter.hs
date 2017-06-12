@@ -477,6 +477,3 @@ printTermVar n op (_,_,t,_) =
 
 printBTypeVar :: BTypeVar -> Doc
 printBTypeVar (_,x) = text x
-
-fst4 :: (a, b, c, d) -> a
-fst4 (x, _, _, _) = x

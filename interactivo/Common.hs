@@ -105,7 +105,7 @@ type FTypeContext = Seq FTypeVar
   --Comandos.
 data Command = Ty String Type
              | Ta Tactic
-             | Types [String]
+             | Types (Seq TypeVar)
              | Definition String BodyDef
              deriving (Show)
 
@@ -193,8 +193,8 @@ not_code = 0 :: Int
   -- Todas las operaciones que define el usuario son foldeables.
 type FoldeableOp = (String, (Type, TType), Operands, Bool)
 
-getArgs :: FoldeableOp -> Operands
-getArgs (_,_,n,_) = n
+getNumArgs :: FoldeableOp -> Operands
+getNumArgs (_,_,n,_) = n
 
 type FOperations = Seq FoldeableOp
 
@@ -203,7 +203,7 @@ type FOperations = Seq FoldeableOp
   -- 2. Cantidad de operandos.
   -- 3. Lista de los nombres de los argumentos.
   -- 4. Boleano. True sii es una operación binaria infija.
-type TypeDefinition = (Type, Operands, [String], Bool)
+type TypeDefinition = (Type, Operands, Seq TypeVar, Bool)
 
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState

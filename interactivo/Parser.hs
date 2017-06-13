@@ -7,6 +7,7 @@ import qualified Text.Megaparsec.String as S
 import Control.Applicative (empty)
 import Control.Monad (void)
 import Control.Monad.Reader
+import qualified Data.Sequence as S (Seq, empty, (<|), (|>), singleton, fromList)
 
 type ProofCommand = Either ProofExceptions Command
 
@@ -94,7 +95,7 @@ exprTy = do rword "Theorem"
             dot
             return $ Ty name t
          <|> do rword "Propositions" <|> rword "Types"
-                ps <- identifier `sepBy` comma
+                ps <- sepByCommaSeq identifier
                 dot
                 return $ Types ps
          <|> do tac <- tactic
@@ -211,7 +212,7 @@ quantifiers = do rword "forall"
                      return $ Exists v t
 
 prefixOps :: Parser Type
-prefixOps = applications (\_ -> opArgs1 unit5) (identifier <|> symbolIdent) B addArgs
+prefixOps = applications (\_ -> seqOrdered1 unit5) (identifier <|> symbolIdent) B addArgs
 
 addArgs :: Type -> (Int, [Type]) -> Type
 addArgs (B op) (n,xs) = RenameTy op n xs
@@ -227,20 +228,38 @@ infixP s c p = do u <- p
                       return $ c u t
                    <|> return u)
 
--- Parser de los argumentos de una operación.
--- Cero, o más argumentos.
-opArgs0 :: Parser a -> Parser (Int, [a])
-opArgs0 p = do x <- p
-               (n, xs) <- opArgs0 p
-               return (n+1, x:xs)
-            <|> return (0, [])
+-- Parser de una secuencia de expresiones, separadas por espacios.
 
--- Uno, o más argumentos.
-opArgs1 :: Parser a -> Parser (Int, [a])
-opArgs1 p = do x <- p
-               (do (n, xs) <- opArgs1 p
-                   return (n+1, x:xs)
-                <|> return (1, [x]))
+-- Considera cero, o más expresiones.
+-- Retorna la secuencia leida en el orden inverso.
+seqReverseOrd0 :: Parser a -> Parser (Int, S.Seq a)
+seqReverseOrd0 p = do x <- p
+                      (n, xs) <- seqReverseOrd0 p
+                      return (n+1, xs S.|> x)
+                   <|> return (0, S.empty)
+
+-- Considera una, o más expresiones.
+-- Retorna la secuencia leida en el orden inverso.
+seqReverseOrd1 :: Parser a -> Parser (Int, S.Seq a)
+seqReverseOrd1 p = do x <- p
+                      (do (n, xs) <- seqReverseOrd1 p
+                          return (n+1, xs S.|> x)
+                       <|> return (1, S.singleton x))
+
+-- Considera una, o más expresiones.
+-- Retorna la secuencia leida en el orden leido.
+seqOrdered1 :: Parser a -> Parser (Int, [a])
+seqOrdered1 p = do x <- p
+                   (do (n, xs) <- seqOrdered1 p
+                       return (n+1, x:xs)
+                    <|> return (1, [x]))
+
+sepByCommaSeq :: Parser a -> Parser (S.Seq a)
+sepByCommaSeq p = do x <- p
+                     (do xs <- sepByCommaSeq (comma >> p)
+                         return (x S.<| xs)
+                      <|> return (S.singleton x))
+
 
 --------------------------------------------------------------------------------------
 -- Parser de aplicaciones (genérico).
@@ -368,23 +387,23 @@ definition = do x <- identifier
                         <|> do lt <- lambTerm
                                dot
                                return (x, LTerm lt))
-                 <|> try (do (n, xs) <- opArgs0 identifier
+                 <|> try (do (n, xs) <- seqReverseOrd0 identifier
                              equal
                              t <- typeTerm
                              dot
-                             return (x, Type (t, n, reverse xs, False)))
+                             return (x, Type (t, n, xs, False)))
                  <|> do y <- symbolIdent
                         z <- identifier
                         equal
                         t <- typeTerm
                         dot
-                        return (y, Type (t, 2, [z, x], True)))
+                        return (y, Type (t, 2, S.fromList [z, x], True)))
              <|> do name <- symbolIdent
-                    (n, xs) <- opArgs1 identifier
+                    (n, xs) <- seqReverseOrd1 identifier
                     equal
                     t <- typeTerm
                     dot
-                    return (name, Type (t, n, reverse xs, False))
+                    return (name, Type (t, n, xs, False))
 
 --------------------------------------------------------------------------------------
 -- Parser de aplicaciones "ambiguas".                            

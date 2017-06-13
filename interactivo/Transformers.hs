@@ -82,7 +82,7 @@ withoutName' ters tebs _ _ _ _ cnn w@(LVar x) =
 withoutName' ters tebs tyrs tybs fs op cnn (Abs x t e) =
   do let h = getRename x (id, ters) (id, S.empty) (id, S.empty)
      t' <- typeWithoutName (snd, \x -> (0, x), tyrs, tybs) fs op t
-     (ee, ee') <- withoutName' (h S.<| ters)(x <| tebs) tyrs tybs fs op cnn e
+     (ee, ee') <- withoutName' (h S.<| ters)(x S.<| tebs) tyrs tybs fs op cnn e
      return (Abs h (fst t') ee, Lam t' ee')
 withoutName' ters tebs tyrs tybs fs op cnn (App e1 e2) =
   do (ee1, ee1') <- withoutName' ters tebs tyrs tybs fs op cnn e1
@@ -105,7 +105,7 @@ withoutName' ters tebs tyrs tybs fs op cnn (EUnpack x y e1 e2) =
   do (ee1, ee1') <- withoutName' ters tebs tyrs tybs fs op cnn e1
      let v = getRename x (snd, tyrs) (id, fs) (fst4, op)
          h = getRename y (id, ters) (id, S.empty) (id, S.empty)
-     (ee2, ee2') <- withoutName' (h <| ters) (y <| tebs) (bTypeVar v S.<| tyrs) (bTypeVar x S.<| tybs) fs op cnn e2
+     (ee2, ee2') <- withoutName' (h S.<| ters) (y S.<| tebs) (bTypeVar v S.<| tyrs) (bTypeVar x S.<| tybs) fs op cnn e2
      return (EUnpack v h ee1 ee2, Unpack v ee1' ee2')
 withoutName' ters tebs tyrs tybs fs op cnn (As e t) =
   do (ee, ee') <- withoutName' ters tebs tyrs tybs fs op cnn e
@@ -116,26 +116,21 @@ withoutName' ters tebs tyrs tybs fs op cnn (As e t) =
 -- Transformadores para aplicaciones ambiguas.
 
 -- Convierte a una aplicacion ambigua en una aplicación de tipos, o en una aplicación de lambda términos.
--- disambiguatedTerm :: BTypeContext -> FTypeContext ->  FOperations -> (IntSet, Int)
---                   -> GenTree String -> Either ProofExceptions (Either (Type, TType) (LamTerm, Term))
--- disambiguatedTerm btc ftc op cnn t =
---   case disambiguatedType btc ftc op t of
---     Left (TypeE _) -> return $ Right $ disambiguatedLTerm cnn t
---     Left e -> throw e
---     Right ty -> return $ Left ty
-    
-
--- disambiguatedType :: BTypeContext -> FTypeContext -> FOperations
---                   -> GenTree String -> Either ProofExceptions (Type, TType)
--- disambiguatedType bs = disambiguatedType' (foldr (\(_,x) xs -> x : xs) [] bs)
+disambiguatedTerm :: BTypeContext -> FTypeContext ->  FOperations -> (IntSet, Int)
+                  -> GenTree String -> Either ProofExceptions (Either (Type, TType) (LamTerm, Term))
+disambiguatedTerm btc ftc op cnn t =
+  case disambiguatedType btc ftc op t of
+    Left (TypeE _) -> return $ Right $ disambiguatedLTerm cnn t
+    Left e -> throw e
+    Right ty -> return $ Left ty
 
 
--- disambiguatedType' :: [String] -> [String] -> FOperations
---                    -> GenTree String -> Either ProofExceptions (Type, TType)
--- disambiguatedType' bs fs op (Node x []) =
---   getVarType (\w _ _ -> w) [] bs fs op x
--- disambiguatedType' bs fs op (Node x xs) =
---   getOpType op x (length xs) xs $ disambiguatedType' bs fs op
+disambiguatedType :: BTypeContext -> FTypeContext -> FOperations
+                  -> GenTree String -> Either ProofExceptions (Type, TType)
+disambiguatedType bs fs op (Node x []) =
+  getVarType (\w _ _ -> w) (snd, bTypeVar, S.empty, bs) fs op x -- NO es necesario rs
+disambiguatedType bs fs op (Node x xs) =
+  getOpType op x (length xs) xs $ disambiguatedType bs fs op
 
 
 getVarType :: (TypeVar -> S.Seq a -> Int -> TypeVar)
@@ -146,7 +141,7 @@ getVarType fvar frbs@(f, f', rs, bs) fs op x =
   case S.findIndexL (\w -> f w == x) bs of
     Just n -> return (B $ fvar x rs n, TBound n)
     Nothing -> case getElemIndex (\w -> fst4 w == x) op of
-                 Just (n, a) -> if getArgs a == 0
+                 Just (n, a) -> if getNumArgs a == 0
                                 then return (RenameTy x 0 [], RenameTTy n [])
                                 else throw $ OpE1 x
                  Nothing -> if elem x fs
@@ -166,7 +161,7 @@ getOpType op s args ts f =
       else throw $ OpE1 s
     Nothing ->
       do (m, a) <- maybeToEither (OpE2 s) $ getElemIndex (\x -> fst4 x == s) op
-         if getArgs a == args
+         if getNumArgs a == args
            then do rs <- sequence $ map f ts
                    let (tt, tt') = unzip rs
                    return (RenameTy s args tt, RenameTTy m tt')

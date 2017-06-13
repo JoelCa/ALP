@@ -4,7 +4,7 @@ import Common
 import Text.PrettyPrint.HughesPJ hiding (parens)
 import qualified Text.PrettyPrint.HughesPJ as PP 
 import Data.List
-import qualified Data.Vector as V
+import qualified Data.Sequence as S
 import Hypothesis (printHypothesis)
 import qualified Data.IntSet as IS
 
@@ -301,8 +301,8 @@ printTType' op prec@(i,j,k) bs fs (RenameTTy n [t1,t2])
   | n == or_code = printBinInfix (\x t -> printTType' op x bs fs t)
                    (getTextFromDefaultOp n) prec 4 t1 t2
   | n == iff_code = printBinInfix (\x t -> printTType' op x bs fs t)
-                    (fst4 $ op V.! n) prec 6 t1 t2
-  | otherwise = let (s,_,_,inf) = op V.! n
+                    (fst4 $ S.index op n) prec 6 t1 t2
+  | otherwise = let (s,_,_,inf) = S.index op n
                 in if inf
                    then parenIf ( i < 2 || ( i == 2 && ( j < n || ( j == n && k )))) $
                         printTType' op (2, n, True) bs fs t1 <+>
@@ -310,7 +310,7 @@ printTType' op prec@(i,j,k) bs fs (RenameTTy n [t1,t2])
                         printTType' op (2, n, False) bs fs t2
                    else printPrefix (\x t -> printTType' op x bs fs t) s prec [t1,t2]
 printTType' op prec bs fs (RenameTTy n ts) =
-  printPrefix (\x t -> printTType' op x bs fs t) (if n < 0 then getTextFromDefaultOp n else fst4 $ op V.! n) prec ts
+  printPrefix (\x t -> printTType' op x bs fs t) (if n < 0 then getTextFromDefaultOp n else fst4 $ S.index op n) prec ts
 
 
 getTextFromDefaultOp :: Int -> String
@@ -420,26 +420,24 @@ printGoal op Nothing = text "*"
 
 printContext :: IS.IntSet -> FOperations -> (FTypeContext, BTypeContext) -> TermContext -> Doc
 printContext cn op (ftc,btc) c = printFTypeContext ftc $$
-                                 printRestContext cn (IS.size cn + V.length c - 1) op btc c
+                                 printRestContext cn (IS.size cn + S.length c - 1) op btc c
 
 printFTypeContext :: FTypeContext -> Doc
-printFTypeContext [] = empty
-printFTypeContext (x:ftc) = printFTypeVar x $$
-                            printFTypeContext ftc
+printFTypeContext = foldr (\x r -> printFTypeVar x $$ r) empty
 
 printFTypeVar :: FTypeVar -> Doc
 printFTypeVar x = text x
 
 printRestContext :: IS.IntSet -> Int -> FOperations -> BTypeContext -> TermContext -> Doc
 printRestContext cn n op btc c
-  | V.null btc = printRestTermC cn n op c
-  | V.null c = printRestBTypeC btc
-  | otherwise = let x = V.head btc
-                    y = V.head c
+  | S.null btc = printRestTermC cn n op c
+  | S.null c = printRestBTypeC btc
+  | otherwise = let x = S.index btc 0
+                    y = S.index c 0
                 in if fst x > fst4 y
-                   then printRestContext cn n op (V.drop 1 btc) c $$
+                   then printRestContext cn n op (S.drop 1 btc) c $$
                         printBTypeVar x
-                   else printRestContext cn' (n'-1) op btc (V.drop 1 c) $$
+                   else printRestContext cn' (n'-1) op btc (S.drop 1 c) $$
                         printTermVar n' op y
                         where (n', cn') = getValidName cn n
 
@@ -458,18 +456,18 @@ getValidName cn n = let (cn', isMember, _) = IS.splitMember n cn
 
 printRestTermC :: IS.IntSet -> Int -> FOperations -> TermContext -> Doc
 printRestTermC cn n op c
-  | V.null c = empty
-  | otherwise = printRestTermC cn' (n'-1) op (V.drop 1 c) $$
-                printTermVar n' op (V.head c)
+  | S.null c = empty
+  | otherwise = printRestTermC cn' (n'-1) op (S.drop 1 c) $$
+                printTermVar n' op (S.index c 0)
                 where (n', cn') = getValidName cn n
 
 printRestBTypeC :: BTypeContext -> Doc
 printRestBTypeC btc
   | null btc = empty
-  | otherwise = printRestBTypeC (V.drop 1 btc) $$
-                printBTypeVar (V.head btc)
+  | otherwise = printRestBTypeC (S.drop 1 btc) $$
+                printBTypeVar (S.index btc 0)
 
-printTermVar :: Int -> FOperations -> TermVar -> Doc
+printTermVar :: Int -> FOperations -> TermVarWithType -> Doc
 printTermVar n op (_,_,t,_) =
   text (printHypothesis n) <+>
   text ":" <+>

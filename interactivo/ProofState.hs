@@ -2,7 +2,7 @@ module ProofState where
 
 import Common
 import Control.Monad.State.Lazy (get, modify)
-import qualified Data.Vector as V
+import qualified Data.Sequence as S
 import Data.IntSet (IntSet)
 
 -- Operaciones que modifican el estado de la monada Proof.
@@ -65,26 +65,26 @@ modifyTVars' :: (Int -> Int) -> ProofConstruction -> ProofConstruction
 modifyTVars' f ps@(PConstruction {subps=sp:sps}) =
   ps {subps = sp {tvars = f $ tvars sp} : sps}
   
-addTermContext :: TermVar -> Proof ()
+addTermContext :: TermVarWithType -> Proof ()
 addTermContext = modify . addTermContext'
 
-addTermContext' :: TermVar -> ProofConstruction -> ProofConstruction
+addTermContext' :: TermVarWithType -> ProofConstruction -> ProofConstruction
 addTermContext' x ps@(PConstruction {subps=sp:sps}) =
-  ps {subps = sp {termContext = V.cons x (termContext sp)} : sps}
+  ps {subps = sp {termContext = x S.<| termContext sp} : sps}
 
-updateTermContext :: Int -> TermVar -> Proof ()
+updateTermContext :: Int -> TermVarWithType -> Proof ()
 updateTermContext n x = modify $ updateTermContext' n x
 
-updateTermContext' :: Int -> TermVar -> ProofConstruction -> ProofConstruction
+updateTermContext' :: Int -> TermVarWithType -> ProofConstruction -> ProofConstruction
 updateTermContext' n x ps@(PConstruction {subps=sp:sps}) =
-  ps {subps = sp {termContext = V.update (termContext sp) $ V.singleton (n,x)} : sps}
+  ps {subps = sp {termContext = S.update n x $ termContext sp} : sps}
 
 addBTypeContext :: BTypeVar -> Proof ()
 addBTypeContext = modify . addBTypeContext'
 
 addBTypeContext' :: BTypeVar -> ProofConstruction -> ProofConstruction
 addBTypeContext' x ps@(PConstruction {subps=sp:sps})=
-  ps {subps = sp {bTypeContext = V.cons x $ bTypeContext sp} : sps}
+  ps {subps = sp {bTypeContext = x S.<| bTypeContext sp} : sps}
 
 modifyLevelSubp :: (Int -> Int) -> Proof ()
 modifyLevelSubp = modify . modifyLevelSubp'

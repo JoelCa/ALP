@@ -12,7 +12,7 @@ import Control.Monad.IO.Class
 import Data.Maybe
 import qualified Data.Map as Map
 import Data.List (find, findIndex, elemIndex)
-import qualified Data.Vector as V
+import qualified Data.Sequence as S
 import Rules
 import Transformers
 import ErrorMsj
@@ -35,8 +35,8 @@ initialT = Map.fromList initialT'
 -- Crea una prueba.
 newProof :: ProverGlobal -> String -> Type -> Type -> TType -> ProofState
 newProof pglobal name ty tyr tty =
-  let s = SP { termContext = V.empty
-             , bTypeContext = V.empty
+  let s = SP { termContext = S.empty
+             , bTypeContext = S.empty
              , lsubp = 1
              , tvars = length $ fTypeContext $ pglobal
              , ty = [Just (tyr, tty)]
@@ -77,8 +77,8 @@ checkNameConflict s c = case getHypothesisValue s of
 -- Estado inicial.
 initProverState :: ProverState
 initProverState = PSt { global = PGlobal { teorems = initialT
-                                         , fTypeContext = []
-                                         , opers = V.fromList [ not_op
+                                         , fTypeContext = S.empty
+                                         , opers = S.fromList [ not_op
                                                               , iff_op
                                                               ]
                                          , conflict = IS.empty
@@ -118,7 +118,7 @@ checkCommand (Ty name ty) =
      let glo = global s
      when ( (Map.member name $ teorems $ glo)
             || (elem name $ fTypeContext glo)
-            || (V.any (\(x,_,_,_) -> x == name) $ opers glo)
+            || (any (\(x,_,_,_) -> x == name) $ opers glo)
             || (any (\(x,_,_) -> x == name) notFoldeableOps)
           )
        (throwIO $ ExistE name)
@@ -136,18 +136,18 @@ checkCommand (Types ps) =
          (tr1, tr2) = typeRepeated ps
                       (\t -> (elem t gps)
                              || (Map.member t $ teorems $ glo)
-                             || (V.any (\(x,_,_,_) -> x == t) $ opers glo)
+                             || (any (\(x,_,_,_) -> x == t) $ opers glo)
                              || (any (\(x,_,_) -> x == t) notFoldeableOps)
                       )
      when (isJust tr1) (throwIO $ TypeRepeated $ fromJust tr1)
      when (isJust tr2) (throwIO $ ExistE $ fromJust tr2)
-     lift $ put $ s {global = (global s) {teorems=teorems $ global s, fTypeContext=ps++gps}}
+     lift $ put $ s {global = (global s) {teorems = teorems $ global s, fTypeContext= ps S.>< gps}}
      prover
 checkCommand (Definition name body) =
   do s <- lift get
      let glo = global s
      when (isJust $ proof s) (throwIO PNotFinished)
-     when ( (V.any (\(x,_,_,_)-> x == name) $ opers glo)
+     when ( (any (\(x,_,_,_)-> x == name) $ opers glo)
             || (any (\(x,_,_) -> x == name) notFoldeableOps)
           )
        (throwIO $ DefE name)
@@ -168,9 +168,9 @@ checkCommand (Ta (Print x)) =
 checkCommand (Ta (Infer x)) =
   do s <- lift get
      let op = opers $ global s
-     (te,te') <- returnInput $ withoutName op (fTypeContext $ global s) (V.empty) (IS.empty, 0) x
+     (te,te') <- returnInput $ withoutName op (fTypeContext $ global s) (S.empty) (IS.empty, 0) x
      outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
-     (ty,ty') <- returnInput $ inferType 0 V.empty (teorems $ global s) op (te,te')
+     (ty,ty') <- returnInput $ inferType 0 S.empty (teorems $ global s) op (te,te')
      --outputStrLn $ "Renombramiento: " ++ (render $ printTerm (opers $ global s) te')
      outputStrLn $ render $ printType op ty
      outputStrLn $ render $ printTType op ty'
@@ -200,13 +200,13 @@ defCommand name (Type (body, n, args, isInfix)) =
 defCommand name (LTerm body) =
   do s <- lift get
      let glo = global s
-     te  <- returnInput $ withoutName (opers glo) (fTypeContext glo) (V.empty) (IS.empty, 0) body
+     te  <- returnInput $ withoutName (opers glo) (fTypeContext glo) (S.empty) (IS.empty, 0) body
      outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers glo) $ fst te)
      lamTermDefinition name te
 defCommand name (Ambiguous ap) =
   do s <- lift get
      let glo = global s
-     t <- returnInput $ disambiguatedTerm V.empty (fTypeContext glo) (opers glo) (conflict glo, 0) ap
+     t <- returnInput $ disambiguatedTerm S.empty (fTypeContext glo) (opers glo) (conflict glo, 0) ap
      case t of
        Left ty ->
          do outputStrLn $ render $ printType (opers glo) $ fst ty
@@ -219,7 +219,7 @@ defCommand name (Ambiguous ap) =
 typeDefinition :: String -> (Type, TType) -> Int -> Bool -> ProverInputState ()
 typeDefinition name t n isInfix =
   do lift $ modify $
-       \s ->  s { global = (global s) { opers = V.snoc (opers $ global s) (name, t, n, isInfix) }}
+       \s ->  s { global = (global s) { opers = opers (global s) S.|> (name, t, n, isInfix)} }
      when isInfix $ lift $ modify $
        \s' -> s' {infixParser =  PP $ usrInfixParser name $ getParser $ infixParser s' }
 
@@ -228,17 +228,22 @@ lamTermDefinition :: String -> (LamTerm, Term) -> ProverInputState ()
 lamTermDefinition name te =
   do s <- lift get
      let glo = global s
-     ty <- returnInput $ inferType 0 V.empty (teorems glo) (opers glo) te
+     ty <- returnInput $ inferType 0 S.empty (teorems glo) (opers glo) te
      lift $ put $ s { global = glo { teorems = Map.insert name (snd te ::: ty) $ teorems $ glo
                                    , conflict = checkNameConflict name $ conflict $ glo } }
 
 -- Funciones auxiliares del comando "Props/Types".
-typeRepeated :: [String] -> (String -> Bool) -> (Maybe String, Maybe String)
-typeRepeated [] _ = (Nothing, Nothing)
-typeRepeated (p:ps) f
-  | elem p ps = (return p, Nothing)
-  | f p = (Nothing, return p)
-  | otherwise = typeRepeated ps f
+typeRepeated :: S.Seq TypeVar -> (String -> Bool) -> (Maybe String, Maybe String)
+typeRepeated ps f
+  | S.null ps = (Nothing, Nothing)
+  | otherwise = let p = S.index ps 0
+                    ps' = S.drop 1 ps
+                in if elem p ps'
+                   then (return p, Nothing)
+                   else if f p
+                        then (Nothing, return p)
+                        else typeRepeated ps' f
+
 
 -- Funciones auxiliares.
 -- Chequea si la prueba a terminado.

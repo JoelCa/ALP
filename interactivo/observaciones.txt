@@ -155,7 +155,9 @@ ni de términos, ni tampoco se puede declarar variables de tipos. En Coq es posi
 Cuando no se construye una prueba, NO se pueden invocar tácticas. En Coq sí se puede.
 
 FALTA:
+- Ver si el renombre del lambda término con "as", que se le pasa a Check, es necesario.
+Ejemplo 11 de inferencia.
+- Crea modulo para "applyTypes"?. Cambiar nombre a "renameTType" (Command.hs)
 - Ver constantes.
 - Mejorar Print (Print All, Print de tipos)
-- Reveer el uso de Vector. Ver todos los "foldr".
 - Crea una estructura de tipos de términos, con y sin nombre.

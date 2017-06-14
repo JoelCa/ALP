@@ -135,7 +135,12 @@ Para probar el exact, y el inferidor.
   op x = forall q, x -> q.
   Theorem t52: forall q, op q.
 Para chequear el renombramiento cuando se hace "unfold op".
-
+- cc = forall qq, qq -> qq.
+ Theorem t52: forall qq, qq -> cc.
+Para chequear el renombramiento con "unfold cc".
+- qq = forall t, t -> t /\ t.
+  Theorem t53: qq -> cc.
+Para chequear el renombramiento con "unfold cc".
 
 Casos de inferencia OK:
 1. infer \A. \B. \x:A. \y:False. let {B,x} = {*B, \B.\x:False. x} as exists A, forall Q, False -> False in (\C. x [False] y) [B].
@@ -152,6 +157,7 @@ Para chequear el pretty printer.
 Para probar precedencia del "as".
 10. infer (\A. \x:forall B, A. \y: A -> A. y as (A -> A) (x as (forall C, A) [A])) as forall B, (forall C, B) -> (B -> B) -> B.
 Para probar precedencia del "as".
+11. Check (\qq.\x:qq.x) as (forall p, p -> p).
 
 
 Definiciones:

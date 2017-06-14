@@ -39,8 +39,8 @@ renamedType3 bs ftc op = typeWithoutName (id, id, bs, bs) ftc op
 
 typeWithoutName :: (a -> TypeVar, TypeVar -> a, S.Seq a, S.Seq a) -> S.Seq TypeVar
                 -> FOperations -> Type -> Either ProofExceptions (Type, TType)
-typeWithoutName frbs@(f, _, _, _) fs op (B x) =
-  getVarType (\_ zs m -> f $ S.index zs m) frbs fs op x
+typeWithoutName frbs@(f, _, rs, bs) fs op (B x) =
+  getVarType (\_ zs m -> f $ S.index zs m) (f, rs, bs) fs op x
 typeWithoutName frbs@(f, f', rs, bs) fs op (ForAll x t) =
   do let v = getRename x (f, rs) (id, fs) (fst4, op)
      (tt,tt') <- typeWithoutName (f, f', (f' v S.<| rs), (f' x S.<| bs)) fs op t
@@ -55,6 +55,37 @@ typeWithoutName frbs fs op (Fun t1 t2) =
      return (Fun tt1 tt2, TFun tt1' tt2')
 typeWithoutName frbs fs op (RenameTy s args ts) =
   getOpType op s args ts $ typeWithoutName frbs fs op
+
+
+renamedTypeWithName :: BTypeContext -> FTypeContext ->  FOperations
+                    -> Type -> Type
+renamedTypeWithName bs = renamedTypeWithName' bs bs
+  
+-- Renombra las variables de tipo ligadas de un tipo con nombre válido.
+-- Se asume que el tipo dado por el 5º arg. está bien formado. Es decir que,
+-- NO tiene variables escapadas que no han sido declaradas en el contexto.
+-- Argumentos:
+-- 1. Conjunto de variables de tipo ligadas renombradas.
+-- 2. Conjunto de variables de tipo ligadas no renombradas.
+-- 3. Conjunto de variables de tipos libres.
+-- 4. Operaciones.
+-- 5. Tipo sobre el que se realiza el renombramiento.
+renamedTypeWithName' :: BTypeContext -> BTypeContext -> FTypeContext
+                     -> FOperations -> Type -> Type
+renamedTypeWithName' rs bs fs op (B x) =
+  case S.findIndexL (\(_,w) -> w == x) bs of
+    Just n -> B $ snd $ S.index rs n
+    Nothing -> B x
+renamedTypeWithName' rs bs fs op (ForAll x t) =
+  let v = getRename x (snd, rs) (id, fs) (fst4, op)
+  in ForAll v $ renamedTypeWithName' (bTypeVar v S.<| rs) (bTypeVar x S.<| bs) fs op t
+renamedTypeWithName' rs bs fs op (Exists x t) =
+  let v = getRename x (snd, rs) (id, fs) (fst4, op)
+  in Exists v $ renamedTypeWithName' (bTypeVar v S.<| rs) (bTypeVar x S.<| bs) fs op t
+renamedTypeWithName' rs bs fs op (Fun t1 t2) =
+  Fun (renamedTypeWithName' rs bs fs op t1) (renamedTypeWithName' rs bs fs op t2)
+renamedTypeWithName' rs bs fs op (RenameTy s args ts) =
+  RenameTy s args $ map (renamedTypeWithName' rs bs fs op) ts
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Trasformadores de lambda términos: Se pasa de un lambda término con nombre, al equivalente sin nombre.
@@ -128,16 +159,16 @@ disambiguatedTerm btc ftc op cnn t =
 disambiguatedType :: BTypeContext -> FTypeContext -> FOperations
                   -> GenTree String -> Either ProofExceptions (Type, TType)
 disambiguatedType bs fs op (Node x []) =
-  getVarType (\w _ _ -> w) (snd, bTypeVar, S.empty, bs) fs op x -- NO es necesario rs
+  getVarType (\w _ _ -> w) (snd, S.empty, bs) fs op x -- NO es necesario rs
 disambiguatedType bs fs op (Node x xs) =
   getOpType op x (length xs) xs $ disambiguatedType bs fs op
 
 
 getVarType :: (TypeVar -> S.Seq a -> Int -> TypeVar)
-           -> (a -> TypeVar, TypeVar -> a, S.Seq a, S.Seq a) -> S.Seq String
+           -> (a -> TypeVar, S.Seq a, S.Seq a) -> S.Seq String
            -> FOperations
            -> String -> Either ProofExceptions (Type, TType)
-getVarType fvar frbs@(f, f', rs, bs) fs op x =
+getVarType fvar frbs@(f, rs, bs) fs op x =
   case S.findIndexL (\w -> f w == x) bs of
     Just n -> return (B $ fvar x rs n, TBound n)
     Nothing -> case getElemIndex (\w -> fst4 w == x) op of

@@ -1,6 +1,6 @@
 import System.Environment
 import System.Console.Haskeline
-import Commands
+import Tactics (habitar)
 import Parser
 import Common hiding (State, catch, get)
 import Text.PrettyPrint.HughesPJ (render)
@@ -17,6 +17,7 @@ import Rules
 import Transformers
 import ErrorMsj
 import qualified Data.IntSet as IS
+import TypeInference (typeInference)
 
 type ProverInputState a = InputT (StateT ProverState IO) a
 
@@ -170,7 +171,7 @@ checkCommand (Ta (Infer x)) =
      let op = opers $ global s
      (te,te') <- returnInput $ withoutName op (fTypeContext $ global s) (S.empty) (IS.empty, 0) x
      --outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
-     (ty,ty') <- returnInput $ inferType 0 S.empty (teorems $ global s) op (te,te')
+     (ty,ty') <- returnInput $ typeInference 0 S.empty (teorems $ global s) op (te,te')
      --outputStrLn $ "Renombramiento: " ++ (render $ printTerm (opers $ global s) te')
      outputStrLn $ render $ printType op ty
      outputStrLn $ render $ printTType op ty'
@@ -228,7 +229,7 @@ lamTermDefinition :: String -> (LamTerm, Term) -> ProverInputState ()
 lamTermDefinition name te =
   do s <- lift get
      let glo = global s
-     ty <- returnInput $ inferType 0 S.empty (teorems glo) (opers glo) te
+     ty <- returnInput $ typeInference 0 S.empty (teorems glo) (opers glo) te
      lift $ put $ s { global = glo { teorems = Map.insert name (snd te ::: ty) $ teorems $ glo
                                    , conflict = checkNameConflict name $ conflict $ glo } }
 

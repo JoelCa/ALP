@@ -256,7 +256,7 @@ seqOrdered1 p = do x <- p
 
 sepByCommaSeq :: Parser a -> Parser (S.Seq a)
 sepByCommaSeq p = do x <- p
-                     (do xs <- sepByCommaSeq (comma >> p)
+                     (do xs <- comma >> sepByCommaSeq p
                          return (x S.<| xs)
                       <|> return (S.singleton x))
 

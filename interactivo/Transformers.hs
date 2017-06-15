@@ -256,3 +256,52 @@ getTermVar x (cn, n) =
 
 bTypeVar :: TypeVar -> BTypeVar
 bTypeVar x = (0, x)
+
+
+-- Obtiene la substitución para la unificación, de acuerdo a la profundidad dada por el 1º argumento.
+-- Realiza un corrimiento "negativo" de las variables de tipo escapadas.
+-- Argumentos:
+-- 1. Número de corrimiento.
+-- 2. Tipo, con y sin nombre, sobre el que se realiza el corrimiento.
+negativeShift :: Int -> (Type, TType) -> Maybe (Type, TType)
+negativeShift = negativeShift' 0
+
+negativeShift' :: Int -> Int -> (Type, TType) -> Maybe (Type, TType)
+negativeShift' m n (t,t'@(TBound x))
+  | x < m = return (t,t')
+  | (m <= x) && (x < n) = Nothing
+  | otherwise = return (t, TBound $ x - n + m)
+negativeShift' _ _ (t, t'@(TFree f)) = return (t,t')
+negativeShift' m n (Fun t1 t2,TFun t1' t2') =
+  do (x,x') <- negativeShift' m n (t1,t1')
+     (y,y') <- negativeShift' m n (t2,t2')
+     return (Fun x y, TFun x' y')
+negativeShift' m n (RenameTy s args ts, RenameTTy op ts') =
+  do rs <- sequence $ map (negativeShift' m n) $ zip ts ts'
+     let (xs,ys) =  unzip rs
+     return (RenameTy s args xs, RenameTTy op ys)
+negativeShift' m n (ForAll v t, TForAll t') =
+  do (x,x') <- negativeShift' (m+1) (n+1) (t,t')
+     return (ForAll v x, TForAll x')
+negativeShift' m n (Exists v t, TExists t') =
+  do (x,x') <- negativeShift' (m+1) (n+1) (t,t')
+     return (Exists v x, TExists x')
+
+
+-- Realiza un corrimiento "positivo" sobre las variables de tipo ligadas "escapadas".
+-- Argumentos:
+-- 1. Número de corrimiento.
+-- 2. Tipo sin nombre sobre el que se realiza el corrimiento.
+positiveShift :: Int -> TType -> TType
+positiveShift 0 = id
+positiveShift n = positiveShift' 0 n
+
+positiveShift' :: Int -> Int -> TType -> TType
+positiveShift' n r t@(TBound x)
+  | x < n = t
+  | otherwise = TBound (x+r)
+positiveShift' _ _ t@(TFree x) = t
+positiveShift' n r (TForAll t) = TForAll $ positiveShift' (n+1) r t
+positiveShift' n r (TExists t) = TExists $ positiveShift' (n+1) r t
+positiveShift' n r (TFun t1 t2) = TFun (positiveShift' n r t1) (positiveShift' n r t2)
+positiveShift' n r (RenameTTy op ts) = RenameTTy op $ map (positiveShift' n r) ts

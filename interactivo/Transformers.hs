@@ -18,7 +18,7 @@ import Control.Lens.Cons
 -- 3. Tipo a procesar.
 -- OBS: Utilizamos esta función sobre tipos que NO requieren del contexto de tipos "ligados".
 renamedType :: FTypeContext -> FOperations -> Type -> Either ProofExceptions (Type, TType)
-renamedType ftc op = typeWithoutName (id, id, S.empty, S.empty) ftc op
+renamedType ftc op = renamedTypePlus (id, id, S.empty, S.empty) ftc op
 
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
 -- por el 4º argumento.
@@ -26,7 +26,7 @@ renamedType ftc op = typeWithoutName (id, id, S.empty, S.empty) ftc op
 -- OBS: Utilizamos esta función sobre tipos que requieren del contexto de tipos "ligados".
 renamedType2 :: BTypeContext -> FTypeContext ->  FOperations
              -> Type -> Either ProofExceptions (Type, TType)
-renamedType2 bs ftc op = typeWithoutName (snd, bTypeVar, bs, bs) ftc op
+renamedType2 bs ftc op = renamedTypePlus (snd, bTypeVar, bs, bs) ftc op
 
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
 -- por el 4º argumento.
@@ -34,27 +34,64 @@ renamedType2 bs ftc op = typeWithoutName (snd, bTypeVar, bs, bs) ftc op
 -- OBS: Solo la utilizamos en el renombramiento del cuerpo de una operación.
 renamedType3 :: S.Seq TypeVar -> FTypeContext ->  FOperations
              -> Type -> Either ProofExceptions (Type, TType)
-renamedType3 bs ftc op = typeWithoutName (id, id, bs, bs) ftc op
+renamedType3 bs ftc op = renamedTypePlus (id, id, bs, bs) ftc op
 
 
-typeWithoutName :: (a -> TypeVar, TypeVar -> a, S.Seq a, S.Seq a) -> S.Seq TypeVar
+renamedTypePlus :: (a -> TypeVar, TypeVar -> a, S.Seq a, S.Seq a) -> S.Seq TypeVar
                 -> FOperations -> Type -> Either ProofExceptions (Type, TType)
-typeWithoutName frbs@(f, _, rs, bs) fs op (B x) =
+renamedTypePlus (f, _, rs, bs) fs op (B x) =
   getVarType (\_ zs m -> f $ S.index zs m) (f, rs, bs) fs op x
-typeWithoutName frbs@(f, f', rs, bs) fs op (ForAll x t) =
+renamedTypePlus (f, f', rs, bs) fs op (ForAll x t) =
   do let v = getRename x (f, rs) (id, fs) (fst4, op)
-     (tt,tt') <- typeWithoutName (f, f', (f' v S.<| rs), (f' x S.<| bs)) fs op t
+     (tt,tt') <- renamedTypePlus (f, f', (f' v S.<| rs), (f' x S.<| bs)) fs op t
      return (ForAll v tt, TForAll tt')
-typeWithoutName frbs@(f, f', rs, bs) fs op (Exists x t) =
+renamedTypePlus (f, f', rs, bs) fs op (Exists x t) =
   do let v = getRename x (f, rs) (id, fs) (fst4, op)
-     (tt,tt') <- typeWithoutName (f, f', (f' v S.<| rs), (f' x S.<| bs)) fs op t
+     (tt,tt') <- renamedTypePlus (f, f', (f' v S.<| rs), (f' x S.<| bs)) fs op t
      return (Exists v tt, TExists tt')
-typeWithoutName frbs fs op (Fun t1 t2) =
-  do (tt1, tt1') <- typeWithoutName frbs fs op t1
-     (tt2, tt2') <- typeWithoutName frbs fs op t2
+renamedTypePlus frbs fs op (Fun t1 t2) =
+  do (tt1, tt1') <- renamedTypePlus frbs fs op t1
+     (tt2, tt2') <- renamedTypePlus frbs fs op t2
      return (Fun tt1 tt2, TFun tt1' tt2')
-typeWithoutName frbs fs op (RenameTy s args ts) =
-  getOpType op s args ts $ typeWithoutName frbs fs op
+renamedTypePlus frbs fs op (RenameTy s args ts) =
+  getOpType op s args ts $ renamedTypePlus frbs fs op
+
+
+typeWithoutName :: (a -> TypeVar, TypeVar -> a, S.Seq a) -> S.Seq TypeVar
+                -> FOperations -> Type -> Either ProofExceptions TType
+typeWithoutName (f, _, bs) fs op (B x) =
+  case S.findIndexL (\w -> f w == x) bs of
+    Just n -> return $ TBound n
+    Nothing -> case getElemIndex (\w -> fst4 w == x) op of
+                 Just (n, a) -> if getNumArgs a == 0
+                                then return $ RenameTTy n []
+                                else throw $ OpE1 x
+                 Nothing -> if elem x fs
+                            then return $ TFree x
+                            else throw $ TypeE x
+typeWithoutName (f, f', bs) fs op (ForAll x t) =
+  do tt <- typeWithoutName (f, f', f' x S.<| bs) fs op t
+     return $ TForAll tt
+typeWithoutName (f, f', bs) fs op (Exists x t) =
+  do tt <- typeWithoutName (f, f', f' x S.<| bs) fs op t
+     return $ TExists tt
+typeWithoutName fbs fs op (Fun t1 t2) =
+  do tt1 <- typeWithoutName fbs fs op t1
+     tt2 <- typeWithoutName fbs fs op t2
+     return $ TFun tt1 tt2
+typeWithoutName fbs fs op (RenameTy s args ts) =
+  case find (\(x,_,_) -> x == s) notFoldeableOps of
+    Just (_,n,args') ->
+      if args' == args
+      then do tt <- sequence $ map (typeWithoutName fbs fs op) ts
+              return $ RenameTTy n tt
+      else throw $ OpE1 s
+    Nothing ->
+      do (m, a) <- maybeToEither (OpE2 s) $ getElemIndex (\x -> fst4 x == s) op
+         if getNumArgs a == args
+           then do tt <- sequence $ map (typeWithoutName fbs fs op) ts
+                   return $ RenameTTy m tt
+           else throw $ OpE1 s
 
 
 renamedTypeWithName :: BTypeContext -> FTypeContext ->  FOperations
@@ -112,7 +149,7 @@ withoutName' ters tebs _ _ _ _ cnn w@(LVar x) =
     Nothing -> return (w, getTermVar x cnn)
 withoutName' ters tebs tyrs tybs fs op cnn (Abs x t e) =
   do let h = getRename x (id, ters) (id, S.empty) (id, S.empty)
-     t' <- typeWithoutName (snd, \x -> (0, x), tyrs, tybs) fs op t
+     t' <- renamedTypePlus (snd, \x -> (0, x), tyrs, tybs) fs op t
      (ee, ee') <- withoutName' (h S.<| ters)(x S.<| tebs) tyrs tybs fs op cnn e
      return (Abs h (fst t') ee, Lam t' ee')
 withoutName' ters tebs tyrs tybs fs op cnn (App e1 e2) =
@@ -125,12 +162,12 @@ withoutName' ters tebs tyrs tybs fs op cnn (BAbs x e) =
      return (BAbs v ee, BLam v ee')
 withoutName' ters tebs tyrs tybs fs op cnn (BApp e t) =
   do (ee, ee') <- withoutName' ters tebs tyrs tybs fs op cnn e
-     t' <- typeWithoutName (snd, \x -> (0, x), tyrs, tybs) fs op t
+     t' <- renamedTypePlus (snd, \x -> (0, x), tyrs, tybs) fs op t
      return (BApp ee (fst t'), ee' :!: t')
 withoutName' ters tebs tyrs tybs fs op cnn (EPack t e t') =
-  do tt <- typeWithoutName (snd, \x -> (0, x), tyrs, tybs) fs op t
+  do tt <- renamedTypePlus (snd, \x -> (0, x), tyrs, tybs) fs op t
      (ee, ee') <- withoutName' ters tebs tyrs tybs fs op cnn e
-     tt' <- typeWithoutName (snd, \x -> (0, x), tyrs, tybs) fs op t'
+     tt' <- renamedTypePlus (snd, \x -> (0, x), tyrs, tybs) fs op t'
      return (EPack (fst tt) ee (fst tt'), Pack tt ee' tt')
 withoutName' ters tebs tyrs tybs fs op cnn (EUnpack x y e1 e2) =
   do (ee1, ee1') <- withoutName' ters tebs tyrs tybs fs op cnn e1
@@ -140,8 +177,8 @@ withoutName' ters tebs tyrs tybs fs op cnn (EUnpack x y e1 e2) =
      return (EUnpack v h ee1 ee2, Unpack v ee1' ee2')
 withoutName' ters tebs tyrs tybs fs op cnn (As e t) =
   do (ee, ee') <- withoutName' ters tebs tyrs tybs fs op cnn e
-     t' <- typeWithoutName (snd, \x -> (0, x), tyrs, tybs) fs op t
-     return (As ee (fst t'), ee' ::: t')
+     t' <- typeWithoutName (snd, \x -> (0, x), tybs) fs op t
+     return (As ee t, ee' ::: (t, t'))
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Transformadores para aplicaciones ambiguas.

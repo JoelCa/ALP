@@ -158,6 +158,13 @@ Para probar precedencia del "as".
 10. infer (\A. \x:forall B, A. \y: A -> A. y as (A -> A) (x as (forall C, A) [A])) as forall B, (forall C, B) -> (B -> B) -> B.
 Para probar precedencia del "as".
 11. Check (\qq.\x:qq.x) as (forall p, p -> p).
+12. Check (\a.\a.\x:a.x) as (forall a, forall a, a -> a).
+
+
+Casos de inferencia ERROR:
+1. infer \B. let {A,a} = {*B, \x:B.x} as exists C, C -> C in a.
+2. infer \a.\x:a.\a.\b.\y:a->b. y x.
+3. Check (\a.\x:a.\a.\y:a -> a.y x) as (forall a, a -> forall a, (a -> a) -> a).
 
 
 Definiciones:
@@ -167,10 +174,6 @@ Definiciones:
    tutu = (\X. \t:X. \f:X. f) as CBool2.
    t1 = \f:CBool -> CBool -> CBool2. f tru tutu.
 
-
-Casos de inferencia ERROR:
-1. infer \B. let {A,a} = {*B, \x:B.x} as exists C, C -> C in a.
-2. infer \a.\x:a.\a.\b.\y:a->b. y x.
 
 TERMINAR de ver:
 Ver caso de CBool y CBool2, en test.f

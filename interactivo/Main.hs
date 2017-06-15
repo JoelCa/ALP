@@ -123,7 +123,7 @@ checkCommand (Ty name ty) =
           )
        (throwIO $ ExistE name)
      (tyr,tty) <- returnInput $ renamedType (fTypeContext glo) (opers glo) ty
-     outputStrLn $ show (tyr,tty) ++ "\n"
+     --outputStrLn $ show (tyr,tty) ++ "\n"
      let p = newProof glo name ty tyr tty
      lift $ put $ s { proof = Just p }
      outputStrLn $ renderProof $ constr p
@@ -169,7 +169,7 @@ checkCommand (Ta (Infer x)) =
   do s <- lift get
      let op = opers $ global s
      (te,te') <- returnInput $ withoutName op (fTypeContext $ global s) (S.empty) (IS.empty, 0) x
-     outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
+     --outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
      (ty,ty') <- returnInput $ inferType 0 S.empty (teorems $ global s) op (te,te')
      --outputStrLn $ "Renombramiento: " ++ (render $ printTerm (opers $ global s) te')
      outputStrLn $ render $ printType op ty

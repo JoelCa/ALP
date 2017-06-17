@@ -159,7 +159,8 @@ Para probar precedencia del "as".
 Para probar precedencia del "as".
 11. Check (\qq.\x:qq.x) as (forall p, p -> p).
 12. Check (\a.\a.\x:a.x) as (forall a, forall a, a -> a).
-
+13. Check (\a.\b.\x:b.\y:a.y) [forall b, b -> b].
+Notamos que no se renombran las variables ligadas del tipo que se utiliza en una substitución (esta bien, no es necesario).
 
 Casos de inferencia ERROR:
 1. infer \B. let {A,a} = {*B, \x:B.x} as exists C, C -> C in a.

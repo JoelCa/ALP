@@ -61,7 +61,7 @@ rword w = try $ string w *> notFollowedBy alphaNumChar *> sc
 identifier :: Parser String
 identifier = (lexeme . try) (p >>= check)
   where
-    p       = (:) <$> letterChar <*> many alphaNumChar
+    p       = (:) <$> letterChar <*> many (alphaNumChar <|> char '_')
     check x = if x `elem` reservedWords
                 then fail $ "keyword " ++ show x ++ " cannot be an identifier"
                 else return x
@@ -345,10 +345,10 @@ unfoldP = do rword "unfold"
 
 exactP :: Parser Tactic
 exactP = do rword "exact"
-            r <- do xs <- ambiguousApp <|> parens ambiguousApp
-                    return $ Appl xs
-                 <|> do te <- lambTerm
-                        return $ LamT te
+            r <- try (do xs <- ambiguousApp <|> parens ambiguousApp
+                         return $ Appl xs)
+                 <|> try (do te <- lambTerm
+                             return $ LamT te)
                  <|> do ty <- typeTerm
                         return $ T ty
             dot

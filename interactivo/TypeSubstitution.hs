@@ -88,7 +88,8 @@ ttypeSubs' n l (RenameTTy op xs) ts =
 
 -- Consideramos que el 1º argumento corresponde al cuerpo de una cuantificación ("para todo", "existe").
 -- Se reemplaza la variable ligada más "externa" por el 2º argumento.
--- Además, se corrigen las varibles ligadas escapadas.
+-- Además, se corrigen las varibles ligadas escapadas sin nombre. No se renombran las variables ligadas
+-- con nombre.
 basicTypeSubs :: (Type, TType) -> (Type, TType) -> (Type, TType)
 basicTypeSubs = basicTypeSubs' 0
 

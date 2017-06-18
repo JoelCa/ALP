@@ -1,6 +1,8 @@
 module PrettyPrinter where
 
 import Common
+import Proof
+import DefaultOperators
 import Text.PrettyPrint.HughesPJ hiding (parens)
 import qualified Text.PrettyPrint.HughesPJ as PP 
 import Data.List
@@ -27,7 +29,7 @@ typeVars = [ c : n | n <- "" : map show nats, c <- ['a' .. 'o']]
 -- Variables de términos libres.
 fv :: Term -> [String]
 fv (Bound _)         = []
-fv (Free (Global n)) = [n]
+fv (Free (NGlobal n)) = [n]
 fv (Free (Quote _))  = []
 fv (t :@: u)         = fv t ++ fv u
 fv (Lam _ u)         = fv u
@@ -92,7 +94,7 @@ printTermTType' :: FOperations -> (Int, Bool) -> [String] -> [String] -> [String
                 -> Term -> Doc
 printTermTType' _ _ bs _  _ _ (Bound x)=
   text $ bs !! x
-printTermTType' _ _ _  _  _ _ (Free (Global n)) =
+printTermTType' _ _ _  _  _ _ (Free (NGlobal n)) =
   text n
 printTermTType' op (i, j) bs bts fs fts (t :@: u) =
   parenIf ((i < pApp) || ((i == pApp) && j)) $ 
@@ -160,7 +162,7 @@ printTerm op t = printTerm' op (1, False) [] (vars \\ fv t)  t
 printTerm' :: FOperations -> (Int, Bool) -> [String] -> [String] -> Term -> Doc
 printTerm' _ _ bs _  (Bound x) =
   text $ bs !! x
-printTerm' _ _ _  _  (Free (Global n)) =
+printTerm' _ _ _  _  (Free (NGlobal n)) =
   text n
 printTerm' op (i, j) bs fs (t :@: u) =
   parenIf ((i < pApp) || ((i == pApp) && j)) $   

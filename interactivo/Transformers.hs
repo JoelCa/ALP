@@ -1,6 +1,7 @@
 module Transformers where
 
 import Common
+import DefaultOperators
 import Data.List (findIndex, elemIndex, find)
 import RenamedVariables
 import Hypothesis
@@ -251,8 +252,8 @@ getTermVar x (cn, n) =
   case getHypothesisValue x of
     Just h -> case getHypoPosition cn n h of
                 Just i -> Bound i
-                _ -> Free $ Global x       --Probable teorema
-    Nothing -> Free $ Global x
+                _ -> Free $ NGlobal x       --Probable teorema
+    Nothing -> Free $ NGlobal x
 
 bTypeVar :: TypeVar -> BTypeVar
 bTypeVar x = (0, x)

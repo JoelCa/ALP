@@ -1,6 +1,7 @@
 module Rules where
 
 import Common
+import DefaultOperators
 
 -- Reglas de eliminación e introducción del "and","or", y "bottom".
 

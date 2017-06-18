@@ -9,38 +9,31 @@ import System.Console.Haskeline.MonadException (Exception)
 import Data.Map (Map)
 import Control.Monad (ap, liftM)
 import Control.Monad.State.Lazy
-import Data.IntSet
 import Text.Megaparsec
 import Control.Monad.Reader (Reader)
 import Data.Sequence (Seq, foldlWithIndex)
-
-type UsrParser = ParserParser Type
-
-type Parser = ParsecT Dec String (Reader UsrParser)
-
-newtype ParserParser a = PP { getParser :: Parser a }
-
-
+  
   -- Nombres.
 data Name
-     =  Global  String
+     =  NGlobal  String
      |  Quote   Int
      deriving (Show, Eq)
-    
-type TermV = String
-type TypeV = String
+
+type TermVar = String
+
+type TypeVar = String
 
   -- Tipos con nombre.
-data Type = B TypeV
+data Type = B TypeVar
           | Fun Type Type
-          | ForAll TypeV Type
-          | Exists TypeV Type
+          | ForAll TypeVar Type
+          | Exists TypeVar Type
           | RenameTy String Int [Type]
           deriving (Show, Eq)
   
   -- Tipos sin nombre.
 data TType = TBound Int
-           | TFree TypeV
+           | TFree TypeVar
            | TFun TType TType
            | TForAll TType
            | TExists TType
@@ -48,13 +41,13 @@ data TType = TBound Int
            deriving (Show, Eq)
 
   -- Lambda términos con nombres.
-data LamTerm  = LVar TermV
-              | Abs TermV Type LamTerm
+data LamTerm  = LVar TermVar
+              | Abs TermVar Type LamTerm
               | App LamTerm LamTerm
-              | BAbs TypeV LamTerm
+              | BAbs TypeVar LamTerm
               | BApp LamTerm Type
               | EPack Type LamTerm Type
-              | EUnpack TypeV TermV LamTerm LamTerm
+              | EUnpack TypeVar TermVar LamTerm LamTerm
               | As LamTerm Type
               deriving (Show, Eq)
 
@@ -63,16 +56,12 @@ data Term  = Bound Int
            | Free Name 
            | Term :@: Term
            | Lam (Type,TType) Term
-           | BLam TypeV Term
+           | BLam TypeVar Term
            | Term :!: (Type,TType)
            | Pack (Type,TType) Term (Type,TType)
-           | Unpack TypeV Term Term
+           | Unpack TypeVar Term Term
            | Term ::: (Type,TType)
            deriving (Show, Eq)
-
-type TypeVar = String
-
-type TermVar = String
 
 -- Para cada variable de término, tenemos (por posición en la 4-tupla):
   -- 1. Su posición en el contexto, a la hora de imprimirlo.
@@ -92,15 +81,17 @@ type BTypeVar = (Int, TypeVar)
   -- Secuencia de variables de tipo ligadas.
 type BTypeContext = Seq BTypeVar
 
-  -- Tabla de teoremas.
-  -- Clave: Nombre del teorema.
-  -- Valor: El lambda término de la prueba.
-type Teorems = Map String Term
 
 type FTypeVar = TypeVar
 
   -- Secuencia de variables de tipo libres.
 type FTypeContext = Seq FTypeVar
+
+  -- Tabla de teoremas.
+  -- Clave: Nombre del teorema.
+  -- Valor: El lambda término de la prueba.
+type Teorems = Map String Term
+
 
   --Comandos.
 data Command = Ty String Type
@@ -113,7 +104,14 @@ data BodyDef = LTerm LamTerm
              | Type TypeDefinition
              | Ambiguous (GenTree String)
              deriving (Show)
-             
+
+  -- Definición de una "operación".
+  -- 1. Cuerpo de la operación.
+  -- 2. Cantidad de operandos.
+  -- 3. Lista de los nombres de los argumentos.
+  -- 4. Boleano. True sii es una operación binaria infija.
+type TypeDefinition = (Type, Operands, Seq TypeVar, Bool)
+
   -- Tácticas.
 data Tactic = Assumption | Apply Int | Intro | Intros | Split
             | Elim Int | CLeft | CRight | Print String 
@@ -148,42 +146,12 @@ instance Exception ProofExceptions
 data GenTree a = Nil | Node a [GenTree a]
                deriving (Show)
 
+
   -- Cantidad de operandos de una operación.
 type Operands = Int
 
-fst3 :: (a, b, c) -> a
-fst3 (x, _, _) = x
-
-snd3 :: (a, b, c) -> b
-snd3 (_, x, _) = x
-
-  -- Conjunto de operaciones NO "foldeables".
-notFoldeableOps :: [(String, Int, Operands)]
-notFoldeableOps = [and_, or_, bottom_]
-
-  -- Operaciones por default, NO "foldeables", donde:
-  -- 1. Texto de la operación.
-  -- 2. Código que identifica a la operación.
-  -- 3. Cantidad de operandos (a lo sumo 2).
-and_ = (['/','\\'] , -1, 2)
-or_ = (['\\','/'], -2, 2)
-bottom_ = ("False", -3, 0)
-
-and_text = fst3 and_
-or_text = fst3 or_
-bottom_text = fst3 bottom_
-
-and_code = snd3 and_
-or_code = snd3 or_
-bottom_code = snd3 bottom_
-
-  -- Operaciones por default, "foldeables".
-not_text = "~"
-iff_text = "<->"
-
-iff_code = 1 :: Int
-not_code = 0 :: Int
-
+  -- Operación NO "foldeable".
+type NotFoldeableOp = (String, Int, Operands)
 
   -- Operación "foldeable", donde:
   -- 1. Identificador.
@@ -193,67 +161,22 @@ not_code = 0 :: Int
   -- Todas las operaciones que define el usuario son foldeables.
 type FoldeableOp = (String, (Type, TType), Operands, Bool)
 
+  -- Operaciones "foldeables".
+type FOperations = Seq FoldeableOp
+
 getNumArgs :: FoldeableOp -> Operands
 getNumArgs (_,_,n,_) = n
 
-type FOperations = Seq FoldeableOp
+fst3 :: (a, b, c) -> a
+fst3 (x, _, _) = x
 
-  -- Definición de una "operación".
-  -- 1. Cuerpo de la operación.
-  -- 2. Cantidad de operandos.
-  -- 3. Lista de los nombres de los argumentos.
-  -- 4. Boleano. True sii es una operación binaria infija.
-type TypeDefinition = (Type, Operands, Seq TypeVar, Bool)
-
-  -- Estado general.
-data ProverState = PSt { proof :: Maybe ProofState
-                       , global :: ProverGlobal
-                       , infixParser :: UsrParser
-                       }
-
-  -- Definiciones globales.
-data ProverGlobal = PGlobal { fTypeContext :: FTypeContext
-                            , teorems :: Teorems             -- Teoremas.
-                            , opers :: FOperations           -- Operaciones "foldeables"
-                            , conflict :: IntSet             -- Nombres de teoremas conflictivos.
-                            }
-                    
-  -- Estado de la prueba que se está construyendo.
-data ProofState = PState { name :: String
-                         , types :: (Type,TType)
-                         , constr :: ProofConstruction
-                         }
-
-  -- Construcción de la prueba.
-data ProofConstruction = PConstruction { tsubp :: Int              -- Cantidad total de subpruebas activas.
-                                       , subps :: [SubProof]       -- Datos de las subpruebas, ordenas por nivel.
-                                       , cglobal :: ProverGlobal   -- Copia de los datos globales.
-                                       , term :: [SpecialTerm]     -- Lambda termino.
-                                       }
-
-  -- Conjunto de subpruebas.
-data SubProof = SP { termContext :: TermContext    -- Vars. de término.
-                   , bTypeContext :: BTypeContext  -- Vars. de tipo ligadas.
-                                                   -- Útil para el pretty printer.
-                   , lsubp :: Int                  -- Cantidad de subpruebas activas contenidas.
-                   , tvars :: Int                  -- Cantidad total de variables de tipo y
-                                                   -- términos disponibles. Útil para el pretty printer.
-                   , ty :: [Maybe (Type, TType)]   -- Tipo objetivo, de cada subprueba contenida.
-                   }
-
-
-  -- Lamda términos con aujeros.
-data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) |
-                   Term Term | TypeH TypeHole
-
-  -- Tipos con aujeros.
-data TypeHole = HTe ((Type, TType) -> Term) | HTy ((Type, TType) -> TypeHole)
+snd3 :: (a, b, c) -> b
+snd3 (_, x, _) = x
 
 
   -- Instancias.
 newtype StateExceptions s e a = StateExceptions { runStateExceptions :: s -> Either e (a, s) }
 
-type Proof = StateExceptions ProofConstruction ProofExceptions
 
 instance Monad (StateExceptions s e) where
   return x = StateExceptions (\s -> Right (x, s))

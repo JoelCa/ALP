@@ -27,7 +27,7 @@ typeInference n c te op t = case typeInference' n c te op t of
 
 typeInference' :: Int -> TermContext -> Teorems -> FOperations
           -> (LamTerm, Term) -> Either InferExceptions (Type, TType)
-typeInference' n _ te _ (_, Free (Global x)) =
+typeInference' n _ te _ (_, Free (NGlobal x)) =
   case M.lookup x te of
     Just (_ ::: t) -> return t
     Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean teoremas.

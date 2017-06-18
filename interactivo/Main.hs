@@ -1,10 +1,19 @@
-import System.Environment
-import System.Console.Haskeline
 import Tactics (habitar)
 import Parser
 import Common hiding (State, catch, get)
 import Text.PrettyPrint.HughesPJ (render)
 import PrettyPrinter (printTerm, printProof, printType, printTType, printTermTType, printLamTerm)
+import Rules
+import Transformers
+import ErrorMsj
+import TypeInference (typeInference)
+import ProverState
+import GlobalState
+import Proof
+import TermsWithHoles
+import DefaultOperators
+import System.Environment
+import System.Console.Haskeline
 import System.Console.Haskeline.MonadException
 import Control.Monad.Trans.Class
 import Control.Monad.State.Strict
@@ -13,12 +22,8 @@ import Data.Maybe
 import qualified Data.Map as Map
 import Data.List (find, findIndex, elemIndex)
 import qualified Data.Sequence as S
-import Rules
-import Transformers
-import ErrorMsj
 import qualified Data.IntSet as IS
-import TypeInference (typeInference)
-
+  
 type ProverInputState a = InputT (StateT ProverState IO) a
 
 -- Teoremas iniciales.
@@ -34,7 +39,7 @@ initialT' = [ ("intro_and", intro_and),
 initialT = Map.fromList initialT'
 
 -- Crea una prueba.
-newProof :: ProverGlobal -> String -> Type -> Type -> TType -> ProofState
+newProof :: GlobalState -> String -> Type -> Type -> TType -> ProofState
 newProof pglobal name ty tyr tty =
   let s = SP { termContext = S.empty
              , bTypeContext = S.empty
@@ -77,13 +82,13 @@ checkNameConflict s c = case getHypothesisValue s of
 
 -- Estado inicial.
 initProverState :: ProverState
-initProverState = PSt { global = PGlobal { teorems = initialT
-                                         , fTypeContext = S.empty
-                                         , opers = S.fromList [ not_op
-                                                              , iff_op
-                                                              ]
-                                         , conflict = IS.empty
-                                         }
+initProverState = PSt { global = Global { teorems = initialT
+                                        , fTypeContext = S.empty
+                                        , opers = S.fromList [ not_op
+                                                             , iff_op
+                                                             ]
+                                        , conflict = IS.empty
+                                        }
                       , proof = Nothing
                       , infixParser = PP basicInfixParser   -- infixOps
                       }

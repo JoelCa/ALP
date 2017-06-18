@@ -1,6 +1,7 @@
 module Parser where
 
 import Common
+import DefaultOperators
 import Text.Megaparsec hiding (State)
 import qualified Text.Megaparsec.Lexer as L
 import qualified Text.Megaparsec.String as S
@@ -8,6 +9,12 @@ import Control.Applicative (empty)
 import Control.Monad (void)
 import Control.Monad.Reader
 import qualified Data.Sequence as S (Seq, empty, (<|), (|>), singleton, fromList)
+
+type UsrParser = ParserParser Type
+
+type Parser = ParsecT Dec String (Reader UsrParser)
+
+newtype ParserParser a = PP { getParser :: Parser a }
 
 type ProofCommand = Either ProofExceptions Command
 

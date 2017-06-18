@@ -1,9 +1,9 @@
 module ProverState where
 
 import Common
-import Parser (UsrParser)
-import GlobalState (GlobalState)
-import Proof (ProofConstruction)
+import Parser (UsrParser, basicInfixParser)
+import GlobalState
+import Proof (ProofConstruction, newProofC, getTermFromProof)
 
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState
@@ -18,22 +18,40 @@ data ProofState = PState { name :: String
                          , constr :: ProofConstruction
                          }
 
--- Crea una prueba.
-newProof :: GlobalState -> String -> Type -> Type -> TType -> ProofState
-newProof pglobal name ty tyr tty =
-  let s = SP { termContext = S.empty
-             , bTypeContext = S.empty
-             , lsubp = 1
-             , tvars = length $ fTypeContext $ pglobal
-             , ty = [Just (tyr, tty)]
-             }
-      c = PConstruction { tsubp = 1
-                        , subps = [s]
-                        , cglobal = pglobal
-                        , term = [HoleT id]
-                        }
-  in PState { name = name
-            , types = (ty, tty)
-            , constr = c
-            }
+-- Genera una nueva prueba.
+newProof' :: GlobalState -> String -> (Type,TType) -> (Type, TType) -> ProofState
+newProof' g name ty tyr = PState { name = name
+                                 , types = ty
+                                 , constr = newProofC g tyr
+                                 }
+
+-- Inicia una nueva prueba.
+newProof :: GlobalState -> String -> (Type,TType) -> (Type, TType) -> ProverState -> ProverState
+newProof g name ty tyr p = p {proof = Just $ newProof' g name ty tyr}
+
+getProofC :: ProverState -> ProofConstruction
+getProofC (PSt {proof = Just pr}) = constr $ pr
+
+-- Finaliza la prueba.
+finishProof :: ProverState -> ProverState
+finishProof p = p {proof = Nothing}
+
+-- La prueba pasa a ser un teorema.
+newTheoremFromProof :: ProverState -> ProverState
+newTheoremFromProof p@(PSt {proof = Just pr}) =
+  newTheorem (name pr) (getTermFromProof (constr pr) (types pr)) p
+
+newTheorem :: String -> Term -> ProverState -> ProverState
+newTheorem name te p@(PSt {global = g}) =
+  p { global = (checkConflictName name .
+                addTheorem name te) g }
+  
+
+-- Estado inicial.
+initialProver :: ProverState
+initialProver = PSt { global = initialGlobal
+                    , proof = Nothing
+                    , infixParser = basicInfixParser
+                    }
+
 

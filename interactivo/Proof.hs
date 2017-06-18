@@ -56,8 +56,8 @@ getBTypeContext = getAttribute bTypeContext
 getUsrOpers :: Proof FOperations
 getUsrOpers = getGlobalAttr opers
 
-getTeorems :: Proof Teorems
-getTeorems = getGlobalAttr teorems
+getTheorems :: Proof Theorems
+getTheorems = getGlobalAttr theorems
 
 getFTypeContext :: Proof FTypeContext
 getFTypeContext = getGlobalAttr fTypeContext
@@ -191,37 +191,31 @@ endSubProof =
        Nothing -> return ()
 
 ------------------------------------------------------------------------------
+-- Funciones sobre ProofConstruction
+
 newSubProof :: Int -> (Type, TType) -> SubProof
-newSumProof n ty = SP {termContext = S.empty,
+newSubProof n ty = SP { termContext = S.empty,
                         bTypeContext = S.empty,
                         lsubp = 1,
                         tvars = n,
-                        ty = [Just ty]}
+                        ty = [Just ty]
+                      }
 
 
-newProofC :: Int -> GlobalState -> (Type,TType) ->ProofConstruction
-newProofC g = PConstruction { tsubp = 1
-                            , subps = [newSumProof n ty]
-                        , cglobal = g
-                        , term = [HoleT id]
-                        }
+newProofC :: GlobalState -> (Type,TType) -> ProofConstruction
+newProofC g ty = PConstruction { tsubp = 1
+                               , subps = [newSubProof (length $ fTypeContext $ g) ty]
+                               , cglobal = g
+                               , term = [HoleT id]
+                               }
 
-newProof :: GlobalState -> String -> (Type,TType) -> (Type, TType) -> ProofState
-newProof pglobal name ty tyr=newProofC length $ fTypeContext $ pglobal
+-- Obtiene el lambda término final de la prueba construida.
+getTermFromProof :: ProofConstruction -> (Type, TType) -> Term
+getTermFromProof (PConstruction {term=[Term t]}) ty = t ::: ty
+getTermFromProof _ _ = error "getTermFromProof: no debería pasar."
 
-
-  let s = SP { termContext = S.empty
-             , bTypeContext = S.empty
-             , lsubp = 1
-             , tvars = length $ fTypeContext $ pglobal
-             , ty = [Just (tyr, tty)]
-             }
-      c = PConstruction { tsubp = 1
-                        , subps = [s]
-                        , cglobal = pglobal
-                        , term = [HoleT id]
-                        }
-  in PState { name = name
-            , types = (ty, tty)
-            , constr = c
-            }
+-- Funciones auxiliares.
+-- Chequea si la prueba a terminado.
+isFinalTerm :: ProofConstruction -> Bool
+isFinalTerm (PConstruction {term=[Term _]}) = True
+isFinalTerm _ = False

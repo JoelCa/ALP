@@ -19,13 +19,13 @@ import qualified Data.Sequence as S
 -- 3. Lista de teoremas.
 -- 4. Operaciones "foldeables".
 -- 5. Lambda término con y sin nombre, al que se le quiere inferir su tipo.
-typeInference :: Int -> TermContext -> Teorems -> FOperations
+typeInference :: Int -> TermContext -> Theorems -> FOperations
           -> (LamTerm, Term) -> Either ProofExceptions (Type, TType)
 typeInference n c te op t = case typeInference' n c te op t of
                           Right r -> return r
                           Left e -> throw $ InferE (fst t) e
 
-typeInference' :: Int -> TermContext -> Teorems -> FOperations
+typeInference' :: Int -> TermContext -> Theorems -> FOperations
           -> (LamTerm, Term) -> Either InferExceptions (Type, TType)
 typeInference' n _ te _ (_, Free (NGlobal x)) =
   case M.lookup x te of

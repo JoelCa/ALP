@@ -450,11 +450,11 @@ getInt s = parseMaybe nat2 s
 -- Argumentos:
 -- 1º La nueva operación infija.
 -- 2º El parser de operaciones infijas (con más precedencia),
-usrInfixParser :: String -> Parser Type -> Parser Type
-usrInfixParser s p = infixP s (\x y -> RenameTy s 2 [x, y]) p
+usrInfixParser :: String -> Parser Type -> UsrParser
+usrInfixParser s p = PP $ infixP s (\x y -> RenameTy s 2 [x, y]) p
 
-basicInfixParser :: Parser Type
-basicInfixParser = unit4
+basicInfixParser :: UsrParser
+basicInfixParser = PP unit4
 
 --------------------------------------------------------------------------------------
 -- PRUEBAS

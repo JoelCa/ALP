@@ -90,7 +90,7 @@ type FTypeContext = Seq FTypeVar
   -- Tabla de teoremas.
   -- Clave: Nombre del teorema.
   -- Valor: El lambda término de la prueba.
-type Teorems = Map String Term
+type Theorems = Map String Term
 
 
   --Comandos.

@@ -91,20 +91,3 @@ elim_bottom =
     , TForAll $ TFun (RenameTTy bottom_code []) $ TBound 0
     )
   )
-
--- Operaciones "foldeables" por default.
-not_op :: FoldeableOp
-not_op = (not_text,
-          (ForAll "a" $ Fun (B "a") $ RenameTy bottom_text 0 []
-          , TForAll $ TFun (TBound 0) $ RenameTTy bottom_code [])
-         , 1
-         , False)
-
-iff_op :: FoldeableOp
-iff_op = (iff_text
-         , (ForAll "a" $ ForAll "b" $ RenameTy and_text 1
-            [Fun (B "a") (B "b"), Fun (B "b") (B "a")]
-           , TForAll $ TForAll $ RenameTTy and_code
-             [TFun (TBound 1) (TBound 0), TFun (TBound 0) (TBound 1)])
-         , 2
-         , True)

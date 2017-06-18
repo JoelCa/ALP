@@ -9,7 +9,7 @@ import ErrorMsj
 import TypeInference (typeInference)
 import ProverState
 import GlobalState
-import Proof
+import Proof (ProofConstruction, getTermFromProof, isFinalTerm, cglobal, tsubp, subps)
 import TermsWithHoles
 import DefaultOperators
 import System.Environment
@@ -19,86 +19,29 @@ import Control.Monad.Trans.Class
 import Control.Monad.State.Strict
 import Control.Monad.IO.Class
 import Data.Maybe
-import qualified Data.Map as Map
 import Data.List (find, findIndex, elemIndex)
 import qualified Data.Sequence as S
 import qualified Data.IntSet as IS
+import qualified Data.Map as Map
   
 type ProverInputState a = InputT (StateT ProverState IO) a
 
--- Teoremas iniciales.
-initialT' = [ ("intro_and", intro_and),
-              ("elim_and", elim_and),
-              ("intro_or1", intro_or1),
-              ("intro_or2", intro_or2),
-              ("elim_or", elim_or),
-              ("intro_bottom", intro_bottom),
-              ("elim_bottom", elim_bottom)
-            ]
-
-initialT = Map.fromList initialT'
-
--- Crea una prueba.
-newProof :: GlobalState -> String -> Type -> Type -> TType -> ProofState
-newProof pglobal name ty tyr tty =
-  let s = SP { termContext = S.empty
-             , bTypeContext = S.empty
-             , lsubp = 1
-             , tvars = length $ fTypeContext $ pglobal
-             , ty = [Just (tyr, tty)]
-             }
-      c = PConstruction { tsubp = 1
-                        , subps = [s]
-                        , cglobal = pglobal
-                        , term = [HoleT id]
-                        }
-  in PState { name = name
-            , types = (ty, tty)
-            , constr = c
-            }
 
 -- Aborta la prueba.
 resetProof :: ProverInputState ()
-resetProof = do s <- lift get
-                lift $ put $ s {proof = Nothing}
-                prover
+resetProof = (lift $ modify $ finishProof) >> prover
                 
 -- Finaliza la prueba.
 reloadProver :: ProverInputState ()
-reloadProver = do s <- lift get
-                  let p = fromJust $ proof s
-                  lift $ put $ s { global = (global s)
-                                            { teorems = Map.insert (name p)
-                                                        (getTermFromProof (constr p) (types p))
-                                                        (teorems $ global s)
-                                            , conflict = checkNameConflict (name p) (conflict $ global s) }
-                                 , proof = Nothing }
+reloadProver = lift $ modify $ finishProof . newTheoremFromProof
 
-checkNameConflict :: String -> IS.IntSet -> IS.IntSet
-checkNameConflict s c = case getHypothesisValue s of
-                          Just n -> IS.insert n c
-                          Nothing -> c
-
-
--- Estado inicial.
-initProverState :: ProverState
-initProverState = PSt { global = Global { teorems = initialT
-                                        , fTypeContext = S.empty
-                                        , opers = S.fromList [ not_op
-                                                             , iff_op
-                                                             ]
-                                        , conflict = IS.empty
-                                        }
-                      , proof = Nothing
-                      , infixParser = PP basicInfixParser   -- infixOps
-                      }
 
 main :: IO ()
 main = do args <- getArgs
           if args == []
-            then evalStateT (runInputT defaultSettings prover) initProverState
+            then evalStateT (runInputT defaultSettings prover) initialProver
             else do putStrLn "aviso: hay argumentos!" --Tratar
-                    evalStateT (runInputT defaultSettings prover) initProverState
+                    evalStateT (runInputT defaultSettings prover) initialProver
 
 
 prover :: ProverInputState ()
@@ -122,7 +65,7 @@ checkCommand (Ty name ty) =
   do s <- lift get
      when (isJust $ proof s) (throwIO PNotFinished)
      let glo = global s
-     when ( (Map.member name $ teorems $ glo)
+     when ( (Map.member name $ theorems $ glo)
             || (elem name $ fTypeContext glo)
             || (any (\(x,_,_,_) -> x == name) $ opers glo)
             || (any (\(x,_,_) -> x == name) notFoldeableOps)
@@ -130,9 +73,9 @@ checkCommand (Ty name ty) =
        (throwIO $ ExistE name)
      (tyr,tty) <- returnInput $ renamedType (fTypeContext glo) (opers glo) ty
      --outputStrLn $ show (tyr,tty) ++ "\n"
-     let p = newProof glo name ty tyr tty
-     lift $ put $ s { proof = Just p }
-     outputStrLn $ renderProof $ constr p
+     lift $ modify $ newProof glo name (ty,tty) (tyr,tty)
+     s' <- lift get
+     outputStrLn $ renderProof $ getProofC s'
      prover                          
 checkCommand (Types ps) =
   do s <- lift get
@@ -141,13 +84,13 @@ checkCommand (Types ps) =
          gps = fTypeContext glo
          (tr1, tr2) = typeRepeated ps
                       (\t -> (elem t gps)
-                             || (Map.member t $ teorems $ glo)
+                             || (Map.member t $ theorems $ glo)
                              || (any (\(x,_,_,_) -> x == t) $ opers glo)
                              || (any (\(x,_,_) -> x == t) notFoldeableOps)
                       )
      when (isJust tr1) (throwIO $ TypeRepeated $ fromJust tr1)
      when (isJust tr2) (throwIO $ ExistE $ fromJust tr2)
-     lift $ put $ s {global = (global s) {teorems = teorems $ global s, fTypeContext= ps S.>< gps}}
+     lift $ put $ s {global = (global s) {theorems = theorems $ global s, fTypeContext= ps S.>< gps}}   --VER
      prover
 checkCommand (Definition name body) =
   do s <- lift get
@@ -158,14 +101,14 @@ checkCommand (Definition name body) =
           )
        (throwIO $ DefE name)
      when ( (elem name $ fTypeContext glo)
-            || (Map.member name $ teorems $ glo)
+            || (Map.member name $ theorems $ glo)
           )
        (throwIO $ ExistE name)
      defCommand name body
      prover
 checkCommand (Ta (Print x)) =
   do s <- lift get
-     let ter = teorems $ global s
+     let ter = theorems $ global s
      when (Map.notMember x ter) (throwIO $ NotExistE x)
      let t = ter Map.! x
      outputStrLn $ render $ printTerm (opers $ global s) $ t
@@ -176,7 +119,7 @@ checkCommand (Ta (Infer x)) =
      let op = opers $ global s
      (te,te') <- returnInput $ withoutName op (fTypeContext $ global s) (S.empty) (IS.empty, 0) x
      --outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
-     (ty,ty') <- returnInput $ typeInference 0 S.empty (teorems $ global s) op (te,te')
+     (ty,ty') <- returnInput $ typeInference 0 S.empty (theorems $ global s) op (te,te')
      --outputStrLn $ "Renombramiento: " ++ (render $ printTerm (opers $ global s) te')
      outputStrLn $ render $ printType op ty
      outputStrLn $ render $ printTType op ty'
@@ -227,16 +170,17 @@ typeDefinition name t n isInfix =
   do lift $ modify $
        \s ->  s { global = (global s) { opers = opers (global s) S.|> (name, t, n, isInfix)} }
      when isInfix $ lift $ modify $
-       \s' -> s' {infixParser =  PP $ usrInfixParser name $ getParser $ infixParser s' }
+       \s' -> s' {infixParser =  usrInfixParser name $ getParser $ infixParser s' }
 
 -- Función auxiliar de defCommand
 lamTermDefinition :: String -> (LamTerm, Term) -> ProverInputState ()
 lamTermDefinition name te =
   do s <- lift get
      let glo = global s
-     ty <- returnInput $ typeInference 0 S.empty (teorems glo) (opers glo) te
-     lift $ put $ s { global = glo { teorems = Map.insert name (snd te ::: ty) $ teorems $ glo
-                                   , conflict = checkNameConflict name $ conflict $ glo } }
+     ty <- returnInput $ typeInference 0 S.empty (theorems glo) (opers glo) te
+     lift $ modify $ newTheorem name (snd te ::: ty)                                               -- CHEQUEAR
+     -- lift $ put $ s { global = glo { theorems = Map.insert name (snd te ::: ty) $ theorems $ glo
+     --                               , conflict = checkNameConflict name $ conflict $ glo } }
 
 -- Funciones auxiliares del comando "Props/Types".
 typeRepeated :: S.Seq TypeVar -> (String -> Bool) -> (Maybe String, Maybe String)
@@ -249,18 +193,6 @@ typeRepeated ps f
                    else if f p
                         then (Nothing, return p)
                         else typeRepeated ps' f
-
-
--- Funciones auxiliares.
--- Chequea si la prueba a terminado.
-isFinalTerm :: ProofConstruction -> Bool
-isFinalTerm (PConstruction {term=[Term _]}) = True
-isFinalTerm _ = False
-
--- Obtiene el lambda término final de la prueba construida.
-getTermFromProof :: ProofConstruction -> (Type, TType) -> Term
-getTermFromProof (PConstruction {term=[Term t]}) ty = t ::: ty
-getTermFromProof _ _ = error "getTermFromProof: no debería pasar"
                             
 
 -- Impresión del lambda término final.

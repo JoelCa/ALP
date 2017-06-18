@@ -342,7 +342,7 @@ exactType ty =
 exactTerm :: (LamTerm, Term) -> Proof ()
 exactTerm te =
   do c <- getTermContext
-     teo <- getTeorems
+     teo <- getTheorems
      q <- getTBTypeVars
      op <- getUsrOpers
      (_,t') <- eitherToProof $ typeInference q c teo op te

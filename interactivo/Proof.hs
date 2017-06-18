@@ -149,8 +149,8 @@ modifySubps f = modify (\ps -> ps {subps = f $ subps ps})
 ------------------------------------------------------------------------------
 -- Crea una subprueba para el tipo objetivo dado por el 1º arg.
 -- Lo agrega a la lista de subpruebas del 2º arg.
-newSubProof :: Maybe (Type, TType) -> [SubProof] -> [SubProof]
-newSubProof t sp =  SP { termContext = x
+addSubProof :: Maybe (Type, TType) -> [SubProof] -> [SubProof]
+addSubProof t sp =  SP { termContext = x
                        , bTypeContext = y
                        , tvars = z
                        , lsubp = 1
@@ -167,7 +167,7 @@ newSubProofs n ts
   | n > 1 = do replaceMaybeTypes $ tail ts
                replaceLevelSubp (n-1)
                modifyTotalSubp (+ (n-1))
-               modifySubps $ newSubProof $ head ts
+               modifySubps $ addSubProof $ head ts
   | otherwise = error "error: newSubProofs, no debería pasar."
 
 -- De acuerdo al 1º argumento, mantiene, crea o termina una subprueba.
@@ -187,5 +187,41 @@ endSubProof =
                  then return ()
                  else do modifyType tail
                          modifyLevelSubp (+ (-1))
-                         modifySubps $ newSubProof $ head $ ty l
+                         modifySubps $ addSubProof $ head $ ty l
        Nothing -> return ()
+
+------------------------------------------------------------------------------
+newSubProof :: Int -> (Type, TType) -> SubProof
+newSumProof n ty = SP {termContext = S.empty,
+                        bTypeContext = S.empty,
+                        lsubp = 1,
+                        tvars = n,
+                        ty = [Just ty]}
+
+
+newProofC :: Int -> GlobalState -> (Type,TType) ->ProofConstruction
+newProofC g = PConstruction { tsubp = 1
+                            , subps = [newSumProof n ty]
+                        , cglobal = g
+                        , term = [HoleT id]
+                        }
+
+newProof :: GlobalState -> String -> (Type,TType) -> (Type, TType) -> ProofState
+newProof pglobal name ty tyr=newProofC length $ fTypeContext $ pglobal
+
+
+  let s = SP { termContext = S.empty
+             , bTypeContext = S.empty
+             , lsubp = 1
+             , tvars = length $ fTypeContext $ pglobal
+             , ty = [Just (tyr, tty)]
+             }
+      c = PConstruction { tsubp = 1
+                        , subps = [s]
+                        , cglobal = pglobal
+                        , term = [HoleT id]
+                        }
+  in PState { name = name
+            , types = (ty, tty)
+            , constr = c
+            }

@@ -8,7 +8,6 @@ import Hypothesis
 import Parser (getHypothesisValue)
 import Data.IntSet (IntSet)
 import qualified Data.Sequence as S
-import Control.Lens.Cons
 
 -- Retorna el tipo con nombre, posiblemente renombrado, de su 3º arg.
 -- A fin de respetar la Convención 1.

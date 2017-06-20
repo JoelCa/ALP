@@ -45,3 +45,6 @@ initialGlobal = Global { theorems = Map.fromList initialTheorems
                        , opers = S.fromList [not_op, iff_op]
                        , conflict = empty
                        }
+
+addFreeVars :: S.Seq TypeVar -> GlobalState -> GlobalState
+addFreeVars vars g = g {fTypeContext = vars S.>< fTypeContext g}

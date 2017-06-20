@@ -90,7 +90,8 @@ checkCommand (Types ps) =
                       )
      when (isJust tr1) (throwIO $ TypeRepeated $ fromJust tr1)
      when (isJust tr2) (throwIO $ ExistE $ fromJust tr2)
-     lift $ put $ s {global = (global s) {theorems = theorems $ global s, fTypeContext= ps S.>< gps}}   --VER
+     --lift $ put $ s {global = (global s) {theorems = theorems $ global s, fTypeContext= ps S.>< gps}}   --VER
+     lift $ modify $ addFreeVarsProver ps
      prover
 checkCommand (Definition name body) =
   do s <- lift get

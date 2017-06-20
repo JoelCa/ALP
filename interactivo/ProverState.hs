@@ -4,6 +4,7 @@ import Common
 import Parser (UsrParser, basicInfixParser)
 import GlobalState
 import Proof (ProofConstruction, newProofC, getTermFromProof)
+import Data.Sequence (Seq)
 
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState
@@ -31,6 +32,7 @@ newProof g name ty tyr p = p {proof = Just $ newProof' g name ty tyr}
 
 getProofC :: ProverState -> ProofConstruction
 getProofC (PSt {proof = Just pr}) = constr $ pr
+getProofC (PSt {proof = Nothing}) = error $ show $ "error: getProofC, no debería pasar"
 
 -- Finaliza la prueba.
 finishProof :: ProverState -> ProverState
@@ -46,7 +48,6 @@ newTheorem name te p@(PSt {global = g}) =
   p { global = (checkConflictName name .
                 addTheorem name te) g }
   
-
 -- Estado inicial.
 initialProver :: ProverState
 initialProver = PSt { global = initialGlobal
@@ -54,4 +55,7 @@ initialProver = PSt { global = initialGlobal
                     , infixParser = basicInfixParser
                     }
 
+addFreeVarsProver :: Seq TypeVar -> ProverState -> ProverState
+addFreeVarsProver vars p@(PSt {global = g}) = p {global = addFreeVars vars g}
 
+--Crear: invalidPropositionName, y invalidDefinitionName (en base a las funciones de GlobalState)

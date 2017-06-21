@@ -61,3 +61,5 @@ isInvalidName name g =  isTheorem name g
                         || isFoldeableOp name g
                         || isNotFoldeableOp name
           
+addFreeVars :: S.Seq TypeVar -> GlobalState -> GlobalState
+addFreeVars vars g = g {fTypeContext = vars S.>< fTypeContext g}

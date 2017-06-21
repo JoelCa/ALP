@@ -6,6 +6,9 @@ import Common
 notFoldeableOps :: [NotFoldeableOp]
 notFoldeableOps = [and_, or_, bottom_]
 
+isNotFoldeableOp :: String -> Bool
+isNotFoldeableOp name = any (\(x,_,_) -> x == name) notFoldeableOps
+
   -- Operaciones por default, NO "foldeables", donde:
   -- 1. Texto de la operación.
   -- 2. Código que identifica a la operación.

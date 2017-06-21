@@ -45,3 +45,19 @@ initialGlobal = Global { theorems = Map.fromList initialTheorems
                        , opers = S.fromList [not_op, iff_op]
                        , conflict = empty
                        }
+
+isTheorem :: String -> GlobalState -> Bool
+isTheorem name g = Map.member name $ theorems g
+
+isFreeVar :: String -> GlobalState -> Bool
+isFreeVar name g = elem name $ fTypeContext g
+
+isFoldeableOp :: String -> GlobalState -> Bool
+isFoldeableOp name g = any (\(x,_,_,_) -> x == name) $ opers g
+
+isInvalidName :: String -> GlobalState -> Bool
+isInvalidName name g =  isTheorem name g
+                        || isFreeVar name g
+                        || isFoldeableOp name g
+                        || isNotFoldeableOp name
+          

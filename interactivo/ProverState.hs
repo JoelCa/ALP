@@ -4,6 +4,7 @@ import Common
 import Parser (UsrParser, basicInfixParser)
 import GlobalState
 import Proof (ProofConstruction, newProofC, getTermFromProof)
+import Data.Maybe (isJust)
 
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState
@@ -45,7 +46,10 @@ newTheorem :: String -> Term -> ProverState -> ProverState
 newTheorem name te p@(PSt {global = g}) =
   p { global = (checkConflictName name .
                 addTheorem name te) g }
-  
+
+-- Indica si se inicio una prueba.
+proofStarted :: ProverState -> Bool
+proofStarted p = isJust $ proof p
 
 -- Estado inicial.
 initialProver :: ProverState

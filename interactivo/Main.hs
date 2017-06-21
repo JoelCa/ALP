@@ -63,17 +63,12 @@ prover = do s <- lift get
 checkCommand :: Command -> ProverInputState ()
 checkCommand (Ty name ty) =
   do s <- lift get
-     when (isJust $ proof s) (throwIO PNotFinished)
-     let glo = global s
-     when ( (Map.member name $ theorems $ glo)
-            || (elem name $ fTypeContext glo)
-            || (any (\(x,_,_,_) -> x == name) $ opers glo)
-            || (any (\(x,_,_) -> x == name) notFoldeableOps)
-          )
-       (throwIO $ ExistE name)
-     (tyr,tty) <- returnInput $ renamedType (fTypeContext glo) (opers glo) ty
+     when (proofStarted s) (throwIO PNotFinished)
+     let g = global s
+     when (isInvalidName name g) (throwIO $ ExistE name)
+     (tyr,tty) <- returnInput $ renamedType (fTypeContext g) (opers g) ty
      --outputStrLn $ show (tyr,tty) ++ "\n"
-     lift $ modify $ newProof glo name (ty,tty) (tyr,tty)
+     lift $ modify $ newProof g name (ty,tty) (tyr,tty)
      s' <- lift get
      outputStrLn $ renderProof $ getProofC s'
      prover                          
@@ -178,7 +173,7 @@ lamTermDefinition name te =
   do s <- lift get
      let glo = global s
      ty <- returnInput $ typeInference 0 S.empty (theorems glo) (opers glo) te
-     lift $ modify $ newTheorem name (snd te ::: ty)                                               -- CHEQUEAR
+     lift $ modify $ newTheorem name (snd te ::: ty)
      -- lift $ put $ s { global = glo { theorems = Map.insert name (snd te ::: ty) $ theorems $ glo
      --                               , conflict = checkNameConflict name $ conflict $ glo } }
 

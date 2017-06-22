@@ -65,41 +65,24 @@ checkCommand (Ty name ty) =
   do s <- lift get
      when (proofStarted s) (throwIO PNotFinished)
      let g = global s
-     when (isInvalidName name g) (throwIO $ ExistE name)
+     when (invalidName name g) (throwIO $ ExistE name)
      (tyr,tty) <- returnInput $ renamedType (fTypeContext g) (opers g) ty
      --outputStrLn $ show (tyr,tty) ++ "\n"
-     lift $ modify $ newProof g name (ty,tty) (tyr,tty)
+     lift $ modify $ newProof name (ty,tty) (tyr,tty)
      s' <- lift get
      outputStrLn $ renderProof $ getProofC s'
      prover                          
 checkCommand (Types ps) =
   do s <- lift get
-     when (isJust $ proof s) (throwIO PNotFinished)
-     let glo = global s
-         gps = fTypeContext glo
-         (tr1, tr2) = typeRepeated ps
-                      (\t -> (elem t gps)
-                             || (Map.member t $ theorems $ glo)
-                             || (any (\(x,_,_,_) -> x == t) $ opers glo)
-                             || (any (\(x,_,_) -> x == t) notFoldeableOps)
-                      )
+     when (proofStarted s) (throwIO PNotFinished)
+     let (tr1, tr2) = typeRepeated ps (\t -> invalidName t $ global s)
      when (isJust tr1) (throwIO $ TypeRepeated $ fromJust tr1)
      when (isJust tr2) (throwIO $ ExistE $ fromJust tr2)
-     --lift $ put $ s {global = (global s) {theorems = theorems $ global s, fTypeContext= ps S.>< gps}}   --VER
      lift $ modify $ addFreeVarsProver ps
      prover
 checkCommand (Definition name body) =
   do s <- lift get
-     let glo = global s
-     when (isJust $ proof s) (throwIO PNotFinished)
-     when ( (any (\(x,_,_,_)-> x == name) $ opers glo)
-            || (any (\(x,_,_) -> x == name) notFoldeableOps)
-          )
-       (throwIO $ DefE name)
-     when ( (elem name $ fTypeContext glo)
-            || (Map.member name $ theorems $ glo)
-          )
-       (throwIO $ ExistE name)
+     when (invalidName name $ global s) (throwIO $ ExistE name)
      defCommand name body
      prover
 checkCommand (Ta (Print x)) =
@@ -122,7 +105,7 @@ checkCommand (Ta (Infer x)) =
      prover                            
 checkCommand (Ta ta) =
   do s <- lift get
-     when (isNothing $ proof s) (throwIO PNotStarted)
+     when (not $ proofStarted s) (throwIO PNotStarted)
      let pr = fromJust $ proof s
      (_ , p) <- returnInput $ runStateExceptions (habitar ta) (constr $ pr)
      lift $ put $ s {proof = Just $ pr {constr = p}}

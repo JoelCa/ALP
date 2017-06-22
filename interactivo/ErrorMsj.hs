@@ -44,7 +44,6 @@ errorMessage op (InferE te e) =
   render (printLamTerm op te) ++
   "\". " ++
   errorInfer op e
-errorMessage op (DefE s) = "error: " ++ s ++ " es un operador que ya existe."
 errorMessage _ (UnfoldE1 s) =  "error: " ++ s ++ " no es un operador foldeable."
 errorMessage _ (HypoE i) = "error: la hipótesis " ++ printHypothesis i ++ " no existe."
   

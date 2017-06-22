@@ -55,11 +55,11 @@ isFreeVar name g = elem name $ fTypeContext g
 isFoldeableOp :: String -> GlobalState -> Bool
 isFoldeableOp name g = any (\(x,_,_,_) -> x == name) $ opers g
 
-isInvalidName :: String -> GlobalState -> Bool
-isInvalidName name g =  isTheorem name g
-                        || isFreeVar name g
-                        || isFoldeableOp name g
-                        || isNotFoldeableOp name
-          
+invalidName :: String -> GlobalState -> Bool
+invalidName name g =  isTheorem name g
+                      || isFreeVar name g
+                      || isFoldeableOp name g
+                      || isNotFoldeableOp name
+                                 
 addFreeVars :: S.Seq TypeVar -> GlobalState -> GlobalState
 addFreeVars vars g = g {fTypeContext = vars S.>< fTypeContext g}

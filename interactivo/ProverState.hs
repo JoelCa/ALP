@@ -28,8 +28,8 @@ newProof' g name ty tyr = PState { name = name
                                  }
 
 -- Inicia una nueva prueba.
-newProof :: GlobalState -> String -> (Type,TType) -> (Type, TType) -> ProverState -> ProverState
-newProof g name ty tyr p = p {proof = Just $ newProof' g name ty tyr}
+newProof :: String -> (Type,TType) -> (Type, TType) -> ProverState -> ProverState
+newProof name ty tyr p = p {proof = Just $ newProof' (global p) name ty tyr}
 
 getProofC :: ProverState -> ProofConstruction
 getProofC (PSt {proof = Just pr}) = constr $ pr
@@ -62,5 +62,3 @@ initialProver = PSt { global = initialGlobal
 
 addFreeVarsProver :: Seq TypeVar -> ProverState -> ProverState
 addFreeVarsProver vars p@(PSt {global = g}) = p {global = addFreeVars vars g}
-
---Crear: invalidPropositionName, y invalidDefinitionName (en base a las funciones de GlobalState)

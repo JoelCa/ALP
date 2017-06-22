@@ -32,8 +32,13 @@ newProof :: String -> (Type,TType) -> (Type, TType) -> ProverState -> ProverStat
 newProof name ty tyr p = p {proof = Just $ newProof' (global p) name ty tyr}
 
 getProofC :: ProverState -> ProofConstruction
-getProofC (PSt {proof = Just pr}) = constr $ pr
-getProofC (PSt {proof = Nothing}) = error $ show $ "error: getProofC, no debería pasar"
+getProofC (PSt {proof = Just pr}) = constr pr
+getProofC _ = error "error: getProofC, no debería pasar."
+
+getTypeProof :: ProverState -> (Type,TType)
+getTypeProof (PSt {proof = Just pr}) = types pr
+getTypeProof _ = error "error: getTypeProof, no debería pasar."
+
 
 -- Finaliza la prueba.
 finishProof :: ProverState -> ProverState
@@ -45,9 +50,7 @@ newTheoremFromProof p@(PSt {proof = Just pr}) =
   newTheorem (name pr) (getTermFromProof (constr pr) (types pr)) p
 
 newTheorem :: String -> Term -> ProverState -> ProverState
-newTheorem name te p@(PSt {global = g}) =
-  p { global = (checkConflictName name .
-                addTheorem name te) g }
+newTheorem name te  = modifyGlobal (checkConflictName name . addTheorem name te)
 
 -- Indica si se inicio una prueba.
 proofStarted :: ProverState -> Bool
@@ -60,5 +63,12 @@ initialProver = PSt { global = initialGlobal
                     , infixParser = basicInfixParser
                     }
 
-addFreeVarsProver :: Seq TypeVar -> ProverState -> ProverState
-addFreeVarsProver vars p@(PSt {global = g}) = p {global = addFreeVars vars g}
+modifyGlobal :: (GlobalState -> GlobalState) -> ProverState -> ProverState
+modifyGlobal f p = p {global = f $ global p}
+
+modifyUsrParser :: (UsrParser -> UsrParser) -> ProverState -> ProverState
+modifyUsrParser f p = p {infixParser = f $ infixParser p}
+
+setProofC :: ProofConstruction -> ProverState -> ProverState
+setProofC pc p@(PSt {proof = Just pr}) = p {proof = Just $ pr {constr = pc}}
+setProofC _ _ = error $ "error: setProofC, no debería pasar."

@@ -123,7 +123,7 @@ Hice: intros; split; split; exact (\a. \x:a. x) as forall ww, ww -> ww; exact (\
 Para probar el parser, y chequear que se efectue correctamente la transformación del tipo con nombre a uno sin nombre.
 - x x x = forall w, forall v, x /\ v.
   jojo x x = forall w, forall v, x /\ v.
-  Theorem t49: forall m, jojo m ~m -> False.
+  Theorem t49: forall m, jojo m (~m) -> False.
 NO se probo. Para chequear definición de operadores. 
 - op = forall w, w -> w.
   Theorem t50: op -> forall op, op -> op.
@@ -145,6 +145,11 @@ Para chequear el renombramiento con "unfold cc".
   H0 = \a.\x:a.x.
   Theorem t54: forall p, forall q, p -> p.
 Chequemos que los nombres de los hipótesis NO coincidan con los nombres de los teoremas.
+- qqq = \t.\x:t.intro_and [t] [t] x x.
+  Theorem t55: forall w, w -> (w /\ w) /\ (w -> w).
+Para chequear el exact sobre una definición de término.
+La prueba es: intros; exact (intro_and [w /\ w] [w -> w] (qqq [w] H0) (\f:w.f)).
+
 
 Casos de inferencia OK:
 1. infer \A. \B. \x:A. \y:False. let {B,x} = {*B, \B.\x:False. x} as exists A, forall Q, False -> False in (\C. x [False] y) [B].

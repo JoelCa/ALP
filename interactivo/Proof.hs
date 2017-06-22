@@ -13,7 +13,7 @@ type Proof = StateExceptions ProofConstruction ProofExceptions
   -- Construcción de la prueba.
 data ProofConstruction = PConstruction { tsubp :: Int              -- Cantidad total de subpruebas activas.
                                        , subps :: [SubProof]       -- Datos de las subpruebas, ordenas por nivel.
-                                       , cglobal :: GlobalState   -- Copia de los datos globales.
+                                       , cglobal :: GlobalState    -- Copia de los datos globales.
                                        , term :: [SpecialTerm]     -- Lambda termino.
                                        }
 

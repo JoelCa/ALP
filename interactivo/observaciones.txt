@@ -152,7 +152,7 @@ Por ejemplo, Theorem t:forall w, w\/w.
 
 - Una vez que una prueba comienza, NO es posible aplicar el comando de definición de tipos,
 ni de términos, ni tampoco se puede declarar variables de tipos. En Coq es posible
-Cuando no se construye una prueba, NO se pueden invocar tácticas. En Coq sí se puede.
+Además, cuando no se construye una prueba, NO se pueden invocar tácticas. En Coq sí se puede.
 
 FALTA:
 - Organizar Main.hs. Hacer funciones que operen sobre prover state.

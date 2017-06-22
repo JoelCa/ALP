@@ -22,7 +22,6 @@ import Data.Maybe
 import Data.List (find, findIndex, elemIndex)
 import qualified Data.Sequence as S
 import qualified Data.IntSet as IS
-import qualified Data.Map as Map
   
 type ProverInputState a = InputT (StateT ProverState IO) a
 
@@ -78,25 +77,24 @@ checkCommand (Types ps) =
      let (tr1, tr2) = typeRepeated ps (\t -> invalidName t $ global s)
      when (isJust tr1) (throwIO $ TypeRepeated $ fromJust tr1)
      when (isJust tr2) (throwIO $ ExistE $ fromJust tr2)
-     lift $ modify $ addFreeVarsProver ps
+     lift $ modify $ modifyGlobal $ addFreeVars ps
      prover
 checkCommand (Definition name body) =
   do s <- lift get
+     when (proofStarted s) (throwIO PNotFinished)
      when (invalidName name $ global s) (throwIO $ ExistE name)
      defCommand name body
      prover
 checkCommand (Ta (Print x)) =
   do s <- lift get
-     let ter = theorems $ global s
-     when (Map.notMember x ter) (throwIO $ NotExistE x)
-     let t = ter Map.! x
-     outputStrLn $ render $ printTerm (opers $ global s) $ t
-     --outputStrLn $ render $ printType (opers $ global s) $ fst $ snd t
+     let g = global s
+     when (isTheorem x g) (throwIO $ NotExistE x)
+     outputStrLn $ render $ printTerm (opers g) $ getLTerm x g
      prover
 checkCommand (Ta (Infer x)) =
   do s <- lift get
      let op = opers $ global s
-     (te,te') <- returnInput $ withoutName op (fTypeContext $ global s) (S.empty) (IS.empty, 0) x
+     (te,te') <- returnInput $ withoutNameBasic op (fTypeContext $ global s) x
      --outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
      (ty,ty') <- returnInput $ typeInference 0 S.empty (theorems $ global s) op (te,te')
      --outputStrLn $ "Renombramiento: " ++ (render $ printTerm (opers $ global s) te')
@@ -106,14 +104,15 @@ checkCommand (Ta (Infer x)) =
 checkCommand (Ta ta) =
   do s <- lift get
      when (not $ proofStarted s) (throwIO PNotStarted)
-     let pr = fromJust $ proof s
-     (_ , p) <- returnInput $ runStateExceptions (habitar ta) (constr $ pr)
-     lift $ put $ s {proof = Just $ pr {constr = p}}
-     if (isFinalTerm p)
+     let pc = getProofC s
+         typ = getTypeProof s
+     (_ , pc') <- returnInput $ runStateExceptions (habitar ta) pc
+     if (isFinalTerm pc')
        then ((outputStrLn $ "Prueba completa.\n"
-              ++ renderFinalTerm (opers $ cglobal p) (getTermFromProof p (types pr))  ++ "\n")
+              ++ renderFinalTerm (opers $ global s) (getTermFromProof pc' typ)  ++ "\n")
              >> reloadProver)
-       else outputStrLn $ renderProof p
+       else (lift $ modify $ setProofC pc')
+            >> (outputStrLn $ renderProof pc')
      prover
 
 -- Trata el comando de definición.
@@ -128,7 +127,7 @@ defCommand name (Type (body, n, args, isInfix)) =
 defCommand name (LTerm body) =
   do s <- lift get
      let glo = global s
-     te  <- returnInput $ withoutName (opers glo) (fTypeContext glo) (S.empty) (IS.empty, 0) body
+     te  <- returnInput $ withoutNameBasic (opers glo) (fTypeContext glo) body
      outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers glo) $ fst te)
      lamTermDefinition name te
 defCommand name (Ambiguous ap) =
@@ -146,10 +145,8 @@ defCommand name (Ambiguous ap) =
 -- Función auxiliar de defCommand
 typeDefinition :: String -> (Type, TType) -> Int -> Bool -> ProverInputState ()
 typeDefinition name t n isInfix =
-  do lift $ modify $
-       \s ->  s { global = (global s) { opers = opers (global s) S.|> (name, t, n, isInfix)} }
-     when isInfix $ lift $ modify $
-       \s' -> s' {infixParser =  usrInfixParser name $ getParser $ infixParser s' }
+  do lift $ modify $ modifyGlobal $ addOperator (name, t, n, isInfix)
+     when isInfix $ lift $ modify $ modifyUsrParser $ usrInfixParser name . getParser
 
 -- Función auxiliar de defCommand
 lamTermDefinition :: String -> (LamTerm, Term) -> ProverInputState ()
@@ -158,8 +155,6 @@ lamTermDefinition name te =
      let glo = global s
      ty <- returnInput $ typeInference 0 S.empty (theorems glo) (opers glo) te
      lift $ modify $ newTheorem name (snd te ::: ty)
-     -- lift $ put $ s { global = glo { theorems = Map.insert name (snd te ::: ty) $ theorems $ glo
-     --                               , conflict = checkNameConflict name $ conflict $ glo } }
 
 -- Funciones auxiliares del comando "Props/Types".
 typeRepeated :: S.Seq TypeVar -> (String -> Bool) -> (Maybe String, Maybe String)
@@ -185,7 +180,6 @@ renderFinalTermWithoutName op t = render $ printTermTType op t
 -- Impresión de la prueba en construcción
 renderProof :: ProofConstruction -> String
 renderProof p = render $ printProof (tsubp p) (conflict $ cglobal p) (opers $ cglobal p) (fTypeContext $ cglobal p) (subps p)
-
 
 returnInput :: Either ProofExceptions a -> ProverInputState a
 returnInput (Left exception) = throwIO exception

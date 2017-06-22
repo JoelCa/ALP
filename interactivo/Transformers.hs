@@ -6,7 +6,7 @@ import Data.List (findIndex, elemIndex, find)
 import RenamedVariables
 import Hypothesis
 import Parser (getHypothesisValue)
-import Data.IntSet (IntSet)
+import Data.IntSet (IntSet, empty)
 import qualified Data.Sequence as S
 
 -- Retorna el tipo con nombre, posiblemente renombrado, de su 3º arg.
@@ -125,7 +125,12 @@ renamedTypeWithName' rs bs fs op (RenameTy s args ts) =
   RenameTy s args $ map (renamedTypeWithName' rs bs fs op) ts
 
 ----------------------------------------------------------------------------------------------------------------------
--- Trasformadores de lambda términos: Se pasa de un lambda término con nombre, al equivalente sin nombre.
+-- Trasformadores de lambda términos: Se pasa de un lambda término con nombre, a uno renombrado y al equivalente sin nombre.
+
+withoutNameBasic :: FOperations -> FTypeContext -> LamTerm
+                 -> Either ProofExceptions (LamTerm, Term)
+withoutNameBasic op fs = withoutName op fs (S.empty) (empty, 0)
+  
 
 -- ARREGLAR: hacer renombre de tipos.
 -- Genera el lambda término con renombre de variables de tipo, y el lambda término sin nombre.

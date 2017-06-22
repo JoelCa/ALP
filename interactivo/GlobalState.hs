@@ -31,6 +31,9 @@ initialTheorems = [ ("intro_and", intro_and),
 addTheorem :: String -> Term -> GlobalState -> GlobalState
 addTheorem name lt g = g {theorems = Map.insert name lt $ theorems g}
 
+addOperator :: FoldeableOp -> GlobalState -> GlobalState
+addOperator op g = g {opers = (opers g) S.|> op}
+
 checkConflictName :: String -> GlobalState -> GlobalState
 checkConflictName s g = g {conflict = addConflictName s $ conflict g}
 
@@ -63,3 +66,6 @@ invalidName name g =  isTheorem name g
                                  
 addFreeVars :: S.Seq TypeVar -> GlobalState -> GlobalState
 addFreeVars vars g = g {fTypeContext = vars S.>< fTypeContext g}
+
+getLTerm :: String -> GlobalState -> Term
+getLTerm name (Global {theorems = te}) = te Map.! name

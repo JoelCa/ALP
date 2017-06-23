@@ -188,6 +188,10 @@ withoutName' ters tebs tyrs tybs fs op cnn (As e t) =
 ----------------------------------------------------------------------------------------------------------------------
 -- Transformadores para aplicaciones ambiguas.
 
+basicDisambiguatedTerm :: FTypeContext ->  FOperations -> GenTree String
+                       -> Either ProofExceptions (Either (Type, TType) (LamTerm, Term))
+basicDisambiguatedTerm ftc op = disambiguatedTerm S.empty ftc op (empty, 0)
+
 -- Convierte a una aplicacion ambigua en una aplicación de tipos, o en una aplicación de lambda términos.
 disambiguatedTerm :: BTypeContext -> FTypeContext ->  FOperations -> (IntSet, Int)
                   -> GenTree String -> Either ProofExceptions (Either (Type, TType) (LamTerm, Term))
@@ -242,7 +246,7 @@ getOpType op s args ts f =
 
 -- Convierte una aplicacion en una aplicación de lambda términos, si es posible.
 disambiguatedLTerm :: (IntSet, Int) -> GenTree String -> (LamTerm, Term)
-disambiguatedLTerm cnn@(cn,n) (Node x xs) =
+disambiguatedLTerm cnn (Node x xs) =
   foldl (\r node ->
             let (t,t') = disambiguatedLTerm cnn node
                 (tt,tt') = r

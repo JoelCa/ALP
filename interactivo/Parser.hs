@@ -388,9 +388,9 @@ tacticIndexArg = tacticOneArg (char 'H' >> nat)
 definition :: Parser (String, BodyDef)
 definition = do x <- identifier
                 (try (equal >>
-                       (do ap <- ambiguousApp
-                           dot
-                           return (x, Ambiguous ap))
+                       (try (do ap <- ambiguousApp
+                                dot
+                                return (x, Ambiguous ap)))
                         <|> do lt <- lambTerm
                                dot
                                return (x, LTerm lt))

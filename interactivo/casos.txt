@@ -183,7 +183,12 @@ Definiciones:
    tru = (\X. \t:X. \f:X. t) as CBool.
    tutu = (\X. \t:X. \f:X. f) as CBool2.
    t1 = \f:CBool -> CBool -> CBool2. f tru tutu.
+2. n2 = (\a.\x:a.x) as forall gg, gg -> gg.
+Para probar "Check n2".
+3. Theorem H:forall w, w -> w.
+   Propositions p, q.
+   algo = jojo H q.
+Chequear el error.
 
-
-TERMINAR de ver:
+   TERMINAR de ver:
 Ver caso de CBool y CBool2, en test.f

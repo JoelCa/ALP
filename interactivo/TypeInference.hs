@@ -9,6 +9,10 @@ import qualified Data.Sequence as S
 
 -- Algoritmo de inferencia de tipos de un lambda término.
 
+basicTypeInference :: Theorems -> FOperations -> (LamTerm, Term)
+                   -> Either ProofExceptions (Type, TType)
+basicTypeInference = typeInference 0 S.empty
+
 -- Infiere el tipo de un lambda término.
 -- Suponemos que ninguna de las pruebas de los teoremas son recursivas.
 -- Es decir, que su lambda término es recursivo.
@@ -20,7 +24,7 @@ import qualified Data.Sequence as S
 -- 4. Operaciones "foldeables".
 -- 5. Lambda término con y sin nombre, al que se le quiere inferir su tipo.
 typeInference :: Int -> TermContext -> Theorems -> FOperations
-          -> (LamTerm, Term) -> Either ProofExceptions (Type, TType)
+              -> (LamTerm, Term) -> Either ProofExceptions (Type, TType)
 typeInference n c te op t = case typeInference' n c te op t of
                           Right r -> return r
                           Left e -> throw $ InferE (fst t) e

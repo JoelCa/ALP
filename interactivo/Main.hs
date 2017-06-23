@@ -6,7 +6,7 @@ import PrettyPrinter (printTerm, printProof, printType, printTType, printTermTTy
 import Rules
 import Transformers
 import ErrorMsj
-import TypeInference (typeInference)
+import TypeInference (basicTypeInference)
 import ProverState
 import GlobalState
 import Proof (ProofConstruction, getTermFromProof, isFinalTerm, cglobal, tsubp, subps)
@@ -21,14 +21,13 @@ import Control.Monad.IO.Class
 import Data.Maybe
 import Data.List (find, findIndex, elemIndex)
 import qualified Data.Sequence as S
-import qualified Data.IntSet as IS
-  
+
 type ProverInputState a = InputT (StateT ProverState IO) a
 
 
 -- Aborta la prueba.
 resetProof :: ProverInputState ()
-resetProof = (lift $ modify $ finishProof) >> prover
+resetProof = lift $ modify $ finishProof
                 
 -- Finaliza la prueba.
 reloadProver :: ProverInputState ()
@@ -50,7 +49,7 @@ prover = do s <- lift get
               Nothing -> return ()
               Just "-quit" -> do outputStrLn "Saliendo."
                                  return ()
-              Just "-r" -> resetProof
+              Just "-r" -> resetProof >> prover
               Just "" -> prover
               Just x -> catch (do command <- returnInput $ getCommand x (infixParser s)
                                   checkCommand command)
@@ -88,7 +87,7 @@ checkCommand (Definition name body) =
 checkCommand (Ta (Print x)) =
   do s <- lift get
      let g = global s
-     when (isTheorem x g) (throwIO $ NotExistE x)
+     when (not $ isTheorem x g) (throwIO $ NotExistE x)
      outputStrLn $ render $ printTerm (opers g) $ getLTerm x g
      prover
 checkCommand (Ta (Infer x)) =
@@ -96,7 +95,7 @@ checkCommand (Ta (Infer x)) =
      let op = opers $ global s
      (te,te') <- returnInput $ withoutNameBasic op (fTypeContext $ global s) x
      --outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
-     (ty,ty') <- returnInput $ typeInference 0 S.empty (theorems $ global s) op (te,te')
+     (ty,ty') <- returnInput $ basicTypeInference (theorems $ global s) op (te,te')
      --outputStrLn $ "Renombramiento: " ++ (render $ printTerm (opers $ global s) te')
      outputStrLn $ render $ printType op ty
      outputStrLn $ render $ printTType op ty'
@@ -107,12 +106,12 @@ checkCommand (Ta ta) =
      let pc = getProofC s
          typ = getTypeProof s
      (_ , pc') <- returnInput $ runStateExceptions (habitar ta) pc
+     lift $ modify $ setProofC pc'
      if (isFinalTerm pc')
        then ((outputStrLn $ "Prueba completa.\n"
               ++ renderFinalTerm (opers $ global s) (getTermFromProof pc' typ)  ++ "\n")
              >> reloadProver)
-       else (lift $ modify $ setProofC pc')
-            >> (outputStrLn $ renderProof pc')
+       else outputStrLn $ renderProof pc'
      prover
 
 -- Trata el comando de definición.
@@ -133,7 +132,7 @@ defCommand name (LTerm body) =
 defCommand name (Ambiguous ap) =
   do s <- lift get
      let glo = global s
-     t <- returnInput $ disambiguatedTerm S.empty (fTypeContext glo) (opers glo) (conflict glo, 0) ap
+     t <- returnInput $ basicDisambiguatedTerm (fTypeContext glo) (opers glo) ap
      case t of
        Left ty ->
          do outputStrLn $ render $ printType (opers glo) $ fst ty
@@ -153,7 +152,7 @@ lamTermDefinition :: String -> (LamTerm, Term) -> ProverInputState ()
 lamTermDefinition name te =
   do s <- lift get
      let glo = global s
-     ty <- returnInput $ typeInference 0 S.empty (theorems glo) (opers glo) te
+     ty <- returnInput $ basicTypeInference (theorems glo) (opers glo) te
      lift $ modify $ newTheorem name (snd te ::: ty)
 
 -- Funciones auxiliares del comando "Props/Types".

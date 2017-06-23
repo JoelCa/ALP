@@ -10,6 +10,10 @@ data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) |
 data TypeHole = HTe ((Type, TType) -> Term) | HTy ((Type, TType) -> TypeHole)
 
 
+instance Show (SpecialTerm) where
+  show (Term t) = show t
+  show _ = "término con aujeros"
+
 -- Funciones que operan sobre los lambda términos con aujeros.
 
 simplifyTypeInTerm :: (Type, TType) -> [SpecialTerm] -> [SpecialTerm]

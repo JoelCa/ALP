@@ -210,9 +210,9 @@ newProofC g ty = PConstruction { tsubp = 1
                                }
 
 -- Obtiene el lambda término final de la prueba construida.
-getTermFromProof :: ProofConstruction -> (Type, TType) -> Term
-getTermFromProof (PConstruction {term=[Term t]}) ty = t ::: ty
-getTermFromProof _ _ = error "getTermFromProof: no debería pasar."
+getLTermFromProof :: ProofConstruction -> (Type, TType) -> Term
+getLTermFromProof (PConstruction {term=[Term t]}) ty = t ::: ty
+getLTermFromProof _ _ = error "getTermFromProof: no debería pasar."
 
 -- Funciones auxiliares.
 -- Chequea si la prueba a terminado.

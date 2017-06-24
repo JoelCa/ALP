@@ -1,26 +1,18 @@
+import Common hiding (catch)
+import System.Console.Haskeline
+import Control.Monad.State.Strict
+import Data.Maybe
+import qualified Data.Sequence as S
 import Tactics (habitar)
-import Parser
-import Common hiding (State, catch, get)
+import Parser (getCommand, usrInfixParser, getParser)
 import Text.PrettyPrint.HughesPJ (render)
-import PrettyPrinter (printTerm, printProof, printType, printTType, printTermTType, printLamTerm)
-import Rules
+import PrettyPrinter (printTerm, printProof, printType, printLamTerm)
 import Transformers
-import ErrorMsj
+import ErrorMsj (errorMessage)
 import TypeInference (basicTypeInference)
 import ProverState
 import GlobalState
-import Proof (ProofConstruction, getTermFromProof, isFinalTerm, cglobal, tsubp, subps)
-import TermsWithHoles
-import DefaultOperators
-import System.Environment
-import System.Console.Haskeline
-import System.Console.Haskeline.MonadException
-import Control.Monad.Trans.Class
-import Control.Monad.State.Strict
-import Control.Monad.IO.Class
-import Data.Maybe
-import Data.List (find, findIndex, elemIndex)
-import qualified Data.Sequence as S
+import Proof (ProofConstruction, getLTermFromProof, isFinalTerm, cglobal, tsubp, subps)
 
 type ProverInputState a = InputT (StateT ProverState IO) a
 
@@ -35,11 +27,7 @@ reloadProver = lift $ modify $ finishProof . newTheoremFromProof
 
 
 main :: IO ()
-main = do args <- getArgs
-          if args == []
-            then evalStateT (runInputT defaultSettings prover) initialProver
-            else do putStrLn "aviso: hay argumentos!" --Tratar
-                    evalStateT (runInputT defaultSettings prover) initialProver
+main = evalStateT (runInputT defaultSettings prover) initialProver
 
 
 prover :: ProverInputState ()
@@ -64,8 +52,7 @@ checkCommand (Ty name ty) =
      when (proofStarted s) (throwIO PNotFinished)
      let g = global s
      when (invalidName name g) (throwIO $ ExistE name)
-     (tyr,tty) <- returnInput $ renamedType (fTypeContext g) (opers g) ty
-     --outputStrLn $ show (tyr,tty) ++ "\n"
+     (tyr,tty) <- returnInput $ renamedType1 (fTypeContext g) (opers g) ty
      lift $ modify $ newProof name (ty,tty) (tyr,tty)
      s' <- lift get
      outputStrLn $ renderProof $ getProofC s'
@@ -88,17 +75,16 @@ checkCommand (Ta (Print x)) =
   do s <- lift get
      let g = global s
      when (not $ isTheorem x g) (throwIO $ NotExistE x)
-     outputStrLn $ render $ printTerm (opers g) $ getLTerm x g
+     outputStrLn $ renderNoNameLTerm (opers g) $ getLTermFromTheorems x g
      prover
 checkCommand (Ta (Infer x)) =
   do s <- lift get
      let op = opers $ global s
-     (te,te') <- returnInput $ withoutNameBasic op (fTypeContext $ global s) x
+     (te,te') <- returnInput $ basicWithoutName op (fTypeContext $ global s) x
      --outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
      (ty,ty') <- returnInput $ basicTypeInference (theorems $ global s) op (te,te')
      --outputStrLn $ "Renombramiento: " ++ (render $ printTerm (opers $ global s) te')
-     outputStrLn $ render $ printType op ty
-     outputStrLn $ render $ printTType op ty'
+     outputStrLn $ renderType op ty
      prover                            
 checkCommand (Ta ta) =
   do s <- lift get
@@ -109,7 +95,7 @@ checkCommand (Ta ta) =
      lift $ modify $ setProofC pc'
      if (isFinalTerm pc')
        then ((outputStrLn $ "Prueba completa.\n"
-              ++ renderFinalTerm (opers $ global s) (getTermFromProof pc' typ)  ++ "\n")
+              ++ renderNoNameLTerm (opers $ global s) (getLTermFromProof pc' typ)  ++ "\n")
              >> reloadProver)
        else outputStrLn $ renderProof pc'
      prover
@@ -121,13 +107,13 @@ defCommand name (Type (body, n, args, isInfix)) =
   do s <- lift get
      let glo = global s   
      t <- returnInput $ renamedType3 args (fTypeContext glo) (opers glo) body
-     outputStrLn $ render $ printType (opers glo) $ fst t
+     outputStrLn $ renderType (opers glo) $ fst t
      typeDefinition name t n isInfix
 defCommand name (LTerm body) =
   do s <- lift get
      let glo = global s
-     te  <- returnInput $ withoutNameBasic (opers glo) (fTypeContext glo) body
-     outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers glo) $ fst te)
+     te  <- returnInput $ basicWithoutName (opers glo) (fTypeContext glo) body
+     outputStrLn $ "Renombramiento: " ++ (renderLTerm (opers glo) $ fst te)
      lamTermDefinition name te
 defCommand name (Ambiguous ap) =
   do s <- lift get
@@ -135,10 +121,10 @@ defCommand name (Ambiguous ap) =
      t <- returnInput $ basicDisambiguatedTerm (fTypeContext glo) (opers glo) ap
      case t of
        Left ty ->
-         do outputStrLn $ render $ printType (opers glo) $ fst ty
+         do outputStrLn $ renderType (opers glo) $ fst ty
             typeDefinition name ty 0 False
        Right te ->
-         do outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers glo) $ fst te)
+         do outputStrLn $ "Renombramiento: " ++ (renderLTerm (opers glo) $ fst te)
             lamTermDefinition name te
 
 -- Función auxiliar de defCommand
@@ -155,7 +141,7 @@ lamTermDefinition name te =
      ty <- returnInput $ basicTypeInference (theorems glo) (opers glo) te
      lift $ modify $ newTheorem name (snd te ::: ty)
 
--- Funciones auxiliares del comando "Props/Types".
+-- Función auxiliar del comando "Props/Types".
 typeRepeated :: S.Seq TypeVar -> (String -> Bool) -> (Maybe String, Maybe String)
 typeRepeated ps f
   | S.null ps = (Nothing, Nothing)
@@ -168,17 +154,22 @@ typeRepeated ps f
                         else typeRepeated ps' f
                             
 
--- Impresión del lambda término final.
-renderFinalTerm :: FOperations -> Term -> String
-renderFinalTerm op t = render $ printTerm op t
+-- Impresión de lambda término sin nombre, y tipos con nombres.
+renderNoNameLTerm :: FOperations -> Term -> String
+renderNoNameLTerm op = render . printTerm op
 
--- Impresión del lambda término final sin nombres (a modo de prueba).
-renderFinalTermWithoutName :: FOperations -> Term -> String
-renderFinalTermWithoutName op t = render $ printTermTType op t
+-- Impresión de lambda término con nombre, y tipos con nombres.
+renderLTerm :: FOperations -> LamTerm -> String
+renderLTerm op  = render . printLamTerm op
+
+-- Impresión de tipo con nombre.
+renderType :: FOperations -> Type -> String
+renderType op = render . printType op
 
 -- Impresión de la prueba en construcción
 renderProof :: ProofConstruction -> String
 renderProof p = render $ printProof (tsubp p) (conflict $ cglobal p) (opers $ cglobal p) (fTypeContext $ cglobal p) (subps p)
+
 
 returnInput :: Either ProofExceptions a -> ProverInputState a
 returnInput (Left exception) = throwIO exception

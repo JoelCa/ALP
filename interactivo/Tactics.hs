@@ -10,8 +10,6 @@ import Transformers
 import TypeInference (typeInference)
 import TypeUnification (unification)
 import TypeSubstitution (typeSubs)
-import Data.Char (isDigit)
-import Data.List (findIndex, elemIndex, find)
 import Control.Monad (unless, when)
 import qualified Data.Map as M (Map, lookup, insert, empty, size)
 import Data.Maybe (fromJust, isJust)
@@ -210,7 +208,7 @@ elimComm i (t,t') (Exists v tt, TExists tt') =
      btc <- getBTypeContext
      ftc <- getFTypeContext
      op <- getUsrOpers
-     replaceType (renamedTypeWithName (bTypeVar v S.<| btc) ftc op t, positiveShift 1 t')
+     replaceType (renamedValidType (bTypeVar v S.<| btc) ftc op t, positiveShift 1 t')
      modifyTerm $ addHT (\x -> Unpack v (Bound i) x)
 elimComm i (t,t') (RenameTy _ _ [t1,t2], RenameTTy n [t1',t2'])
   | n == and_code =

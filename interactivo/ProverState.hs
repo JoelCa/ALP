@@ -3,7 +3,7 @@ module ProverState where
 import Common
 import Parser (UsrParser, basicInfixParser)
 import GlobalState
-import Proof (ProofConstruction, newProofC, getTermFromProof)
+import Proof (ProofConstruction, newProofC, getLTermFromProof)
 import Data.Maybe (isJust)
 import Data.Sequence (Seq)
 
@@ -47,7 +47,7 @@ finishProof p = p {proof = Nothing}
 -- La prueba pasa a ser un teorema.
 newTheoremFromProof :: ProverState -> ProverState
 newTheoremFromProof p@(PSt {proof = Just pr}) =
-  newTheorem (name pr) (getTermFromProof (constr pr) (types pr)) p
+  newTheorem (name pr) (getLTermFromProof (constr pr) (types pr)) p
 
 newTheorem :: String -> Term -> ProverState -> ProverState
 newTheorem name te  = modifyGlobal (checkConflictName name . addTheorem name te)

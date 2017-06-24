@@ -86,7 +86,7 @@ pEPack = 2
 pEUnpack :: Int
 pEUnpack = 2
 
--- Pretty-printer de términos, con tipos sin nombres.
+-- Pretty-printer de lambda término sin nombre, y tipos sin nombres.
 printTermTType :: FOperations -> Term -> Doc 
 printTermTType op t = printTermTType' op (1, False) [] [] (vars \\ fv t) (typeVars \\ ftv t) t
 
@@ -155,7 +155,7 @@ printTypeTermTType :: FOperations -> [String] -> TType -> Doc
 printTypeTermTType op bs t = printTType' op (7,7,False) bs ((typeVars \\ fType t) \\ bs) t
 
 
--- Pretty-printer de términos, con tipos con nombres.
+-- Pretty-printer de lambda término sin nombre, y tipos con nombres.
 printTerm :: FOperations -> Term -> Doc 
 printTerm op t = printTerm' op (1, False) [] (vars \\ fv t)  t
 
@@ -217,6 +217,8 @@ printTerm' op (i,j) bs fs (t ::: (ty, _)) =
 printTerm' _ _ _ [] (Lam _ _) =
   error "prinTerm': no hay nombres para elegir"
 
+
+-- Pretty-printer de lambda término con nombre, y tipos con nombres.
 printLamTerm :: FOperations -> LamTerm -> Doc
 printLamTerm op = printLamTerm' op (1, False)
 

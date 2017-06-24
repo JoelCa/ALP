@@ -67,5 +67,5 @@ invalidName name g =  isTheorem name g
 addFreeVars :: S.Seq TypeVar -> GlobalState -> GlobalState
 addFreeVars vars g = g {fTypeContext = vars S.>< fTypeContext g}
 
-getLTerm :: String -> GlobalState -> Term
-getLTerm name (Global {theorems = te}) = te Map.! name
+getLTermFromTheorems :: String -> GlobalState -> Term
+getLTermFromTheorems name (Global {theorems = te}) = te Map.! name

@@ -40,7 +40,7 @@ typeSubs' n l fs bs rs op (B v, TBound x) ts
               Nothing -> error "error: typeSubs', no debería pasar."
   | (n <= x) && (x < l) =
       let (ty,ty') = ts !! (l - x - 1)
-      in (renamedTypeWithName rs fs op ty, positiveShift n ty')
+      in (renamedValidType rs fs op ty, positiveShift n ty')
   | otherwise = (B v, TBound $ x - l + n)
 typeSubs' _ _ _ _ _ _ x@(_, TFree f) _ = x
 typeSubs' n l fs bs rs op (ForAll v t1, TForAll t1') ts =

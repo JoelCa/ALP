@@ -29,13 +29,14 @@ reloadProver = lift $ modify $ finishProof . newTheoremFromProof
 main :: IO ()
 main = evalStateT (runInputT defaultSettings prover) initialProver
 
-
+prompt :: ProverState -> String
+prompt s = if proofStarted s
+           then theoremName s ++ " < "
+           else "> "
+            
 prover :: ProverInputState ()
 prover = do s <- lift get
-            if proofStarted s
-              then do input <- getInputLine $ theoremName s ++ 
-
-            input <- getInputLine "> "
+            minput <- getInputLine $ prompt s
             case minput of
               Nothing -> return ()
               Just "-quit" -> do outputStrLn "Saliendo."
@@ -52,7 +53,7 @@ prover = do s <- lift get
 checkCommand :: Command -> ProverInputState ()
 checkCommand (Ty name ty) =
   do s <- lift get
-     when 0 (throwIO PNotFinished)
+     when (proofStarted s) (throwIO PNotFinished)
      let g = global s
      when (invalidName name g) (throwIO $ ExistE name)
      (tyr,tty) <- returnInput $ renamedType1 (fTypeContext g) (opers g) ty

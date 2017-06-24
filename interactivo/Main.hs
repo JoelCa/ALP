@@ -32,7 +32,10 @@ main = evalStateT (runInputT defaultSettings prover) initialProver
 
 prover :: ProverInputState ()
 prover = do s <- lift get
-            minput <- getInputLine "> "
+            if proofStarted s
+              then do input <- getInputLine $ theoremName s ++ 
+
+            input <- getInputLine "> "
             case minput of
               Nothing -> return ()
               Just "-quit" -> do outputStrLn "Saliendo."
@@ -49,7 +52,7 @@ prover = do s <- lift get
 checkCommand :: Command -> ProverInputState ()
 checkCommand (Ty name ty) =
   do s <- lift get
-     when (proofStarted s) (throwIO PNotFinished)
+     when 0 (throwIO PNotFinished)
      let g = global s
      when (invalidName name g) (throwIO $ ExistE name)
      (tyr,tty) <- returnInput $ renamedType1 (fTypeContext g) (opers g) ty

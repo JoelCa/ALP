@@ -3,8 +3,7 @@ module PrettyPrinter where
 import Common
 import Proof
 import DefaultOperators
-import Text.PrettyPrint.HughesPJ hiding (parens)
-import qualified Text.PrettyPrint.HughesPJ as PP 
+import Text.PrettyPrint
 import Data.List
 import qualified Data.Sequence as S
 import Hypothesis (printHypothesis)
@@ -62,7 +61,7 @@ fType (RenameTTy _ ts) = foldr (\x r -> fType x ++ r) [] ts
 
 parenIf :: Bool -> Doc -> Doc
 parenIf False d   = d
-parenIf True d    = PP.parens d
+parenIf True d    = parens d
 
 -- Precedencias
 pAs :: Int
@@ -106,7 +105,7 @@ printTermTType' op (i, j) bs bts (f:fs) fts (Lam (_,t) u) =
   text f <> 
   text ":" <> 
   printTypeTermTType op bts t <>
-  text "." <> 
+  text "." <>
   printTermTType' op (pLam, j) (f:bs) bts fs fts u
 printTermTType' op (i, j) bs bts fs (f':fts) (BLam _ u) =
   parenIf (i < pBLam) $
@@ -166,54 +165,65 @@ printTerm' _ _ _  _  (Free (NGlobal n)) =
   text n
 printTerm' op (i, j) bs fs (t :@: u) =
   parenIf ((i < pApp) || ((i == pApp) && j)) $   
-  printTerm' op (pApp, False) bs fs t <+> 
-  printTerm' op (pApp, True) bs fs u
+  sep $
+  printTerm' op (pApp, False) bs fs t :
+  [printTerm' op (pApp, True) bs fs u]
 printTerm' op (i, j) bs (f:fs) (Lam (t,_) u) =
   parenIf (i < pLam) $ 
+  sep $
   text "\\" <> 
   text f <> 
   text ":" <> 
   printType op t <>
-  text "." <>
-  printTerm' op (pLam, j) (f:bs) fs u
+  text "." :
+  [nest 2  $ printTerm' op (pLam, j) (f:bs) fs u]
 printTerm' op (i,j) bs fs (BLam x u) =
   parenIf (i < pBLam) $
+  sep $
   text "\\" <> 
   text x <> 
-  text "." <>
-  printTerm' op (pBLam, j) bs fs u
+  text "." :
+  [nest 2 $ printTerm' op (pBLam, j) bs fs u]
 printTerm' op (i,j) bs fs (t :!: (ty,_)) =
   parenIf ((i < pBApp) || ((i == pBApp) && j)) $ 
-  printTerm' op (pBApp, False) bs fs t <+>
-  text "[" <>
-  printType op ty <>
-  text "]"
+  sep $
+  printTerm' op (pBApp, False) bs fs t :
+  [nest 2 $
+   text "[" <>
+   printType op ty <>
+   text "]"]
 printTerm' op (i,j) bs fs (Pack (ty,_) t (tty,_)) =
   parenIf (i < pEPack) $
+  sep $
   text "{*" <>
   printType op ty <>
-  text "," <+>
+  text "," :
   printTerm' op (pEPack, j) bs fs t <>
-  text "}" <+>
-  text "as" <+>
-  printType op tty
+  text "}" :
+  [nest 2 $
+   text "as" <+>
+   printType op tty]
 printTerm' op (i,j) bs (f:fs) (Unpack x t u) =
   parenIf (i < pEUnpack) $
-  text "let" <+>
+  sep $
+  text "let" :
   text "{" <>
   text x <>
-  text "," <+>
+  text "," :
   text f <>
   text "}" <+>
-  text "=" <+>
-  printTerm' op (pEUnpack, j) bs fs t <+>
-  text "in" <+>
-  printTerm' op (pEUnpack, j) (f:bs) fs u
+  text "=" :
+  [nest 2 $
+   printTerm' op (pEUnpack, j) bs fs t <+>
+   text "in" <+>
+   printTerm' op (pEUnpack, j) (f:bs) fs u]
 printTerm' op (i,j) bs fs (t ::: (ty, _)) =
   parenIf (i == pAs) $
-  printTerm' op (pAs, j) bs fs t <+>
-  text "as" <+>
-  PP.parens (printType op ty)
+  sep $
+  printTerm' op (pAs, j) bs fs t :
+  [nest 2 $
+    text "as" <+>
+    parens (printType op ty)]
 printTerm' _ _ _ [] (Lam _ _) =
   error "prinTerm': no hay nombres para elegir"
 
@@ -274,7 +284,7 @@ printLamTerm' op (i, j) (As t ty) =
   parenIf (i == pAs) $
   printLamTerm' op (pAs, j) t <+>
   text "as" <+>
-  PP.parens (printType op ty)
+  parens (printType op ty)
 
 
 -- Pretty-printer de tipos sin nombres.

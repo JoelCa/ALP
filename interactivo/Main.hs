@@ -88,6 +88,7 @@ checkCommand (Ta (Infer x)) =
      --outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
      (ty,ty') <- returnInput $ basicTypeInference (theorems $ global s) op (te,te')
      --outputStrLn $ "Renombramiento: " ++ (render $ printTerm (opers $ global s) te')
+     outputStrLn $ renderNoNameLTerm op te'
      outputStrLn $ renderType op ty
      prover                            
 checkCommand (Ta ta) =

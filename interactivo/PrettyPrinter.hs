@@ -358,16 +358,18 @@ printType' prec op (Fun t1 t2) =
   printBinInfix (\x t -> printType' x op t) "->" prec 5 t1 t2
 printType' (i,j,k) op (ForAll v t) =
   parenIf (i < 7) $
+  sep $
   text "forall" <+>
   text v <>
-  text "," <+>
-  printType' (7,j,k) op t
+  text "," :
+  [nest 2 $ printType' (7,j,k) op t]
 printType' (i,j,k) op (Exists v t) =
   parenIf (i < 7) $
+  sep $
   text "exists" <+>
   text v <>
-  text "," <+>
-  printType' (7,j,k) op t
+  text "," :
+  [nest 2 $ printType' (7,j,k) op t]
 printType' prec@(i,j,k) op (RenameTy s _ [t1, t2])
   | s == and_text = printBinInfix (\x t -> printType' x op t) s prec 3 t1 t2
   | s == or_text = printBinInfix (\x t -> printType' x op t) s prec 4 t1 t2
@@ -377,9 +379,10 @@ printType' prec@(i,j,k) op (RenameTy s _ [t1, t2])
             printPrefix (\x t -> printType' x op t) s prec [t1,t2]
           Just (n, (_,_,_,True)) ->
             parenIf ( i < 2 || ( i == 2 && ( j < n || ( j == n && k )))) $
-            printType' (2, n, True) op t1 <+>
-            text s <+> 
-            printType' (2, n, False) op t2
+            sep $
+            printType' (2, n, True) op t1 :
+            [ text s <+>
+              printType' (2, n, False) op t2 ]
           _ -> error "error: printType' no debería pasar."
 printType' prec op (RenameTy s _ ts) =
   printPrefix (\x t -> printType' x op t) s prec ts
@@ -389,9 +392,10 @@ printBinInfix :: ((Int, Int, Bool) -> a -> Doc) -> String
               -> (Int, Int, Bool) -> Int -> a -> a -> Doc              
 printBinInfix f s (i,j,k) n t1 t2 =
   parenIf (i < n || ( (i == n) && k)) $
-  f (n, j, True) t1 <+>
-  text s <+> 
-  f (n, j, False) t2
+  sep $
+  f (n, j, True) t1 :
+  [ text s <+>
+    f (n, j, False) t2 ]
 
 
 printPrefix :: ((Int, Int, Bool) -> a -> Doc) -> String

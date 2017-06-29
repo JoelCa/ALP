@@ -188,10 +188,10 @@ printTerm' op (i,j) bs fs (t :!: (ty,_)) =
   parenIf ((i < pBApp) || ((i == pBApp) && j)) $ 
   sep $
   printTerm' op (pBApp, False) bs fs t :
-  [nest 2 $
-   text "[" <>
-   printType op ty <>
-   text "]"]
+  [ nest 2 $
+    text "[" <>
+    printType op ty <>
+    text "]" ]
 printTerm' op (i,j) bs fs (Pack (ty,_) t (tty,_)) =
   parenIf (i < pEPack) $
   sep $
@@ -200,9 +200,9 @@ printTerm' op (i,j) bs fs (Pack (ty,_) t (tty,_)) =
   text "," :
   printTerm' op (pEPack, j) bs fs t <>
   text "}" :
-  [nest 2 $
-   text "as" <+>
-   printType op tty]
+  [ nest 2 $
+    text "as" <+>
+    printType op tty ]
 printTerm' op (i,j) bs (f:fs) (Unpack x t u) =
   parenIf (i < pEUnpack) $
   sep $
@@ -213,17 +213,17 @@ printTerm' op (i,j) bs (f:fs) (Unpack x t u) =
   text f <>
   text "}" <+>
   text "=" :
-  [nest 2 $
-   printTerm' op (pEUnpack, j) bs fs t <+>
-   text "in" <+>
-   printTerm' op (pEUnpack, j) (f:bs) fs u]
+  [ nest 2 $
+    printTerm' op (pEUnpack, j) bs fs t <+>
+    text "in" <+>
+    printTerm' op (pEUnpack, j) (f:bs) fs u ]
 printTerm' op (i,j) bs fs (t ::: (ty, _)) =
   parenIf (i == pAs) $
   sep $
   printTerm' op (pAs, j) bs fs t :
-  [nest 2 $
+  [ nest 2 $
     text "as" <+>
-    parens (printType op ty)]
+    parens (printType op ty) ]
 printTerm' _ _ _ [] (Lam _ _) =
   error "prinTerm': no hay nombres para elegir"
 
@@ -236,62 +236,72 @@ printLamTerm' :: FOperations -> (Int, Bool) -> LamTerm -> Doc
 printLamTerm' _ _ (LVar x ) =
   text x
 printLamTerm' op (i,j) (Abs x t e) =
-  parenIf (i < pLam) $ 
+  parenIf (i < pLam) $
+  sep $
   text "\\" <> 
   text x <> 
   text ":" <> 
   printType op t <>
-  text "." <>
-  printLamTerm' op (pLam,j) e
+  text "." :
+  [nest 2 $ printLamTerm' op (pLam,j) e]
 printLamTerm' op (i, j) (App t u) =
   parenIf ((i < pApp) || ((i == pApp) && j)) $  
-  printLamTerm' op (pApp, False) t <+> 
-  printLamTerm' op (pApp, True) u
+  sep $
+  printLamTerm' op (pApp, False) t :
+  [printLamTerm' op (pApp, True) u]
 printLamTerm' op (i, j) (BAbs x u) =
   parenIf (i < pBLam) $
+  sep $
   text "\\" <> 
   text x <> 
-  text "." <>
-  printLamTerm' op (pBLam,j) u
+  text "." :
+  [nest 2 $ printLamTerm' op (pBLam,j) u]
 printLamTerm' op (i, j) (BApp x ty) =
-  parenIf ((i < pBApp) || ((i == pBApp) && j)) $   
-  printLamTerm' op (pBApp, False) x <+>
-  text "[" <>
-  printType op ty <>
-  text "]"
+  parenIf ((i < pBApp) || ((i == pBApp) && j)) $
+  sep $
+  printLamTerm' op (pBApp, False) x :
+  [ nest 2 $
+    text "[" <>
+    printType op ty <>
+    text "]" ]
 printLamTerm' op (i, j) (EPack ty e tty) =
   parenIf (i < pEPack) $
+  sep $
   text "{*" <>
   printType op ty <>
-  text "," <+>
+  text "," :
   printLamTerm' op (pEPack, j) e <>
-  text "}" <+>
-  text "as" <+>
-  printType op tty
+  text "}" :
+  [ nest 2 $
+    text "as" <+>
+    printType op tty ]
 printLamTerm' op (i, j) (EUnpack x y e u) =
   parenIf (i < pEUnpack) $
-  text "let" <+>
+  sep $
+  text "let" :
   text "{" <>
   text x <>
-  text "," <+>
+  text "," :
   text y <>
   text "}" <+>
-  text "=" <+>
-  printLamTerm' op (pEUnpack, j) e <+>
-  text "in" <+>
-  printLamTerm' op (pEUnpack, j) u
+  text "=" :
+  [ nest 2 $
+    printLamTerm' op (pEUnpack, j) e <+>
+    text "in" <+>
+    printLamTerm' op (pEUnpack, j) u ]
 printLamTerm' op (i, j) (As t ty) =
   parenIf (i == pAs) $
-  printLamTerm' op (pAs, j) t <+>
-  text "as" <+>
-  parens (printType op ty)
+  sep $
+  printLamTerm' op (pAs, j) t :
+  [ nest 2 $
+    text "as" <+>
+    parens (printType op ty) ]
 
 
 -- Pretty-printer de tipos sin nombres.
 printTType :: FOperations -> TType -> Doc
 printTType op t = printTType' op (7,7,False) [] (typeVars \\ fType t) t
 
--- Chequear si es necesario usar parenIf
 printTType' :: FOperations -> (Int, Int, Bool) -> [String] -> [String] -> TType -> Doc
 printTType' op _ bs _ (TBound n) = text $ bs !! n
 printTType' op _ bs _ (TFree n) = text n

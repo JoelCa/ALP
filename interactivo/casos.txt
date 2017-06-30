@@ -1,6 +1,6 @@
 Casos probados:
 
-Props p, q.
+Propositions p, q.
 
 Casos con existenciales:
 - Theorem t1: (forall x, x -> x) -> (exists x, x -> x) -> (exists w, w -> w).
@@ -63,12 +63,12 @@ Para chequear el renombre de variables de tipo ligadas en el unfold.
 - Theorem t23: forall o, forall t, (forall w,  forall r, o /\ w) -> (o /\ t).
 Para chequear la unificación (este caso no unificaba y lo arregle).
 - Theorem t24: p -> q -> (((p /\ q) /\ (p /\ p)) /\ q) /\ p.
-Para chequear el pretty printer de la prueba, y el inferidor sobre el lambda término de la prueba.
+Para chequear el pretty printer de la prueba, y el Checkidor sobre el lambda término de la prueba.
 - Definition x x y := forall w, forall v, x /\ y.
   Theorem t25 : forall w, forall y, x w y -> x w y.
 Para probar el parseo (antes no se parseaba bien).
 - Theorem t26: forall w, forall y,  w /\ y -> w \/ y.
-Para probar que puede inferirse el tipo del lambda término asociado
+Para probar que puede Checkirse el tipo del lambda término asociado
 - Theorem t27: p -> p <-> p -> p.
 Para probar el pretty printer (precedencias).
 - Definition fun1 w := forall x, w -> x -> w.
@@ -85,9 +85,9 @@ Para probar el pretty printer (precedencias).
 - Theorem t32: (p -- q ^ q -- p) ^ (q ++ q) ^ p.
 Para probar el pretty printer (precedencias).
 - Theorem t33: ~p \/ fun1 p.
-Para probar el pretty printer (precedencias), y el inferidor de tipos.
+Para probar el pretty printer (precedencias), y el Checkidor de tipos.
 - Theorem t34: forall x, x -> x /\ (x <-> x).
-Para probar el inferidor de tipos.
+Para probar el Checkidor de tipos.
 - Theorem t35: False -> ~p.
 Para probar la táctica de eliminación del bottom.
 - Definition fun3 w y := forall x, w -> x -> y -> w.
@@ -112,7 +112,7 @@ Para probar el parser (Antes NO funcionaba).
   Theorem t43: forall w, forall p, w -> forall p, p $ w -- forall w, forall p, w /\ p.
 Para probar el parser, con "para todo" sin paréntesis (NO se probó su veracidad).
 - Theorem t45: forall t, forall g, (forall x, forall y, exists z, z /\ x \/ ~exists k, k -> y) -> exists q, q /\ (t -> g) \/ ~exists m, m -> g -> t.
-Para probar el parser, y el inferidor.
+Para probar el parser, y el Checkidor.
 - Theorem t46: (forall w, forall d, forall a, a -> d)-> forall b, forall c, b -> c.
 Para probar la unificación, donde hay que ingregar un tipo mediante exact.
 - Theorem t47: forall p, forall q, p -> q -> ((forall x, x -> x) /\ (forall w, w -> w)) /\ forall k, p /\ q.
@@ -130,7 +130,7 @@ NO se probo. Para chequear definición de operadores.
 Para chequear el renombre de variables ligadas.
 - Theorem t51: forall w, forall w, w -> w.
 Lo resuelvo con: intro; exact (\h.\x:h.x).
-Para probar el exact, y el inferidor.
+Para probar el exact, y el Checkidor.
 - (Props p, q.)
   op x = forall q, x -> q.
   Theorem t52: forall q, op q.
@@ -152,28 +152,28 @@ La prueba es: intros; exact (intro_and [w /\ w] [w -> w] (qqq [w] H0) (\f:w.f)).
 
 
 Casos de inferencia OK:
-1. infer \A. \B. \x:A. \y:False. let {B,x} = {*B, \B.\x:False. x} as exists A, forall Q, False -> False in (\C. x [False] y) [B].
-2. infer \A.\B.let {W,x} = {*A, \C.\y:B. y} as exists A, forall R, B -> B in x.
-3. infer \a.\b.\x:a->b.\c.\y:a->c.\d.\z:a->b.y.
-4. infer \a.\b.\w:a->b.(\c.\x:a->c.\d.\y:forall o, d->c. y [d]) [a].
-5. infer \a.\b. \x:forall a, a -> a. \y: forall q, q. x [a] (y [a]).
+1. Check \A. \B. \x:A. \y:False. let {B,x} = {*B, \B.\x:False. x} as exists A, forall Q, False -> False in (\C. x [False] y) [B].
+2. Check \A.\B.let {W,x} = {*A, \C.\y:B. y} as exists A, forall R, B -> B in x.
+3. Check \a.\b.\x:a->b.\c.\y:a->c.\d.\z:a->b.y.
+4. Check \a.\b.\w:a->b.(\c.\x:a->c.\d.\y:forall o, d->c. y [d]) [a].
+5. Check \a.\b. \x:forall a, a -> a. \y: forall q, q. x [a] (y [a]).
 Para chequear el pretty printer.
-6. infer \A.\B.\x:(B -> (forall A, B -> B)). \y:B. x y [A] y.
+6. Check \A.\B.\x:(B -> (forall A, B -> B)). \y:B. x y [A] y.
 Para chequear el pretty printer.
-7. infer \x:forall w, False -> w.\a.\b.{*forall a0, forall b0, forall c, c -> a0, \c.x [forall a0, forall b0, forall c0, c0 -> a0]} as exists x, forall c, False -> x.
-8. infer \p.{*p, \w.\x:p.x} as exists x, forall w, p -> x.
-9. infer (\A. \x:A. \y: A -> forall B, A. y as (A -> forall W, A) x as A [A]) as forall B, B -> (B -> forall C, B) -> B.
+7. Check \x:forall w, False -> w.\a.\b.{*forall a0, forall b0, forall c, c -> a0, \c.x [forall a0, forall b0, forall c0, c0 -> a0]} as exists x, forall c, False -> x.
+8. Check \p.{*p, \w.\x:p.x} as exists x, forall w, p -> x.
+9. Check (\A. \x:A. \y: A -> forall B, A. y as (A -> forall W, A) x as A [A]) as forall B, B -> (B -> forall C, B) -> B.
 Para probar precedencia del "as".
-10. infer (\A. \x:forall B, A. \y: A -> A. y as (A -> A) (x as (forall C, A) [A])) as forall B, (forall C, B) -> (B -> B) -> B.
+10. Check (\A. \x:forall B, A. \y: A -> A. y as (A -> A) (x as (forall C, A) [A])) as forall B, (forall C, B) -> (B -> B) -> B.
 Para probar precedencia del "as".
 11. Check (\qq.\x:qq.x) as (forall p, p -> p).
 12. Check (\a.\a.\x:a.x) as (forall a, forall a, a -> a).
 13. Check (\a.\b.\x:b.\y:a.y) [forall b, b -> b].
 Notamos que no se renombran las variables ligadas del tipo que se utiliza en una substitución (esta bien, no es necesario).
 
-Casos de inferencia ERROR:
-1. infer \B. let {A,a} = {*B, \x:B.x} as exists C, C -> C in a.
-2. infer \a.\x:a.\a.\b.\y:a->b. y x.
+Casos de indeferencia ERROR:
+1. Check \B. let {A,a} = {*B, \x:B.x} as exists C, C -> C in a.
+2. Check \a.\x:a.\a.\b.\y:a->b. y x.
 3. Check (\a.\x:a.\a.\y:a -> a.y x) as (forall a, a -> forall a, (a -> a) -> a).
 
 

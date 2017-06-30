@@ -88,7 +88,7 @@ checkCommand (Ta (Infer x)) =
      --outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
      (ty,ty') <- returnInput $ basicTypeInference (theorems $ global s) op (te,te')
      --outputStrLn $ "Renombramiento: " ++ (render $ printTerm (opers $ global s) te')
-     outputStrLn $ renderNoNameLTerm op te'
+     --outputStrLn $ renderNoNameLTerm op te'
      outputStrLn $ renderType op ty
      prover                            
 checkCommand (Ta ta) =
@@ -100,7 +100,7 @@ checkCommand (Ta ta) =
      lift $ modify $ setProofC pc'
      if (isFinalTerm pc')
        then ((outputStrLn $ "Prueba completa.\n"
-              ++ renderNoNameLTerm (opers $ global s) (getLTermFromProof pc' typ)  ++ "\n")
+              ++ renderNoNameLTerm (opers $ global s) (getLTermFromProof pc' typ))
              >> reloadProver)
        else outputStrLn $ renderProof pc'
      prover
@@ -112,13 +112,13 @@ defCommand name (Type (body, n, args, isInfix)) =
   do s <- lift get
      let glo = global s   
      t <- returnInput $ renamedType3 args (fTypeContext glo) (opers glo) body
-     outputStrLn $ renderType (opers glo) $ fst t
+     --outputStrLn $ renderType (opers glo) $ fst t
      typeDefinition name t n isInfix
 defCommand name (LTerm body) =
   do s <- lift get
      let glo = global s
      te  <- returnInput $ basicWithoutName (opers glo) (fTypeContext glo) body
-     outputStrLn $ "Renombramiento: " ++ (renderLTerm (opers glo) $ fst te)
+     --outputStrLn $ "Renombramiento: " ++ (renderLTerm (opers glo) $ fst te)
      lamTermDefinition name te
 defCommand name (Ambiguous ap) =
   do s <- lift get
@@ -126,10 +126,10 @@ defCommand name (Ambiguous ap) =
      t <- returnInput $ basicDisambiguatedTerm (fTypeContext glo) (opers glo) ap
      case t of
        Left ty ->
-         do outputStrLn $ renderType (opers glo) $ fst ty
+         do --outputStrLn $ renderType (opers glo) $ fst ty
             typeDefinition name ty 0 False
        Right te ->
-         do outputStrLn $ "Renombramiento: " ++ (renderLTerm (opers glo) $ fst te)
+         do --outputStrLn $ "Renombramiento: " ++ (renderLTerm (opers glo) $ fst te)
             lamTermDefinition name te
 
 -- Función auxiliar de defCommand

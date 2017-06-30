@@ -155,7 +155,6 @@ ni de términos, ni tampoco se puede declarar variables de tipos. En Coq es posi
 Además, cuando no se construye una prueba, NO se pueden invocar tácticas. En Coq sí se puede.
 
 FALTA:
-- Organizar Main.hs. Hacer funciones que operen sobre prover state.
 - Ver constantes.
 - Explicar en el informe el renombre de lambda términos (tanto de var. de tipos, como de términos).
 - Mejorar Print (Print All, Print de tipos)

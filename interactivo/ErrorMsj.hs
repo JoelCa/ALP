@@ -42,7 +42,7 @@ errorMessage _ (TypeE x) =  "error: el tipo \"" ++ x ++ "\" no fue declarado."
 errorMessage op (InferE te e) =
   "error: en el término \"" ++
   render (printLamTerm op te) ++
-  "\". " ++
+  "\".\n" ++
   errorInfer op e
 errorMessage _ (UnfoldE1 s) =  "error: " ++ s ++ " no es un operador foldeable."
 errorMessage _ (HypoE i) = "error: la hipótesis " ++ printHypothesis i ++ " no existe."

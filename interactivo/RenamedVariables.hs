@@ -12,7 +12,7 @@ getRename s (f,xs) (g,ys) (h,zs) =
   if p < -1  then s else s ++ [ intToDigit (succ p) ]
   where p = posfix s f xs
             `max` posfix s g ys
-            `max` posfix s h zs
+            `max` posfix s h zsa
 
 posfix :: Foldable t => String -> (a -> String) -> t a -> Int
 posfix s f xs = foldr (\x i -> maybe i (max i) $ getIntPosfix s $ f x) (-2) xs

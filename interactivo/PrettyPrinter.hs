@@ -8,6 +8,10 @@ import Data.List
 import qualified Data.Sequence as S
 import Hypothesis (printHypothesis)
 import qualified Data.IntSet as IS
+import Data.Set (Set)
+import qualified Data.Set as Set
+
+
 
 -----------------------
 --- pretty printer
@@ -59,9 +63,23 @@ fType (TForAll t) = fType t
 fType (TExists t) = fType t
 fType (RenameTTy _ ts) = foldr (\x r -> fType x ++ r) [] ts
 
+-- Genera la variables de tipo ligadas
+bv :: Term -> Set String
+bv (t :@: u)          = Set.union (bv t) (bv u)
+bv (BLam x u)         = Set.insert x $ bv u
+bv (t :!: _)          = bv t
+bv (Lam _ t)          = bv t
+bv (Pack _ t _)       = bv t
+bv (Unpack _ t u)     = Set.union (bv t) (bv u)
+bv (t ::: _)          = bv t
+bv _                  = Set.empty
+
+--------------------------------------------------------------------------
+
 parenIf :: Bool -> Doc -> Doc
 parenIf False d   = d
 parenIf True d    = parens d
+
 
 -- Precedencias
 pAs :: Int

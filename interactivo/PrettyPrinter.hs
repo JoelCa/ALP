@@ -8,10 +8,6 @@ import Data.List
 import qualified Data.Sequence as S
 import Hypothesis (printHypothesis)
 import qualified Data.IntSet as IS
-import Data.Set (Set)
-import qualified Data.Set as Set
-
-
 
 -----------------------
 --- pretty printer
@@ -63,16 +59,16 @@ fType (TForAll t) = fType t
 fType (TExists t) = fType t
 fType (RenameTTy _ ts) = foldr (\x r -> fType x ++ r) [] ts
 
--- Genera la variables de tipo ligadas
-bv :: Term -> Set String
-bv (t :@: u)          = Set.union (bv t) (bv u)
-bv (BLam x u)         = Set.insert x $ bv u
+-- Genera las variables de tipo ligadas de un lambda término.
+bv :: Term -> [String]
+bv (t :@: u)          = bv t ++ bv u
+bv (BLam x u)         = x : bv u
 bv (t :!: _)          = bv t
 bv (Lam _ t)          = bv t
 bv (Pack _ t _)       = bv t
-bv (Unpack _ t u)     = Set.union (bv t) (bv u)
+bv (Unpack _ t u)     = bv t ++ bv u
 bv (t ::: _)          = bv t
-bv _                  = Set.empty
+bv _                  = []
 
 --------------------------------------------------------------------------
 
@@ -174,7 +170,7 @@ printTypeTermTType op bs t = printTType' op (7,7,False) bs ((typeVars \\ fType t
 
 -- Pretty-printer de lambda término sin nombre, y tipos con nombres.
 printTerm :: FOperations -> Term -> Doc 
-printTerm op t = printTerm' op (1, False) [] (vars \\ fv t)  t
+printTerm op t = printTerm' op (1, False) [] (vars \\ bv t)  t
 
 printTerm' :: FOperations -> (Int, Bool) -> [String] -> [String] -> Term -> Doc
 printTerm' _ _ bs _  (Bound x) =

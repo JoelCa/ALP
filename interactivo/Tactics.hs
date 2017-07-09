@@ -82,13 +82,15 @@ habitar Split =
          else throw CommandInvalid
        _ -> throw CommandInvalid
 habitar (Exact (LamT te)) =
-  do op <- getUsrOpers
+  do x <- getType
+     tt <- maybeToProof EmptyType x
+     op <- getUsrOpers
      n <- getTTermVars
      cn <- getConflictNames
      btc <- getBTypeContext
      ftc <- getFTypeContext
      te' <- eitherToProof $ withoutName op ftc btc (cn,n) te
-     exactTerm te'  
+     exactTerm te' tt  
 habitar (Exact (T ty)) =
   do x <- getType
      when (isJust x) $ throw $ ExactE2 $ fst $ fromJust x
@@ -104,9 +106,14 @@ habitar (Exact (Appl aps)) =
      n <- getTTermVars
      cn <- getConflictNames
      t <- eitherToProof $ disambiguatedTerm btc ftc op (cn,n) aps
+     x <- getType
      case t of
-       Right te -> exactTerm te
-       Left ty -> exactType ty
+       Right te ->
+         do tt <- maybeToProof EmptyType x
+            exactTerm te tt
+       Left ty ->
+         do when (isJust x) $ throw $ ExactE2 $ fst $ fromJust x
+            exactType ty
 habitar (Unfold s Nothing) =
   do x <- getType
      (t,t') <- maybeToProof EmptyType x
@@ -337,15 +344,13 @@ exactType ty =
   endSubProof >>
   (modifyTerm $ simplifyTypeInTerm ty)
 
-exactTerm :: (LamTerm, Term) -> Proof ()
-exactTerm te =
+exactTerm :: (LamTerm, Term) -> (Type, TType) -> Proof ()
+exactTerm te (tt, tt') =
   do c <- getTermContext
      teo <- getTheorems
      q <- getTBTypeVars
      op <- getUsrOpers
      (_,t') <- eitherToProof $ typeInference q c teo op te
-     x <- getType
-     (tt,tt') <- maybeToProof EmptyType x
      unless (t' == tt') $ throw $ ExactE1 tt
      endSubProof
      modifyTerm $ simplify (snd te)

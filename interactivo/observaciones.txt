@@ -154,6 +154,16 @@ Por ejemplo, Theorem t:forall w, w\/w.
 ni de términos, ni tampoco se puede declarar variables de tipos. En Coq es posible
 Además, cuando no se construye una prueba, NO se pueden invocar tácticas. En Coq sí se puede.
 
+- A la hora de imprimir un lambda término, hacemos que las variables de términos ligadas sean
+distintas a las variables de tipo ligadas (no tenemos en cuenta a las variables que se declaran
+en los tipos), para que sea más facil de entender al lambda término imprimido.
+Además, NO renombramos las variables de tipo ligadas. Por ello, se pueden dar esta situación:
+> Theorem x: forall w, w -> w.
+> algo = \x.\z:x.x.
+> Print algo.
+(\x. \y:x. x) as (forall x, x -> (forall w, w -> w))
+Donde, la variable de tipo ligada "x", coincide con la variable de término "x".
+
 FALTA:
 - Ver constantes.
 - Explicar en el informe el renombre de lambda términos (tanto de var. de tipos, como de términos).

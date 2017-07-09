@@ -55,20 +55,21 @@ fType :: TType -> [String]
 fType (TBound  _) = []
 fType (TFree n) = [n]
 fType (TFun t u) = fType t ++ fType u
-fType (TForAll t) = fType t
+fType (TForAll t) = fType t 
 fType (TExists t) = fType t
 fType (RenameTTy _ ts) = foldr (\x r -> fType x ++ r) [] ts
 
--- Genera las variables de tipo ligadas de un lambda término.
-bv :: Term -> [String]
-bv (t :@: u)          = bv t ++ bv u
-bv (BLam x u)         = x : bv u
-bv (t :!: _)          = bv t
-bv (Lam _ t)          = bv t
-bv (Pack _ t _)       = bv t
-bv (Unpack _ t u)     = bv t ++ bv u
-bv (t ::: _)          = bv t
-bv _                  = []
+-- Obtiene las variables de términos libres y las variables de tipo ligadas de un lambda término.
+fbv :: Term -> [String]
+fbv (Free (NGlobal n)) = [n]
+fbv (t :@: u)          = fbv t ++ fbv u
+fbv (BLam x u)         = x : fbv u
+fbv (t :!: _)          = fbv t
+fbv (Lam _ t)          = fbv t
+fbv (Pack _ t _)       = fbv t
+fbv (Unpack _ t u)     = fbv t ++ fbv u
+fbv (t ::: _)          = fbv t
+fbv _                  = []
 
 --------------------------------------------------------------------------
 
@@ -170,7 +171,7 @@ printTypeTermTType op bs t = printTType' op (7,7,False) bs ((typeVars \\ fType t
 
 -- Pretty-printer de lambda término sin nombre, y tipos con nombres.
 printTerm :: FOperations -> Term -> Doc 
-printTerm op t = printTerm' op (1, False) [] (vars \\ bv t)  t
+printTerm op t = printTerm' op (1, False) [] (vars \\ fbv t)  t
 
 printTerm' :: FOperations -> (Int, Bool) -> [String] -> [String] -> Term -> Doc
 printTerm' _ _ bs _  (Bound x) =

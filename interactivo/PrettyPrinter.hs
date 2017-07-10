@@ -8,6 +8,8 @@ import Data.List
 import qualified Data.Sequence as S
 import Hypothesis (printHypothesis)
 import qualified Data.IntSet as IS
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 -----------------------
 --- pretty printer
@@ -38,6 +40,7 @@ fv (Pack _ t _)      = fv t
 fv (Unpack _ t u)    = fv t ++ fv u
 fv (t ::: _)         = fv t
 
+-- CHEQUEAR
 -- Variables de tipo libres.
 ftv :: Term -> [String]
 ftv (Bound _) = []
@@ -59,17 +62,40 @@ fType (TForAll t) = fType t
 fType (TExists t) = fType t
 fType (RenameTTy _ ts) = foldr (\x r -> fType x ++ r) [] ts
 
--- Obtiene las variables de términos libres y las variables de tipo ligadas de un lambda término.
-fbv :: Term -> [String]
-fbv (Free (NGlobal n)) = [n]
-fbv (t :@: u)          = fbv t ++ fbv u
-fbv (BLam x u)         = x : fbv u
-fbv (t :!: _)          = fbv t
-fbv (Lam _ t)          = fbv t
-fbv (Pack _ t _)       = fbv t
-fbv (Unpack _ t u)     = fbv t ++ fbv u
-fbv (t ::: _)          = fbv t
-fbv _                  = []
+
+freeVarsAndOps :: Type -> Set String
+freeVarsAndOps (B x) = Set.singleton x
+freeVarsAndOps (Fun t u) = Set.union (freeVarsAndOps t) (freeVarsAndOps u)
+freeVarsAndOps (ForAll x t) = Set.insert x $ freeVarsAndOps t 
+freeVarsAndOps (Exists x t) = Set.insert x $ freeVarsAndOps t
+freeVarsAndOps (RenameTy x _ ts) =
+  foldr (\t r -> Set.insert x $ Set.union (freeVarsAndOps t) r) Set.empty ts
+ 
+
+-- TERMINAR
+-- Obtiene las siguientes variables:
+-- a. Variables de términos libres.
+-- b. Variables de tipo ligadas.
+-- c. Variables de tipo libres.
+-- d. Nombre de operadores.
+varsInTerm :: Term -> Set String
+varsInTerm (Free (NGlobal n)) =
+  Set.singleton n
+varsInTerm (w :@: u)          =
+  Set.union (varsInTerm w) (varsInTerm u)
+varsInTerm (BLam x u)         =
+  Set.insert x $ varsInTerm u
+varsInTerm (w :!: (t,_))      =
+  Set.union (varsInTerm w) (freeVarsAndOps t)
+varsInTerm (Lam (t,_) w)      =
+  Set.union (varsInTerm w) (freeVarsAndOps t)
+varsInTerm (Pack (t,_) w (t',_)) =
+  Set.union (varsInTerm w) (Set.union (freeVarsAndOps t) (freeVarsAndOps t'))
+--varsInTerm (Unpack _ t u)     = varsInTerm t ++ varsInTerm u
+varsInTerm (w ::: (t,_))      =
+  Set.union (varsInTerm w) (freeVarsAndOps t)
+varsInTerm _                  =
+  Set.empty
 
 --------------------------------------------------------------------------
 
@@ -171,7 +197,7 @@ printTypeTermTType op bs t = printTType' op (7,7,False) bs ((typeVars \\ fType t
 
 -- Pretty-printer de lambda término sin nombre, y tipos con nombres.
 printTerm :: FOperations -> Term -> Doc 
-printTerm op t = printTerm' op (1, False) [] (vars \\ fbv t)  t
+printTerm op t = printTerm' op (1, False) [] (vars \\ (Set.toList $ varsInTerm t))  t
 
 printTerm' :: FOperations -> (Int, Bool) -> [String] -> [String] -> Term -> Doc
 printTerm' _ _ bs _  (Bound x) =

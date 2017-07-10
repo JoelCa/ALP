@@ -108,9 +108,9 @@ Convención: Cada abstracción de tipo (con la forma "\a.") debe ser diferente.
 En la implementación, incluso renombramos las variables de tipo ligadas (correspondiente a "forall x, .."),
 de modo tal de que cada una sea distinta de las que fueron declaradas previamente.
 
-- Transformo Seq en Listas mediante la función foldr, en las funciones: applyTypes, withoutName, y getRenamedType.
+- NO VALE. Transformo Seq en Listas mediante la función foldr, en las funciones: applyTypes, withoutName, y getRenamedType.
 
-- Analizar si se admite la utilización de los comandos "infer" y "Definition" durante una prueba.
+- NO se admite la utilización del comando de definición de términos o tipos, durante una prueba.
 
 - Consideramos que dos tipos son iguales si sus tipos sin nombres son iguales.
 Como consecuencia de esto, un lambda término tiene infinitos tipos.
@@ -135,7 +135,7 @@ Es decir, t0 [x := w] = t0.
 - Los lambda términos pueden tener variables libres, las cuales solo pueden ser nombres
 de teoremas.
 
-- Consideramos que en el lambda término ingresado por el usuario, los nombres de las variables de términos
+- ARREGLAR. Consideramos que en el lambda término ingresado por el usuario, los nombres de las variables de términos
 pueden coincidir con los teoremas. Es decir, que en este caso NO la renombramos.
 
 - Consideramos que ninguna definición (de tipo o de lambda término), puede ser recursiva.
@@ -165,6 +165,10 @@ Además, NO renombramos las variables de tipo ligadas. Por ello, se pueden dar e
 Donde, la variable de tipo ligada "x", coincide con la variable de término "x".
 
 FALTA:
+- Añadir renombre de variables de tipos ligadas a los tipos, de modo tal de que no coincidan con los nombre
+de teoremas probados.
+- En el pretty printer de un lambda término sin nombre, hacer que las variables de términos ligadas sean
+distintas a las variables de tipo libre y nombres de operadores.
 - Ver constantes.
 - Explicar en el informe el renombre de lambda términos (tanto de var. de tipos, como de términos).
 - Mejorar Print (Print All, Print de tipos)

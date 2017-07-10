@@ -193,10 +193,15 @@ Chequear el error.
    TERMINAR de ver:
 Ver caso de CBool y CBool2, en test.f
 
+
 VER:
 
-Theorem x: forall w, w -> w.
-Theorem k: forall x, forall y, y -> y.
+- Theorem x: forall w, w -> w.
+  Theorem k: forall x, forall y, y -> y.
 Si en la prueba de k, hacemos: intro; exact x.
 El programa considera que "x" es la variable de tipo.
+
+- Propositions x.
+  algo = \x:x.x.
+Chequear renombre.
 

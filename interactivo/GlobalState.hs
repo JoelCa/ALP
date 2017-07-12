@@ -2,7 +2,7 @@ module GlobalState where
 
 import Common
 import Data.IntSet
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as S
 import Parser (getHypothesisValue)
 import Rules

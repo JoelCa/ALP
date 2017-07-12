@@ -2,7 +2,7 @@ module TypeUnification where
 
 import Common
 import Transformers (positiveShift, negativeShift)
-import qualified Data.Map as M (Map, lookup, insert, empty, size)
+import qualified Data.Map.Strict as M (Map, lookup, insert, empty, size)
 
 
 -- Algoritmo de unificación para el comando APPLY.

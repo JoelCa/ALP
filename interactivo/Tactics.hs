@@ -11,7 +11,7 @@ import TypeInference (typeInference)
 import TypeUnification (unification)
 import TypeSubstitution (typeSubs)
 import Control.Monad (unless, when)
-import qualified Data.Map as M (Map, lookup, insert, empty, size)
+import qualified Data.Map.Strict as M (Map, lookup, insert, empty, size)
 import Data.Maybe (fromJust, isJust)
 import qualified Data.Sequence as S
 

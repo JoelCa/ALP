@@ -1,6 +1,7 @@
 module Transformers where
 
 import Common
+import Theorems (Theorems, theoremsNames)
 import DefaultOperators
 import Data.List (find)
 import RenamedVariables
@@ -17,45 +18,46 @@ import qualified Data.Sequence as S
 -- 2. Operaciones "foldeables".
 -- 3. Tipo a procesar.
 -- OBS: Utilizamos esta función sobre tipos que NO requieren del contexto de tipos "ligados".
-renamedType1 :: FTypeContext -> FOperations -> Type -> Either ProofExceptions (Type, TType)
-renamedType1 ftc op = renamedType (id, id, S.empty, S.empty) ftc op
+renamedType1 :: FTypeContext -> FOperations -> Theorems -> Type
+             -> Either ProofExceptions (Type, TType)
+renamedType1 ftc op te = renamedType (id, id, S.empty, S.empty) ftc op (theoremsNames te)
 
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
 -- por el 4º argumento.
 -- El renombramiento se realiza de modo tal que se respete la Convención 1.
 -- OBS: Utilizamos esta función sobre tipos que requieren del contexto de tipos "ligados".
-renamedType2 :: BTypeContext -> FTypeContext ->  FOperations
+renamedType2 :: BTypeContext -> FTypeContext ->  FOperations -> Theorems
              -> Type -> Either ProofExceptions (Type, TType)
-renamedType2 bs ftc op = renamedType (snd, bTypeVar, bs, bs) ftc op
+renamedType2 bs ftc op te = renamedType (snd, bTypeVar, bs, bs) ftc op (theoremsNames te)
 
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
 -- por el 4º argumento.
 -- El renombramiento se realiza de modo tal que se respete la Convención 1.
 -- OBS: Solo la utilizamos en el renombramiento del cuerpo de una operación.
-renamedType3 :: S.Seq TypeVar -> FTypeContext ->  FOperations
+renamedType3 :: S.Seq TypeVar -> FTypeContext ->  FOperations -> Theorems
              -> Type -> Either ProofExceptions (Type, TType)
-renamedType3 bs ftc op = renamedType (id, id, bs, bs) ftc op
+renamedType3 bs ftc op te = renamedType (id, id, bs, bs) ftc op (theoremsNames te)
 
 
 -- Obtiene el tipo renombrado, y sin nombre, de su 4º arg.
 renamedType :: (a -> TypeVar, TypeVar -> a, S.Seq a, S.Seq a) -> S.Seq TypeVar
-            -> FOperations -> Type -> Either ProofExceptions (Type, TType)
-renamedType (f, _, rs, bs) fs op (B x) =
+            -> FOperations -> [String] -> Type -> Either ProofExceptions (Type, TType)
+renamedType (f, _, rs, bs) fs op _ (B x) =
   getVarType (\_ zs m -> f $ S.index zs m) (f, rs, bs) fs op x
-renamedType (f, f', rs, bs) fs op (ForAll x t) =
-  do let v = getRename x (f, rs) (id, fs) (fst4, op)
-     (tt,tt') <- renamedType (f, f', (f' v S.<| rs), (f' x S.<| bs)) fs op t
+renamedType (f, f', rs, bs) fs op tn (ForAll x t) =
+  do let v = getRename x (f, rs) (id, fs) (fst4, op) (id, tn)
+     (tt,tt') <- renamedType (f, f', (f' v S.<| rs), (f' x S.<| bs)) fs op tn t
      return (ForAll v tt, TForAll tt')
-renamedType (f, f', rs, bs) fs op (Exists x t) =
-  do let v = getRename x (f, rs) (id, fs) (fst4, op)
-     (tt,tt') <- renamedType (f, f', (f' v S.<| rs), (f' x S.<| bs)) fs op t
+renamedType (f, f', rs, bs) fs op tn (Exists x t) =
+  do let v = getRename x (f, rs) (id, fs) (fst4, op) (id, tn)
+     (tt,tt') <- renamedType (f, f', (f' v S.<| rs), (f' x S.<| bs)) fs op tn t
      return (Exists v tt, TExists tt')
-renamedType frbs fs op (Fun t1 t2) =
-  do (tt1, tt1') <- renamedType frbs fs op t1
-     (tt2, tt2') <- renamedType frbs fs op t2
+renamedType frbs fs op tn (Fun t1 t2) =
+  do (tt1, tt1') <- renamedType frbs fs op tn t1
+     (tt2, tt2') <- renamedType frbs fs op tn t2
      return (Fun tt1 tt2, TFun tt1' tt2')
-renamedType frbs fs op (RenameTy s args ts) =
-  getOpType op s args ts $ renamedType frbs fs op
+renamedType frbs fs op tn (RenameTy s args ts) =
+  getOpType op s args ts $ renamedType frbs fs op tn
 
 -- Obtiene el tipo sin nombre de su 4º arg.
 typeWithoutName :: (a -> TypeVar, TypeVar -> a, S.Seq a) -> S.Seq TypeVar
@@ -95,9 +97,9 @@ typeWithoutName fbs fs op (RenameTy s args ts) =
            else throw $ OpE1 s
 
 
-renamedValidType :: BTypeContext -> FTypeContext ->  FOperations
-                    -> Type -> Type
-renamedValidType bs = renamedValidType' bs bs
+renamedValidType :: BTypeContext -> FTypeContext ->  FOperations -> Theorems
+                 -> Type -> Type
+renamedValidType bs ftc op te = renamedValidType' bs bs ftc op (theoremsNames te) 
   
 -- Renombra las variables de tipo ligadas de un tipo con nombre válido.
 -- Se asume que el tipo dado por el 5º arg. está bien formado. Es decir que,
@@ -107,28 +109,29 @@ renamedValidType bs = renamedValidType' bs bs
 -- 2. Conjunto de variables de tipo ligadas no renombradas.
 -- 3. Conjunto de variables de tipos libres.
 -- 4. Operaciones.
--- 5. Tipo sobre el que se realiza el renombramiento.
+-- 5. Nombres de teorems.
+-- 6. Tipo sobre el que se realiza el renombramiento.
 renamedValidType' :: BTypeContext -> BTypeContext -> FTypeContext
-                  -> FOperations -> Type -> Type
-renamedValidType' rs bs fs op (B x) =
+                  -> FOperations -> [String] -> Type -> Type
+renamedValidType' rs bs fs op _ (B x) =
   case S.findIndexL (\(_,w) -> w == x) bs of
     Just n -> B $ snd $ S.index rs n
     Nothing -> B x
-renamedValidType' rs bs fs op (ForAll x t) =
-  let v = getRename x (snd, rs) (id, fs) (fst4, op)
-  in ForAll v $ renamedValidType' (bTypeVar v S.<| rs) (bTypeVar x S.<| bs) fs op t
-renamedValidType' rs bs fs op (Exists x t) =
-  let v = getRename x (snd, rs) (id, fs) (fst4, op)
-  in Exists v $ renamedValidType' (bTypeVar v S.<| rs) (bTypeVar x S.<| bs) fs op t
-renamedValidType' rs bs fs op (Fun t1 t2) =
-  Fun (renamedValidType' rs bs fs op t1) (renamedValidType' rs bs fs op t2)
-renamedValidType' rs bs fs op (RenameTy s args ts) =
-  RenameTy s args $ map (renamedValidType' rs bs fs op) ts
+renamedValidType' rs bs fs op tn (ForAll x t) =
+  let v = getRename x (snd, rs) (id, fs) (fst4, op) (id, tn)
+  in ForAll v $ renamedValidType' (bTypeVar v S.<| rs) (bTypeVar x S.<| bs) fs op tn t
+renamedValidType' rs bs fs op tn (Exists x t) =
+  let v = getRename x (snd, rs) (id, fs) (fst4, op) (id, tn)
+  in Exists v $ renamedValidType' (bTypeVar v S.<| rs) (bTypeVar x S.<| bs) fs op tn t
+renamedValidType' rs bs fs op tn (Fun t1 t2) =
+  Fun (renamedValidType' rs bs fs op tn t1) (renamedValidType' rs bs fs op tn t2)
+renamedValidType' rs bs fs op tn (RenameTy s args ts) =
+  RenameTy s args $ map (renamedValidType' rs bs fs op tn) ts
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Trasformadores de lambda términos: Se pasa de un lambda término con nombre, a uno renombrado y al equivalente sin nombre.
 
-basicWithoutName :: FOperations -> FTypeContext -> LamTerm
+basicWithoutName :: FOperations -> FTypeContext -> Theorems -> LamTerm
                  -> Either ProofExceptions (LamTerm, Term)
 basicWithoutName op fs = withoutName op fs (S.empty) (empty, 0)
   
@@ -143,46 +146,46 @@ basicWithoutName op fs = withoutName op fs (S.empty) (empty, 0)
 -- El 1º argumento, es la tabla de operaciones "foldeables".
 -- Obs: es util generar el lambda término con nombres renombramos para imprimir mejor los errores.
 -- Se usa en el algoritmo de inferencia, y el comando exact.
-withoutName :: FOperations -> FTypeContext -> BTypeContext -> (IntSet, Int)
+withoutName :: FOperations -> FTypeContext -> BTypeContext -> (IntSet, Int) -> Theorems
             -> LamTerm -> Either ProofExceptions (LamTerm, Term)
-withoutName op fs bs = withoutName' S.empty S.empty bs bs fs op
+withoutName op fs bs cnn te = withoutName' S.empty S.empty bs bs fs op cnn (theoremsNames te)
 
 withoutName' :: S.Seq TermVar -> S.Seq TermVar -> BTypeContext -> BTypeContext -> FTypeContext
-             -> FOperations -> (IntSet, Int) -> LamTerm -> Either ProofExceptions (LamTerm, Term)
-withoutName' ters tebs _ _ _ _ cnn w@(LVar x) =
+             -> FOperations -> (IntSet, Int) -> [String] -> LamTerm -> Either ProofExceptions (LamTerm, Term)
+withoutName' ters tebs _ _ _ _ cnn _ w@(LVar x) =
   case S.elemIndexL x tebs of
     Just m -> return (LVar $ S.index ters m, Bound m)
     Nothing -> return (w, getTermVar x cnn)
-withoutName' ters tebs tyrs tybs fs op cnn (Abs x t e) =
-  do let h = getRename x (id, ters) (id, S.empty) (id, S.empty)
-     t' <- renamedType (snd, \x -> (0, x), tyrs, tybs) fs op t
-     (ee, ee') <- withoutName' (h S.<| ters)(x S.<| tebs) tyrs tybs fs op cnn e
+withoutName' ters tebs tyrs tybs fs op cnn tn (Abs x t e) =
+  do let h = getRename x (id, ters) (id, S.empty) (id, S.empty) (id, [])
+     t' <- renamedType (snd, \x -> (0, x), tyrs, tybs) fs op tn t
+     (ee, ee') <- withoutName' (h S.<| ters)(x S.<| tebs) tyrs tybs fs op cnn tn e
      return (Abs h (fst t') ee, Lam t' ee')
-withoutName' ters tebs tyrs tybs fs op cnn (App e1 e2) =
-  do (ee1, ee1') <- withoutName' ters tebs tyrs tybs fs op cnn e1
-     (ee2, ee2') <- withoutName' ters tebs tyrs tybs fs op cnn e2
+withoutName' ters tebs tyrs tybs fs op cnn tn (App e1 e2) =
+  do (ee1, ee1') <- withoutName' ters tebs tyrs tybs fs op cnn tn e1
+     (ee2, ee2') <- withoutName' ters tebs tyrs tybs fs op cnn tn e2
      return (App ee1 ee2, ee1' :@: ee2')
-withoutName' ters tebs tyrs tybs fs op cnn (BAbs x e) =
-  do let v = getRename x (snd, tyrs) (id, fs) (fst4, op)
-     (ee, ee') <- withoutName' ters tebs (bTypeVar v S.<| tyrs) (bTypeVar x S.<| tybs) fs op cnn e
+withoutName' ters tebs tyrs tybs fs op cnn tn (BAbs x e) =
+  do let v = getRename x (snd, tyrs) (id, fs) (fst4, op) (id, [])
+     (ee, ee') <- withoutName' ters tebs (bTypeVar v S.<| tyrs) (bTypeVar x S.<| tybs) fs op cnn tn e
      return (BAbs v ee, BLam v ee')
-withoutName' ters tebs tyrs tybs fs op cnn (BApp e t) =
-  do (ee, ee') <- withoutName' ters tebs tyrs tybs fs op cnn e
-     t' <- renamedType (snd, \x -> (0, x), tyrs, tybs) fs op t
+withoutName' ters tebs tyrs tybs fs op cnn tn (BApp e t) =
+  do (ee, ee') <- withoutName' ters tebs tyrs tybs fs op cnn tn e
+     t' <- renamedType (snd, \x -> (0, x), tyrs, tybs) fs op tn t
      return (BApp ee (fst t'), ee' :!: t')
-withoutName' ters tebs tyrs tybs fs op cnn (EPack t e t') =
-  do tt <- renamedType (snd, \x -> (0, x), tyrs, tybs) fs op t
-     (ee, ee') <- withoutName' ters tebs tyrs tybs fs op cnn e
-     tt' <- renamedType (snd, \x -> (0, x), tyrs, tybs) fs op t'
+withoutName' ters tebs tyrs tybs fs op cnn tn (EPack t e t') =
+  do tt <- renamedType (snd, \x -> (0, x), tyrs, tybs) fs op tn t
+     (ee, ee') <- withoutName' ters tebs tyrs tybs fs op cnn tn e
+     tt' <- renamedType (snd, \x -> (0, x), tyrs, tybs) fs op tn t'
      return (EPack (fst tt) ee (fst tt'), Pack tt ee' tt')
-withoutName' ters tebs tyrs tybs fs op cnn (EUnpack x y e1 e2) =
-  do (ee1, ee1') <- withoutName' ters tebs tyrs tybs fs op cnn e1
-     let v = getRename x (snd, tyrs) (id, fs) (fst4, op)
-         h = getRename y (id, ters) (id, S.empty) (id, S.empty)
-     (ee2, ee2') <- withoutName' (h S.<| ters) (y S.<| tebs) (bTypeVar v S.<| tyrs) (bTypeVar x S.<| tybs) fs op cnn e2
+withoutName' ters tebs tyrs tybs fs op cnn tn (EUnpack x y e1 e2) =
+  do (ee1, ee1') <- withoutName' ters tebs tyrs tybs fs op cnn tn e1
+     let v = getRename x (snd, tyrs) (id, fs) (fst4, op) (id, [])
+         h = getRename y (id, ters) (id, S.empty) (id, S.empty) (id, [])
+     (ee2, ee2') <- withoutName' (h S.<| ters) (y S.<| tebs) (bTypeVar v S.<| tyrs) (bTypeVar x S.<| tybs) fs op cnn tn e2
      return (EUnpack v h ee1 ee2, Unpack v ee1' ee2')
-withoutName' ters tebs tyrs tybs fs op cnn (As e t) =
-  do (ee, ee') <- withoutName' ters tebs tyrs tybs fs op cnn e
+withoutName' ters tebs tyrs tybs fs op cnn tn (As e t) =
+  do (ee, ee') <- withoutName' ters tebs tyrs tybs fs op cnn tn e
      t' <- typeWithoutName (snd, \x -> (0, x), tybs) fs op t
      return (As ee t, ee' ::: (t, t'))
 

@@ -1,6 +1,7 @@
 module Proof where
 
 import Common
+import Theorems (Theorems)
 import GlobalState
 import TermsWithHoles
 import Control.Monad.State.Lazy (get, modify)

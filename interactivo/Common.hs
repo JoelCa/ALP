@@ -87,11 +87,6 @@ type FTypeVar = TypeVar
   -- Secuencia de variables de tipo libres.
 type FTypeContext = Seq FTypeVar
 
-  -- Tabla de teoremas.
-  -- Clave: Nombre del teorema.
-  -- Valor: El lambda término de la prueba.
-type Theorems = Map String Term
-
 
   --Comandos.
 data Command = Ty String Type

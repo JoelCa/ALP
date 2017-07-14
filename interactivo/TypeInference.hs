@@ -1,9 +1,10 @@
 module TypeInference where
 
 import Common
+import Theorems (Theorems)
+import qualified Theorems as T (lookup)
 import Transformers (positiveShift, negativeShift)
 import TypeSubstitution
-import qualified Data.Map as M (lookup)
 import qualified Data.Sequence as S
 
 
@@ -32,7 +33,7 @@ typeInference n c te op t = case typeInference' n c te op t of
 typeInference' :: Int -> TermContext -> Theorems -> FOperations
           -> (LamTerm, Term) -> Either InferExceptions (Type, TType)
 typeInference' n _ te _ (_, Free (NGlobal x)) =
-  case M.lookup x te of
+  case T.lookup x te of
     Just (_ ::: t) -> return t
     Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean teoremas.
     _ -> error "error: typeInference', no debería pasar."

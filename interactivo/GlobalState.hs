@@ -2,7 +2,8 @@ module GlobalState where
 
 import Common
 import Data.IntSet
-import qualified Data.Map.Strict as Map
+import Theorems (Theorems)
+import qualified Theorems as T
 import qualified Data.Sequence as S
 import Parser (getHypothesisValue)
 import Rules
@@ -29,7 +30,7 @@ initialTheorems = [ ("intro_and", intro_and),
 
 
 addTheorem :: String -> Term -> GlobalState -> GlobalState
-addTheorem name lt g = g {theorems = Map.insert name lt $ theorems g}
+addTheorem name lt g = g {theorems = T.insert name lt $ theorems g}
 
 addOperator :: FoldeableOp -> GlobalState -> GlobalState
 addOperator op g = g {opers = (opers g) S.|> op}
@@ -43,14 +44,14 @@ addConflictName s c = case getHypothesisValue s of
                         Nothing -> c
 
 initialGlobal :: GlobalState
-initialGlobal = Global { theorems = Map.fromList initialTheorems
+initialGlobal = Global { theorems = T.fromList initialTheorems
                        , fTypeContext = S.empty
                        , opers = S.fromList [not_op, iff_op]
                        , conflict = empty
                        }
 
 isTheorem :: String -> GlobalState -> Bool
-isTheorem name g = Map.member name $ theorems g
+isTheorem name g = T.member name $ theorems g
 
 isFreeVar :: String -> GlobalState -> Bool
 isFreeVar name g = elem name $ fTypeContext g
@@ -68,4 +69,4 @@ addFreeVars :: S.Seq TypeVar -> GlobalState -> GlobalState
 addFreeVars vars g = g {fTypeContext = vars S.>< fTypeContext g}
 
 getLTermFromTheorems :: String -> GlobalState -> Term
-getLTermFromTheorems name (Global {theorems = te}) = te Map.! name
+getLTermFromTheorems name (Global {theorems = te}) = te T.! name

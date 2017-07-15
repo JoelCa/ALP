@@ -2,9 +2,10 @@ import Common hiding (catch)
 import System.Console.Haskeline
 import Control.Monad.State.Strict
 import Data.Maybe
+import Data.List (isPrefixOf)
 import qualified Data.Sequence as S
 import Tactics (habitar)
-import Parser (getCommand, usrInfixParser, getParser)
+import Parser (reservedWords, getCommand, usrInfixParser, getParser)
 import Text.PrettyPrint.HughesPJ (render)
 import PrettyPrinter (printTerm, printProof, printType, printLamTerm)
 import Transformers
@@ -27,7 +28,16 @@ reloadProver = lift $ modify $ finishProof . newTheoremFromProof
 
 
 main :: IO ()
-main = evalStateT (runInputT defaultSettings prover) initialProver
+main = evalStateT (runInputT settings prover) initialProver
+
+searchCompl :: String -> [Completion]
+searchCompl str = map simpleCompletion $ filter (str `isPrefixOf`) reservedWords
+
+settings :: Settings (StateT ProverState IO)
+settings = Settings { historyFile = Nothing
+                    , complete = completeWord Nothing " \t" $ return . searchCompl
+                    , autoAddHistory = True
+                    }
 
 prompt :: ProverState -> String
 prompt s = if proofStarted s
@@ -56,7 +66,7 @@ checkCommand (Ty name ty) =
      when (proofStarted s) (throwIO PNotFinished)
      let g = global s
      when (invalidName name g) (throwIO $ ExistE name)
-     (tyr,tty) <- returnInput $ renamedType1 (fTypeContext g) (opers g) ty
+     (tyr,tty) <- returnInput $ renamedType1 (fTypeContext g) (opers g) (theorems g) ty
      lift $ modify $ newProof name (ty,tty) (tyr,tty)
      s' <- lift get
      outputStrLn $ renderProof $ getProofC s'
@@ -83,13 +93,13 @@ checkCommand (Ta (Print x)) =
      prover
 checkCommand (Ta (Infer x)) =
   do s <- lift get
-     let op = opers $ global s
-     (te,te') <- returnInput $ basicWithoutName op (fTypeContext $ global s) x
+     let g = global s
+     (te,te') <- returnInput $ basicWithoutName (opers g) (fTypeContext g) (theorems g) x
      --outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
-     (ty,ty') <- returnInput $ basicTypeInference (theorems $ global s) op (te,te')
+     (ty,ty') <- returnInput $ basicTypeInference (theorems g) (opers g) (te,te')
      --outputStrLn $ "Renombramiento: " ++ (render $ printTerm (opers $ global s) te')
      --outputStrLn $ renderNoNameLTerm op te'
-     outputStrLn $ renderType op ty
+     outputStrLn $ renderType (opers g) ty
      prover                            
 checkCommand (Ta ta) =
   do s <- lift get
@@ -111,13 +121,13 @@ defCommand :: String -> BodyDef -> ProverInputState ()
 defCommand name (Type (body, n, args, isInfix)) =
   do s <- lift get
      let glo = global s   
-     t <- returnInput $ renamedType3 args (fTypeContext glo) (opers glo) body
+     t <- returnInput $ renamedType3 args (fTypeContext glo) (opers glo) (theorems glo) body
      --outputStrLn $ renderType (opers glo) $ fst t
      typeDefinition name t n isInfix
 defCommand name (LTerm body) =
   do s <- lift get
      let glo = global s
-     te  <- returnInput $ basicWithoutName (opers glo) (fTypeContext glo) body
+     te  <- returnInput $ basicWithoutName (opers glo) (fTypeContext glo) (theorems glo) body
      --outputStrLn $ "Renombramiento: " ++ (renderLTerm (opers glo) $ fst te)
      lamTermDefinition name te
 defCommand name (Ambiguous ap) =

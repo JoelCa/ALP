@@ -1,6 +1,7 @@
 module TypeSubstitution where
 
 import Common
+import Theorems (Theorems, theoremsNames)
 import qualified Data.Sequence as S
 import Transformers
 import RenamedVariables
@@ -19,9 +20,9 @@ import RenamedVariables
 -- 3. Conjunto de variables de tipo ligadas (con nombres), del contexto.
 -- 4. Tipo (con nombres y sin nombres), sobre el que se realiza la sust.
 -- 5. Tipos T1,..,Tn.
-typeSubs :: Int -> BTypeContext -> FTypeContext -> FOperations -> (Type, TType)
-         -> [(Type, TType)] -> (Type, TType)
-typeSubs l bs fs op t xs = typeSubs' 0 l fs bs bs op t xs
+typeSubs :: Int -> BTypeContext -> FTypeContext -> FOperations -> Theorems
+         -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
+typeSubs l bs fs op te = typeSubs' 0 l fs bs bs op (theoremsNames te)
 
 -- Realiza la sust. de tipos.
 -- 1. Profundidad ("para todos"), procesados.
@@ -33,30 +34,30 @@ typeSubs l bs fs op t xs = typeSubs' 0 l fs bs bs op t xs
 -- 6. Tipo sobre el que se hace la sust. Sin los "para todos" que se van a sustituir.
 -- 7. Tipos que se sustituyen.
 typeSubs' :: Int -> Int -> FTypeContext -> BTypeContext -> BTypeContext -> FOperations
-          -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
-typeSubs' n l fs bs rs op (B v, TBound x) ts
+          -> [String] -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
+typeSubs' n l fs bs rs op tn (B v, TBound x) ts
   | x < n = case S.findIndexL (\(_,x) -> x == v) bs of
               Just i -> (B $ snd $ S.index rs i, TBound x)
               Nothing -> error "error: typeSubs', no debería pasar."
   | (n <= x) && (x < l) =
       let (ty,ty') = ts !! (l - x - 1)
-      in (renamedValidType rs fs op ty, positiveShift n ty')
+      in (renamedValidType2 rs fs op tn ty, positiveShift n ty')
   | otherwise = (B v, TBound $ x - l + n)
-typeSubs' _ _ _ _ _ _ x@(_, TFree f) _ = x
-typeSubs' n l fs bs rs op (ForAll v t1, TForAll t1') ts =
-  let v' = getRename v (snd, rs) (id, fs) (fst4, op) 
-      (tt, tt') = typeSubs' (n+1) (l+1) fs (bTypeVar v S.<| bs) (bTypeVar v' S.<| rs) op (t1,t1') ts
+typeSubs' _ _ _ _ _ _ _ x@(_, TFree f) _ = x
+typeSubs' n l fs bs rs op tn (ForAll v t1, TForAll t1') ts =
+  let v' = getRename v (snd, rs) (id, fs) (fst4, op) (id, tn)
+      (tt, tt') = typeSubs' (n+1) (l+1) fs (bTypeVar v S.<| bs) (bTypeVar v' S.<| rs) op tn (t1,t1') ts
   in (ForAll v' tt, TForAll tt')
-typeSubs' n l fs bs rs op (Exists v t1, TExists t1') ts =
-  let v' = getRename v (snd, rs) (id, fs) (fst4, op) 
-      (tt, tt') = typeSubs' (n+1) (l+1) fs (bTypeVar v S.<| bs) (bTypeVar v' S.<| rs) op (t1,t1') ts
+typeSubs' n l fs bs rs op tn (Exists v t1, TExists t1') ts =
+  let v' = getRename v (snd, rs) (id, fs) (fst4, op) (id, tn) 
+      (tt, tt') = typeSubs' (n+1) (l+1) fs (bTypeVar v S.<| bs) (bTypeVar v' S.<| rs) op tn (t1,t1') ts
   in (Exists v' tt, TExists tt')
-typeSubs' n l fs bs rs op (Fun t1 t2, TFun t1' t2') ts =
-  let (tt1, tt1') = typeSubs' n l fs bs rs op (t1,t1') ts
-      (tt2, tt2') = typeSubs' n l fs bs rs op (t2,t2') ts
+typeSubs' n l fs bs rs op tn (Fun t1 t2, TFun t1' t2') ts =
+  let (tt1, tt1') = typeSubs' n l fs bs rs op tn (t1,t1') ts
+      (tt2, tt2') = typeSubs' n l fs bs rs op tn (t2,t2') ts
   in (Fun tt1 tt2, TFun tt1' tt2')
-typeSubs' n l fs bs rs op (RenameTy s args xs, RenameTTy m xs') ts =
-  let (r, r') = unzip $ map (\x -> typeSubs' n l fs bs rs op x ts) $ zip xs xs'
+typeSubs' n l fs bs rs op tn (RenameTy s args xs, RenameTTy m xs') ts =
+  let (r, r') = unzip $ map (\x -> typeSubs' n l fs bs rs op tn x ts) $ zip xs xs'
   in (RenameTy s args r, RenameTTy m r')
 
 

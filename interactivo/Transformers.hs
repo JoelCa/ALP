@@ -97,9 +97,13 @@ typeWithoutName fbs fs op (RenameTy s args ts) =
            else throw $ OpE1 s
 
 
-renamedValidType :: BTypeContext -> FTypeContext ->  FOperations -> Theorems
+renamedValidType1 :: BTypeContext -> FTypeContext ->  FOperations -> Theorems
                  -> Type -> Type
-renamedValidType bs ftc op te = renamedValidType' bs bs ftc op (theoremsNames te) 
+renamedValidType1 bs ftc op te = renamedValidType' bs bs ftc op (theoremsNames te) 
+
+renamedValidType2 :: BTypeContext -> FTypeContext ->  FOperations -> [String]
+                  -> Type -> Type
+renamedValidType2 bs = renamedValidType' bs bs 
   
 -- Renombra las variables de tipo ligadas de un tipo con nombre válido.
 -- Se asume que el tipo dado por el 5º arg. está bien formado. Es decir que,

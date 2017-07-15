@@ -1,6 +1,7 @@
 module Tactics where
 
 import Common
+import Theorems (Theorems)
 import Proof
 import DefaultOperators
 import TermsWithHoles
@@ -89,7 +90,8 @@ habitar (Exact (LamT te)) =
      cn <- getConflictNames
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     te' <- eitherToProof $ withoutName op ftc btc (cn,n) te
+     teo <- getTheorems
+     te' <- eitherToProof $ withoutName op ftc btc (cn,n) teo te
      exactTerm te' tt  
 habitar (Exact (T ty)) =
   do x <- getType
@@ -97,7 +99,8 @@ habitar (Exact (T ty)) =
      op <- getUsrOpers
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     ty' <- eitherToProof $ renamedType2 btc ftc op ty
+     teo <- getTheorems
+     ty' <- eitherToProof $ renamedType2 btc ftc op teo ty
      exactType ty'     
 habitar (Exact (Appl aps)) =
   do op <- getUsrOpers
@@ -121,7 +124,8 @@ habitar (Unfold s Nothing) =
      (m, (_, (tt,tt'), _, _)) <- maybeToProof (UnfoldE1 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     replaceType $ unfoldComm btc ftc op m (t,t') (tt,tt')
+     teo <- getTheorems
+     replaceType $ unfoldComm btc ftc op teo m (t,t') (tt,tt')
 habitar (Unfold s (Just h)) =
   do op <- getUsrOpers
      (m, (_, (tt,tt'), _, _)) <- maybeToProof (UnfoldE1 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
@@ -132,7 +136,8 @@ habitar (Unfold s (Just h)) =
      let (x,y,t,t') = S.index c i
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     let (r,r') = unfoldComm btc ftc op m (t,t') (tt,tt')
+     teo <- getTheorems
+     let (r,r') = unfoldComm btc ftc op teo m (t,t') (tt,tt')
      updateTermContext i (x,y,r,r')
 habitar (Absurd ty) =
   do x <- getType
@@ -142,7 +147,8 @@ habitar (Absurd ty) =
          then do op <- getUsrOpers
                  btc <- getBTypeContext
                  ftc <- getFTypeContext
-                 (tty, tty') <- eitherToProof $ renamedType2 btc ftc op ty
+                 teo <- getTheorems
+                 (tty, tty') <- eitherToProof $ renamedType2 btc ftc op teo ty
                  newSubProofs 2 [ Just (tty, tty')
                                 , Just (RenameTy not_text 1 [tty], RenameTTy not_code [tty']) ]
                  modifyTerm $ addDHT (\x y -> ((Free $ NGlobal "intro_bottom")
@@ -157,8 +163,9 @@ habitar (CExists ty) =
          do op <- getUsrOpers
             btc <- getBTypeContext
             ftc <- getFTypeContext
-            ty' <- eitherToProof $ renamedType2 btc ftc op ty
-            replaceType $ typeSubs 1 btc ftc op (t,t') [ty']
+            teo <- getTheorems
+            ty' <- eitherToProof $ renamedType2 btc ftc op teo ty
+            replaceType $ typeSubs 1 btc ftc op teo (t,t') [ty']
             modifyTerm $ addHT (\x -> Pack ty' x tt)
        _ -> throw CommandInvalid
 habitar (Cut ty) =
@@ -167,7 +174,8 @@ habitar (Cut ty) =
      op <- getUsrOpers
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     (tty, tty') <- eitherToProof $ renamedType2 btc ftc op ty
+     teo <- getTheorems
+     (tty, tty') <- eitherToProof $ renamedType2 btc ftc op teo ty
      newSubProofs 2 [ Just (Fun tty t, TFun tty' t')
                     , Just (tty, tty') ]
      modifyTerm $ addDHT (\x y -> x :@: y)
@@ -215,7 +223,8 @@ elimComm i (t,t') (Exists v tt, TExists tt') =
      btc <- getBTypeContext
      ftc <- getFTypeContext
      op <- getUsrOpers
-     replaceType (renamedValidType (bTypeVar v S.<| btc) ftc op t, positiveShift 1 t')
+     te <- getTheorems
+     replaceType (renamedValidType1 (bTypeVar v S.<| btc) ftc op te t, positiveShift 1 t')
      modifyTerm $ addHT (\x -> Unpack v (Bound i) x)
 elimComm i (t,t') (RenameTy _ _ [t1,t2], RenameTTy n [t1',t2'])
   | n == and_code =
@@ -364,22 +373,23 @@ exactTerm te (tt, tt') =
 -- 3. Código de la operación a "unfoldear".
 -- 4. Tipo (con y sin nombre) sobre el que se aplica el unfold.
 -- 5. Tipo (con y sin nombre) que define al operador foldeado (sin los para todos).
-unfoldComm :: BTypeContext -> FTypeContext -> FOperations -> Int -> (Type, TType) -> (Type, TType) -> (Type, TType)
-unfoldComm _ _ _ _ t@(B _, _) _ = t
-unfoldComm btc ftc op code (RenameTy s l ts, RenameTTy m ts') body
-  | m == code = typeSubs l btc ftc op body mapUnfoldComm
+unfoldComm :: BTypeContext -> FTypeContext -> FOperations -> Theorems
+           -> Int -> (Type, TType) -> (Type, TType) -> (Type, TType)
+unfoldComm _ _ _ _ _ t@(B _, _) _ = t
+unfoldComm btc ftc op te code (RenameTy s l ts, RenameTTy m ts') body
+  | m == code = typeSubs l btc ftc op te body mapUnfoldComm
   | otherwise = let (xs, ys) = unzip mapUnfoldComm
                 in (RenameTy s l xs, RenameTTy m ys)
-    where mapUnfoldComm = map (\x -> unfoldComm btc ftc op code x body) $ zip ts ts'
-unfoldComm btc ftc op code (Fun t t', TFun tt tt') body =
-  let (t1,t1') = unfoldComm btc ftc op code (t,tt) body 
-      (t2,t2') = unfoldComm btc ftc op code (t',tt') body
+    where mapUnfoldComm = map (\x -> unfoldComm btc ftc op te code x body) $ zip ts ts'
+unfoldComm btc ftc op te code (Fun t t', TFun tt tt') body =
+  let (t1,t1') = unfoldComm btc ftc op te code (t,tt) body 
+      (t2,t2') = unfoldComm btc ftc op te code (t',tt') body
   in (Fun t1 t2, TFun t1' t2')
-unfoldComm btc ftc op code (ForAll v t, TForAll t') body =
-  let (t1, t1') = unfoldComm (bTypeVar v S.<| btc) ftc op code (t,t') body
+unfoldComm btc ftc op te code (ForAll v t, TForAll t') body =
+  let (t1, t1') = unfoldComm (bTypeVar v S.<| btc) ftc op te code (t,t') body
   in (ForAll v t1, TForAll t1')
-unfoldComm btc ftc op code (Exists v t, TExists t') body =
-  let (t1, t1') = unfoldComm (bTypeVar v S.<| btc) ftc op code (t,t') body
+unfoldComm btc ftc op te code (Exists v t, TExists t') body =
+  let (t1, t1') = unfoldComm (bTypeVar v S.<| btc) ftc op te code (t,t') body
   in (Exists v t1, TExists t1')
 
 ----------------------------------------------------------------------------------------------------------------------

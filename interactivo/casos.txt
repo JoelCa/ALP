@@ -149,7 +149,10 @@ Chequemos que los nombres de los hipótesis NO coincidan con los nombres de los 
   Theorem t55: forall w, w -> (w /\ w) /\ (w -> w).
 Para chequear el exact sobre una definición de término.
 La prueba es: intros; exact (intro_and [w /\ w] [w -> w] (qqq [w] H0) (\f:w.f)).
-
+- algo w = forall x, w -> w.
+  Theorem x: forall q, q -> q.
+  Theorem t56: forall a, a -> algo a.
+Para probar el renombre del unfold. 
 
 Casos de inferencia OK:
 1. Check \A. \B. \x:A. \y:False. let {B,x} = {*B, \B.\x:False. x} as exists A, forall Q, False -> False in (\C. x [False] y) [B].

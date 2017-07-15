@@ -153,6 +153,10 @@ La prueba es: intros; exact (intro_and [w /\ w] [w -> w] (qqq [w] H0) (\f:w.f)).
   Theorem x: forall q, q -> q.
   Theorem t56: forall a, a -> algo a.
 Para probar el renombre del unfold. 
+- Theorem x: forall w, w -> w.
+  Theorem t57: forall x, forall y, y -> y.
+Para chequear el renombre.
+
 
 Casos de inferencia OK:
 1. Check \A. \B. \x:A. \y:False. let {B,x} = {*B, \B.\x:False. x} as exists A, forall Q, False -> False in (\C. x [False] y) [B].
@@ -192,19 +196,13 @@ Para probar "Check n2".
    Propositions p, q.
    algo = jojo H q.
 Chequear el error.
+4. d3 = \A.\B.let {x,x} = {*A, \C.\y:B. y} as exists A, forall R, B -> B in x.
+(basado en el segundo caso de inferencia OK),
+Para chequear el renombre en el pretty printer de d3.   
+- Propositions x.
+  d4 = \x:x.x.
+Para chequear renombre del pretty printer de d4.
 
    TERMINAR de ver:
 Ver caso de CBool y CBool2, en test.f
-
-
-VER:
-
-- Theorem x: forall w, w -> w.
-  Theorem k: forall x, forall y, y -> y.
-Si en la prueba de k, hacemos: intro; exact x.
-El programa considera que "x" es la variable de tipo.
-
-- Propositions x.
-  algo = \x:x.x.
-Chequear renombre.
 

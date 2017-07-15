@@ -21,7 +21,7 @@ basicTypeInference = typeInference 0 S.empty
 -- 1. Indica la profundidad (respecto al cuantificador "para todo")
 -- desde la que se quiere inferir.
 -- 2. Contexto de variables de términos, desde el que se quiere inferir.
--- 3. Lista de teoremas.
+-- 3. Teoremas.
 -- 4. Operaciones "foldeables".
 -- 5. Lambda término con y sin nombre, al que se le quiere inferir su tipo.
 typeInference :: Int -> TermContext -> Theorems -> FOperations
@@ -32,7 +32,7 @@ typeInference n c te op t = case typeInference' n c te op t of
 
 typeInference' :: Int -> TermContext -> Theorems -> FOperations
           -> (LamTerm, Term) -> Either InferExceptions (Type, TType)
-typeInference' n _ te _ (_, Free (NGlobal x)) =
+typeInference' n _ te _ (_, Free x) =
   case T.lookup x te of
     Just (_ ::: t) -> return t
     Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean teoremas.

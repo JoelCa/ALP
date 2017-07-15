@@ -13,15 +13,17 @@ import Text.Megaparsec
 import Control.Monad.Reader (Reader)
 import Data.Sequence (Seq, foldlWithIndex)
   
-  -- Nombres.
-data Name
-     =  NGlobal  String
-     |  Quote   Int
-     deriving (Show, Eq)
-
 type TermVar = String
 
 type TypeVar = String
+
+-- data Type a b = TVar b a
+--               | Fun (Type a b) (Type a b)
+--               | ForAll b (Type a b)
+--               | Exists b (Type a b)
+--               | RenamedType Int b [Type a b]
+--               deriving (Show, Eq)
+
 
   -- Tipos con nombre.
 data Type = B TypeVar
@@ -53,7 +55,7 @@ data LamTerm  = LVar TermVar
 
   -- Lambda términos sin nombres.
 data Term  = Bound Int
-           | Free Name 
+           | Free TermVar
            | Term :@: Term
            | Lam (Type,TType) Term
            | BLam TypeVar Term

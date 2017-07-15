@@ -55,7 +55,7 @@ habitar CLeft =
        Just (RenameTy _ 2 [t1,t2] , RenameTTy n [t1',t2']) ->
          if n == or_code
          then do replaceType (t1,t1')
-                 modifyTerm $ addHT (\x -> ((Free $ NGlobal "intro_or1")
+                 modifyTerm $ addHT (\x -> ((Free "intro_or1")
                                              :!: (t1,t1') :!: (t2,t2'))
                                            :@: x)
          else throw CommandInvalid
@@ -66,7 +66,7 @@ habitar CRight =
        Just (RenameTy _ 2 [t1,t2] , RenameTTy n [t1',t2']) ->
          if n == or_code
          then do replaceType (t2,t2')
-                 modifyTerm $ addHT (\x -> ((Free $ NGlobal "intro_or2")
+                 modifyTerm $ addHT (\x -> ((Free "intro_or2")
                                              :!: (t1,t1') :!: (t2,t2'))
                                            :@: x)
          else throw CommandInvalid
@@ -77,7 +77,7 @@ habitar Split =
        Just (RenameTy _ 2 [t1,t2], RenameTTy n [t1',t2']) ->
          if n == and_code
          then do newSubProofs 2 [Just (t1,t1'), Just (t2,t2')]
-                 modifyTerm $ addDHT (\x y -> ((Free $ NGlobal "intro_and")
+                 modifyTerm $ addDHT (\x y -> ((Free "intro_and")
                                                 :!: (t1,t1') :!: (t2,t2'))
                                               :@: x :@: y)
          else throw CommandInvalid
@@ -151,7 +151,7 @@ habitar (Absurd ty) =
                  (tty, tty') <- eitherToProof $ renamedType2 btc ftc op teo ty
                  newSubProofs 2 [ Just (tty, tty')
                                 , Just (RenameTy not_text 1 [tty], RenameTTy not_code [tty']) ]
-                 modifyTerm $ addDHT (\x y -> ((Free $ NGlobal "intro_bottom")
+                 modifyTerm $ addDHT (\x y -> ((Free "intro_bottom")
                                                 :!: (tty, tty'))
                                               :@: x :@: y)
          else throw CommandInvalid
@@ -229,13 +229,13 @@ elimComm i (t,t') (Exists v tt, TExists tt') =
 elimComm i (t,t') (RenameTy _ _ [t1,t2], RenameTTy n [t1',t2'])
   | n == and_code =
       do replaceType (Fun t1 (Fun t2 t), TFun t1' (TFun t2' t'))
-         modifyTerm $ addHT (\x -> ((Free $ NGlobal "elim_and")
+         modifyTerm $ addHT (\x -> ((Free "elim_and")
                                      :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
                                    :@: (Bound i) :@: x)
   | n == or_code =
       do newSubProofs 2 [ Just (Fun t1 t, TFun t1' t')
                         , Just (Fun t2 t, TFun t2' t') ]
-         modifyTerm $ addDHT (\x y -> ((Free $ NGlobal "elim_or")
+         modifyTerm $ addDHT (\x y -> ((Free "elim_or")
                                         :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
                                       :@: (Bound i) :@: x :@: y)
   | otherwise =
@@ -243,7 +243,7 @@ elimComm i (t,t') (RenameTy _ _ [t1,t2], RenameTTy n [t1',t2'])
 elimComm i t (RenameTy _ _ [], RenameTTy n [])
   | n == bottom_code =
       do endSubProof
-         modifyTerm $ simplify $ (Free $ NGlobal "elim_bottom") :!: t :@: (Bound i)
+         modifyTerm $ simplify $ (Free "elim_bottom") :!: t :@: (Bound i)
   | otherwise =
       throw ElimE1
 elimComm _ _ _ = throw ElimE1

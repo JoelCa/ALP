@@ -16,14 +16,15 @@ import qualified Data.Sequence as S
 -- Argumentos:
 -- 1. Varibles de tipo libres.
 -- 2. Operaciones "foldeables".
--- 3. Tipo a procesar.
+-- 3. Teoremas.
+-- 4. Tipo a procesar.
 -- OBS: Utilizamos esta función sobre tipos que NO requieren del contexto de tipos "ligados".
 renamedType1 :: FTypeContext -> FOperations -> Theorems -> Type
              -> Either ProofExceptions (Type, TType)
 renamedType1 ftc op te = renamedType (id, id, S.empty, S.empty) ftc op (theoremsNames te)
 
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
--- por el 4º argumento.
+-- por el 5º argumento.
 -- El renombramiento se realiza de modo tal que se respete la Convención 1.
 -- OBS: Utilizamos esta función sobre tipos que requieren del contexto de tipos "ligados".
 renamedType2 :: BTypeContext -> FTypeContext ->  FOperations -> Theorems
@@ -31,7 +32,7 @@ renamedType2 :: BTypeContext -> FTypeContext ->  FOperations -> Theorems
 renamedType2 bs ftc op te = renamedType (snd, bTypeVar, bs, bs) ftc op (theoremsNames te)
 
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
--- por el 4º argumento.
+-- por el 5º argumento.
 -- El renombramiento se realiza de modo tal que se respete la Convención 1.
 -- OBS: Solo la utilizamos en el renombramiento del cuerpo de una operación.
 renamedType3 :: S.Seq TypeVar -> FTypeContext ->  FOperations -> Theorems
@@ -39,7 +40,7 @@ renamedType3 :: S.Seq TypeVar -> FTypeContext ->  FOperations -> Theorems
 renamedType3 bs ftc op te = renamedType (id, id, bs, bs) ftc op (theoremsNames te)
 
 
--- Obtiene el tipo renombrado, y sin nombre, de su 4º arg.
+-- Obtiene el tipo renombrado, y sin nombre, de su 5º arg.
 renamedType :: (a -> TypeVar, TypeVar -> a, S.Seq a, S.Seq a) -> S.Seq TypeVar
             -> FOperations -> [String] -> Type -> Either ProofExceptions (Type, TType)
 renamedType (f, _, rs, bs) fs op _ (B x) =
@@ -113,7 +114,7 @@ renamedValidType2 bs = renamedValidType' bs bs
 -- 2. Conjunto de variables de tipo ligadas no renombradas.
 -- 3. Conjunto de variables de tipos libres.
 -- 4. Operaciones.
--- 5. Nombres de teorems.
+-- 5. Nombres de teoremas.
 -- 6. Tipo sobre el que se realiza el renombramiento.
 renamedValidType' :: BTypeContext -> BTypeContext -> FTypeContext
                   -> FOperations -> [String] -> Type -> Type
@@ -140,7 +141,6 @@ basicWithoutName :: FOperations -> FTypeContext -> Theorems -> LamTerm
 basicWithoutName op fs = withoutName op fs (S.empty) (empty, 0)
   
 
--- ARREGLAR: hacer renombre de tipos.
 -- Genera el lambda término con renombre de variables de tipo, y el lambda término sin nombre.
 -- Chequea que las variables de tipo sean válidas de acuerdo a los contexto de tipos
 -- dados por 2º y 3º arg. En caso de ser necesario renombra las variables de tipo "ligadas".
@@ -266,10 +266,10 @@ disambiguatedLTerm _ Nil = error "error: disambiguatedLTerm, no debería pasar."
 getTermVar :: String -> (IntSet, Int) -> Term
 getTermVar x (cn, n) =
   case getHypothesisValue x of
-    Just h -> case getHypoPosition cn n h of
-                Just i -> Bound i
-                _ -> Free $ NGlobal x       --Probable teorema
-    Nothing -> Free $ NGlobal x
+    Just h  -> case getHypoPosition cn n h of
+                 Just i -> Bound i
+                 _      -> Free x       --Probable teorema
+    Nothing -> Free x
 
 bTypeVar :: TypeVar -> BTypeVar
 bTypeVar x = (0, x)

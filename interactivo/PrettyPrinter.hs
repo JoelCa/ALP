@@ -30,8 +30,7 @@ typeVars = [ c : n | n <- "" : map show nats, c <- ['a' .. 'o']]
 -- Variables de términos libres.
 fv :: Term -> [String]
 fv (Bound _)         = []
-fv (Free (NGlobal n)) = [n]
-fv (Free (Quote _))  = []
+fv (Free n)          = [n]
 fv (t :@: u)         = fv t ++ fv u
 fv (Lam _ u)         = fv u
 fv (t :!: _)         = fv t
@@ -79,7 +78,7 @@ freeVarsAndOps (RenameTy x _ ts) =
 -- c. Variables de tipo libres.
 -- d. Nombre de operadores.
 varsInTerm :: Term -> Set String
-varsInTerm (Free (NGlobal n)) =
+varsInTerm (Free n) =
   Set.singleton n
 varsInTerm (w :@: u)          =
   Set.union (varsInTerm w) (varsInTerm u)
@@ -91,7 +90,8 @@ varsInTerm (Lam (t,_) w)      =
   Set.union (varsInTerm w) (freeVarsAndOps t)
 varsInTerm (Pack (t,_) w (t',_)) =
   Set.union (varsInTerm w) (Set.union (freeVarsAndOps t) (freeVarsAndOps t'))
---varsInTerm (Unpack _ t u)     = varsInTerm t ++ varsInTerm u
+varsInTerm (Unpack x t u)     =
+  Set.insert x $ Set.union (varsInTerm t) (varsInTerm u)
 varsInTerm (w ::: (t,_))      =
   Set.union (varsInTerm w) (freeVarsAndOps t)
 varsInTerm _                  =
@@ -134,7 +134,7 @@ printTermTType' :: FOperations -> (Int, Bool) -> [String] -> [String] -> [String
                 -> Term -> Doc
 printTermTType' _ _ bs _  _ _ (Bound x)=
   text $ bs !! x
-printTermTType' _ _ _  _  _ _ (Free (NGlobal n)) =
+printTermTType' _ _ _  _  _ _ (Free n) =
   text n
 printTermTType' op (i, j) bs bts fs fts (t :@: u) =
   parenIf ((i < pApp) || ((i == pApp) && j)) $ 
@@ -202,7 +202,7 @@ printTerm op t = printTerm' op (1, False) [] (vars \\ (Set.toList $ varsInTerm t
 printTerm' :: FOperations -> (Int, Bool) -> [String] -> [String] -> Term -> Doc
 printTerm' _ _ bs _  (Bound x) =
   text $ bs !! x
-printTerm' _ _ _  _  (Free (NGlobal n)) =
+printTerm' _ _ _  _  (Free n) =
   text n
 printTerm' op (i, j) bs fs (t :@: u) =
   parenIf ((i < pApp) || ((i == pApp) && j)) $   

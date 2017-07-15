@@ -18,8 +18,10 @@ import RenamedVariables
 -- 1. Cantidad de sustituciones a realizar.
 -- 2. Conjunto de variables de tipo de libres.
 -- 3. Conjunto de variables de tipo ligadas (con nombres), del contexto.
--- 4. Tipo (con nombres y sin nombres), sobre el que se realiza la sust.
--- 5. Tipos T1,..,Tn.
+-- 4. Operaciones foldeables.
+-- 5. Teoremas.
+-- 6. Tipo (con nombres y sin nombres), sobre el que se realiza la sust.
+-- 7. Tipos T1,..,Tn.
 typeSubs :: Int -> BTypeContext -> FTypeContext -> FOperations -> Theorems
          -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
 typeSubs l bs fs op te = typeSubs' 0 l fs bs bs op (theoremsNames te)
@@ -31,8 +33,10 @@ typeSubs l bs fs op te = typeSubs' 0 l fs bs bs op (theoremsNames te)
 -- 4. Contexto de variables de tipo ligadas (con nombres) procesadas.
 -- 5. Contexto de los renombres de las variables de tipo ligadas (con nombres) del 4º arg.
 --    Incluye además las var. de tipo ligadas del contexto.
--- 6. Tipo sobre el que se hace la sust. Sin los "para todos" que se van a sustituir.
--- 7. Tipos que se sustituyen.
+-- 6. Operaciones foldeables.
+-- 7. Nombres de los teoremas.
+-- 8. Tipo sobre el que se hace la sust. Sin los "para todos" que se van a sustituir.
+-- 9. Tipos que se sustituyen.
 typeSubs' :: Int -> Int -> FTypeContext -> BTypeContext -> BTypeContext -> FOperations
           -> [String] -> (Type, TType) -> [(Type, TType)] -> (Type, TType)
 typeSubs' n l fs bs rs op tn (B v, TBound x) ts

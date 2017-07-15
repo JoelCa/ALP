@@ -17,53 +17,52 @@ type TermVar = String
 
 type TypeVar = String
 
--- data Type a b = TVar b a
---               | Fun (Type a b) (Type a b)
---               | ForAll b (Type a b)
---               | Exists b (Type a b)
---               | RenamedType Int b [Type a b]
---               deriving (Show, Eq)
+data VarName = Free String
+             | Bound Int
 
 
-  -- Tipos con nombre.
-data Type = B TypeVar
-          | Fun Type Type
-          | ForAll TypeVar Type
-          | Exists TypeVar Type
-          | RenameTy String Int [Type]
-          deriving (Show, Eq)
-  
-  -- Tipos sin nombre.
-data TType = TBound Int
-           | TFree TypeVar
-           | TFun TType TType
-           | TForAll TType
-           | TExists TType
-           | RenameTTy Int [TType]
-           deriving (Show, Eq)
+  -- Tipo con nombre.
+type Type1 = Type () TypeVar
 
-  -- Lambda términos con nombres.
-data LamTerm  = LVar TermVar
-              | Abs TermVar Type LamTerm
-              | App LamTerm LamTerm
-              | BAbs TypeVar LamTerm
-              | BApp LamTerm Type
-              | EPack Type LamTerm Type
-              | EUnpack TypeVar TermVar LamTerm LamTerm
-              | As LamTerm Type
+  -- Tipo sin nombre
+type Type2 = Type VarName ()
+
+  --Tipo con y sin nombre.
+type DoubleType = Type VarName TypeVar
+
+data Type a b = TVar b a
+              | Fun (Type a b) (Type a b)
+              | ForAll b (Type a b)
+              | Exists b (Type a b)
+              | RenamedType b [Type a b]
               deriving (Show, Eq)
 
-  -- Lambda términos sin nombres.
-data Term  = Bound Int
-           | Free TermVar
-           | Term :@: Term
-           | Lam (Type,TType) Term
-           | BLam TypeVar Term
-           | Term :!: (Type,TType)
-           | Pack (Type,TType) Term (Type,TType)
-           | Unpack TypeVar Term Term
-           | Term ::: (Type,TType)
-           deriving (Show, Eq)
+
+
+
+
+  -- Lambda términos con nombres.
+-- data LamTerm  = LVar TermVar
+--               | Abs TermVar Type LamTerm
+--               | App LamTerm LamTerm
+--               | BAbs TypeVar LamTerm
+--               | BApp LamTerm Type
+--               | EPack Type LamTerm Type
+--               | EUnpack TypeVar TermVar LamTerm LamTerm
+--               | As LamTerm Type
+--               deriving (Show, Eq)
+
+--   -- Lambda términos sin nombres.
+-- data Term  = Bound Int
+--            | Free TermVar
+--            | Term :@: Term
+--            | Lam (Type,TType) Term
+--            | BLam TypeVar Term
+--            | Term :!: (Type,TType)
+--            | Pack (Type,TType) Term (Type,TType)
+--            | Unpack TypeVar Term Term
+--            | Term ::: (Type,TType)
+--            deriving (Show, Eq)
 
 -- Para cada variable de término, tenemos (por posición en la 4-tupla):
   -- 1. Su posición en el contexto, a la hora de imprimirlo.

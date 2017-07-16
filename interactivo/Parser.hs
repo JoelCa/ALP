@@ -10,7 +10,7 @@ import Control.Monad (void)
 import Control.Monad.Reader
 import qualified Data.Sequence as S (Seq, empty, (<|), (|>), singleton, fromList)
 
-type UsrParser = ParserParser Type
+type UsrParser = ParserParser Type1
 
 type Parser = ParsecT Dec String (Reader UsrParser)
 
@@ -112,40 +112,40 @@ exprTy = do rword "Theorem"
 
 --------------------------------------------------------------------------------------
 -- Parser del lambda término con nombre.
-lambTerm :: Parser LamTerm
+lambTerm :: Parser LTerm1
 lambTerm = abstraction
            <|> do t <- app
                   (do a <- abstraction
-                      return $ App t a
+                      return $ t :@: a
                    <|> return t)
 
-app :: Parser LamTerm
+app :: Parser LTerm1
 app = do x <- unitTerm
          f <- app'
          return $ f x
 
-app' :: Parser (LamTerm -> LamTerm)
+app' :: Parser (LTerm1 -> LTerm1)
 app' = do t <- brackets typeTerm
           f <- app'
-          return $ \a -> f $ BApp a t
+          return $ \a -> f $ a :!: t
        <|> do u <- unitTerm
               f <- app'
-              return $ \a -> f $ App a u
+              return $ \a -> f $ a :@: u
        <|> return id
 
-unitTerm :: Parser LamTerm
+unitTerm :: Parser LTerm1
 unitTerm = do u <- unitaryTerm
               (do rword "as"
                   t <- typeTerm
-                  return $ As u t
+                  return $ u ::: t
                <|> return u)
 
-unitaryTerm :: Parser LamTerm
+unitaryTerm :: Parser LTerm1
 unitaryTerm = do x <- identifier
                  return $ LVar x
               <|> parens lambTerm
 
-abstraction :: Parser LamTerm
+abstraction :: Parser LTerm1
 abstraction = do symbol "\\"
                  v <- identifier
                  (do colon
@@ -172,41 +172,41 @@ abstraction = do symbol "\\"
 --------------------------------------------------------------------------------------
 -- Parser de los tipos (o fórmulas lógicas).
 
-typeTerm :: Parser Type
+typeTerm :: Parser Type1
 typeTerm = do u <- unit1
-              (do symbol iff_text
+              (do symbol iff_id
                   t <- typeTerm
-                  return $ RenameTy iff_text 2 [u, t]
+                  return $ RenamedType iff_id [u, t]
                <|> return u)
   
-unit1 :: Parser Type
+unit1 :: Parser Type1
 unit1 = infixP "->" Fun unit2
 
-unit2 :: Parser Type
-unit2 = infixP or_text (\x y -> RenameTy or_text 2 [x,y]) unit3
+unit2 :: Parser Type1
+unit2 = infixP or_id (\x y -> RenamedType or_id [x,y]) unit3
 
-unit3 :: Parser Type
+unit3 :: Parser Type1
 unit3 = do infixOps <- ask
-           infixP and_text (\x y -> RenameTy and_text 2 [x,y]) (getParser infixOps)
+           infixP and_id (\x y -> RenamedType and_id [x,y]) (getParser infixOps)
 
-unit4 :: Parser Type
-unit4 = do symbol not_text
+unit4 :: Parser Type1
+unit4 = do symbol not_id
            u <- unit4
-           return $ RenameTy not_text 1 [u]
+           return $ RenamedType not_id [u]
         <|> try prefixOps
         <|> unit5                -- OBS: unit5 DEBE ir despues de prefixOps. De lo contrario,
                                  -- el nombre de una operación que se parsea puede ser
                                  -- tomada como un tipo/proposición.
         <|> quantifiers
 
-unit5 :: Parser Type
+unit5 :: Parser Type1
 unit5 = parens typeTerm
         <|> do rword "False"
-               return $ RenameTy bottom_text 0 []
+               return $ RenamedType bottom_id []
         <|> do v <- identifier
-               return $ B v
+               return $ TVar v
 
-quantifiers :: Parser Type
+quantifiers :: Parser Type1
 quantifiers = do rword "forall"
                  v <- identifier
                  comma
@@ -218,17 +218,17 @@ quantifiers = do rword "forall"
                      t <- typeTerm
                      return $ Exists v t
 
-prefixOps :: Parser Type
-prefixOps = applications (\_ -> seqOrdered1 unit5) (identifier <|> symbolIdent) B addArgs
+prefixOps :: Parser Type1
+prefixOps = applications (\_ -> sepBy1 unit5 space) (identifier <|> symbolIdent) TVar addArgs
 
-addArgs :: Type -> (Int, [Type]) -> Type
-addArgs (B op) (n,xs) = RenameTy op n xs
-addArgs (RenameTy op m ys) (n,xs) = RenameTy op (m + n) (ys ++ xs)
+addArgs :: Type1 -> [Type1] -> Type1
+addArgs (TVar op) xs = RenamedType op xs
+addArgs (RenamedType op ys) xs = RenamedType op (ys ++ xs)
 
 
 -- Añade el parser de una operación infija.
-infixP :: String -> (Type -> Type -> Type)
-       -> Parser Type -> Parser Type
+infixP :: String -> (Type1 -> Type1 -> Type1)
+       -> Parser Type1 -> Parser Type1
 infixP s c p = do u <- p
                   (do symbol s
                       t <- infixP s c p
@@ -252,14 +252,6 @@ seqReverseOrd1 p = do x <- p
                       (do (n, xs) <- seqReverseOrd1 p
                           return (n+1, xs S.|> x)
                        <|> return (1, S.singleton x))
-
--- Considera una, o más expresiones.
--- Retorna la secuencia leida en el orden leido.
-seqOrdered1 :: Parser a -> Parser (Int, [a])
-seqOrdered1 p = do x <- p
-                   (do (n, xs) <- seqOrdered1 p
-                       return (n+1, x:xs)
-                    <|> return (1, [x]))
 
 sepByCommaSeq :: Parser a -> Parser (S.Seq a)
 sepByCommaSeq p = do x <- p
@@ -331,13 +323,13 @@ checkP :: Parser Tactic
 checkP = tacticOneArg lambTerm "Check" Infer
 
 absurdP :: Parser Tactic
-absurdP = tacticTypeArg "absurd" Absurd
+absurdP = tacticType1Arg "absurd" Absurd
 
 cutP :: Parser Tactic
-cutP = tacticTypeArg "cut" Cut
+cutP = tacticType1Arg "cut" Cut
 
 existsP :: Parser Tactic
-existsP = tacticTypeArg "exists" CExists
+existsP = tacticType1Arg "exists" CExists
 
 unfoldP :: Parser Tactic
 unfoldP = do rword "unfold"
@@ -376,8 +368,8 @@ tacticOneArg p s tac = do rword s
 tacticIdentArg :: String -> (String -> Tactic) -> Parser Tactic
 tacticIdentArg = tacticOneArg identifier
 
-tacticTypeArg :: String -> (Type -> Tactic) -> Parser Tactic
-tacticTypeArg = tacticOneArg typeTerm
+tacticType1Arg :: String -> (Type1 -> Tactic) -> Parser Tactic
+tacticType1Arg = tacticOneArg typeTerm
 
 tacticIndexArg :: String -> (Int -> Tactic) -> Parser Tactic
 tacticIndexArg = tacticOneArg (char 'H' >> nat)
@@ -450,38 +442,8 @@ getInt s = parseMaybe nat2 s
 -- Argumentos:
 -- 1º La nueva operación infija.
 -- 2º El parser de operaciones infijas (con más precedencia),
-usrInfixParser :: String -> Parser Type -> UsrParser
-usrInfixParser s p = PP $ infixP s (\x y -> RenameTy s 2 [x, y]) p
+usrInfixParser :: String -> Parser Type1 -> UsrParser
+usrInfixParser s p = PP $ infixP s (\x y -> RenamedType s [x, y]) p
 
 basicInfixParser :: UsrParser
 basicInfixParser = PP unit4
-
---------------------------------------------------------------------------------------
--- PRUEBAS
-
-prueba1 :: Parser String
-prueba1 = do i <- identifier
-             symbol "."
-             j <- identifier
-             return $ i ++ j
-              
-
-unitPrueba :: Parser Type
-unitPrueba = do u <- identifier
-                return $ B u
-
-trying :: String -> ParsecT Dec String (Reader [String]) a -> ParsecT Dec String (Reader [String]) a
-trying s p = local (++ ["trying " ++ s]) p
-
-
-test :: ParsecT Dec String (Reader [String]) [String]
-test = (trying "'a'" $ char 'a' >> ask)
-   <|> (trying "'b'" $ char 'b' >> ask)
-
-prueba2 = show $ runReader (runParserT test "" "b") ["jojo"]
-
-run :: Show a => Parser a -> String -> IO ()
-run p s = case runReader (runParserT p "" s) (PP unit4) of
-            Left e -> putStrLn $ parseErrorPretty e
-            Right x -> putStrLn $ show x
-

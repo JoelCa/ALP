@@ -15,7 +15,7 @@ type Proof = StateExceptions ProofConstruction ProofExceptions
 data ProofConstruction = PConstruction { tsubp :: Int              -- Cantidad total de subpruebas activas.
                                        , subps :: [SubProof]       -- Datos de las subpruebas, ordenas por nivel.
                                        , cglobal :: GlobalState    -- Copia de los datos globales.
-                                       , term :: [SpecialTerm]     -- Lambda termino.
+                                       , term :: [LTermHoles]     -- Lambda termino.
                                        }
 
   -- Conjunto de subpruebas.
@@ -25,7 +25,7 @@ data SubProof = SP { termContext :: TermContext    -- Vars. de término.
                    , lsubp :: Int                  -- Cantidad de subpruebas activas contenidas.
                    , tvars :: Int                  -- Cantidad total de variables de tipo y
                                                    -- términos disponibles. Útil para el pretty printer.
-                   , ty :: [Maybe (Type, TType)]   -- Tipo objetivo, de cada subprueba contenida.
+                   , ty :: [Maybe DoubleType]      -- Tipo objetivo, de cada subprueba contenida.
                    }
 
 
@@ -44,7 +44,7 @@ getAttribute f = do ps <- get
                       then throw PSE
                       else return $ f $ head x
 
-getType :: Proof (Maybe (Type, TType))
+getType :: Proof (Maybe DoubleType)
 getType = do t <- getAttribute ty
              return $ head t
 
@@ -124,24 +124,24 @@ modifyTotalSubp f = modify (\ps -> ps {tsubp = f $ tsubp ps})
 replaceLevelSubp :: Int -> Proof ()
 replaceLevelSubp n = modifyLevelSubp (\_ -> n)
 
-modifyType :: ([Maybe (Type, TType)] -> [Maybe (Type, TType)]) -> Proof ()
+modifyType :: ([Maybe DoubleType] -> [Maybe DoubleType]) -> Proof ()
 modifyType = modify . modifyType'
 
-modifyType' :: ([Maybe (Type, TType)] -> [Maybe (Type, TType)])
+modifyType' :: ([Maybe DoubleType] -> [Maybe DoubleType])
            -> ProofConstruction -> ProofConstruction
 modifyType' f ps@(PConstruction {subps=sp:sps})=
   ps {subps = sp {ty = f $ ty sp} : sps}
 
-replaceMaybeTypes :: [Maybe (Type, TType)] -> Proof ()
+replaceMaybeTypes :: [Maybe DoubleType] -> Proof ()
 replaceMaybeTypes ts = modifyType (\_ -> ts)
 
-replaceType :: (Type, TType) -> Proof ()
+replaceType :: DoubleType -> Proof ()
 replaceType t = modifyType (\_ -> [Just t])
 
 removeFirstType :: Proof ()
 removeFirstType = modifyType tail
 
-modifyTerm :: ([SpecialTerm] -> [SpecialTerm]) -> Proof ()
+modifyTerm :: ([LTermHoles] -> [LTermHoles]) -> Proof ()
 modifyTerm f = modify (\ps -> ps {term = f $ term ps})
 
 modifySubps :: ([SubProof] -> [SubProof]) -> Proof ()
@@ -150,7 +150,7 @@ modifySubps f = modify (\ps -> ps {subps = f $ subps ps})
 ------------------------------------------------------------------------------
 -- Crea una subprueba para el tipo objetivo dado por el 1º arg.
 -- Lo agrega a la lista de subpruebas del 2º arg.
-addSubProof :: Maybe (Type, TType) -> [SubProof] -> [SubProof]
+addSubProof :: Maybe DoubleType -> [SubProof] -> [SubProof]
 addSubProof t sp =  SP { termContext = x
                        , bTypeContext = y
                        , tvars = z
@@ -163,7 +163,7 @@ addSubProof t sp =  SP { termContext = x
 
 -- Representa la creación de las subpruebas para cada tipo
 -- objetivo dado por el 2º arg.
-newSubProofs :: Int -> [Maybe (Type, TType)] -> Proof ()
+newSubProofs :: Int -> [Maybe DoubleType] -> Proof ()
 newSubProofs n ts
   | n > 1 = do replaceMaybeTypes $ tail ts
                replaceLevelSubp (n-1)
@@ -172,7 +172,7 @@ newSubProofs n ts
   | otherwise = error "error: newSubProofs, no debería pasar."
 
 -- De acuerdo al 1º argumento, mantiene, crea o termina una subprueba.
-evaluateSubProof :: Int -> [Maybe (Type, TType)] -> Proof ()
+evaluateSubProof :: Int -> [Maybe DoubleType] -> Proof ()
 evaluateSubProof n ts
   | n == 1 = replaceMaybeTypes ts
   | n == 0 = endSubProof
@@ -194,7 +194,7 @@ endSubProof =
 ------------------------------------------------------------------------------
 -- Funciones sobre ProofConstruction
 
-newSubProof :: Int -> (Type, TType) -> SubProof
+newSubProof :: Int -> DoubleType -> SubProof
 newSubProof n ty = SP { termContext = S.empty,
                         bTypeContext = S.empty,
                         lsubp = 1,
@@ -203,20 +203,20 @@ newSubProof n ty = SP { termContext = S.empty,
                       }
 
 
-newProofC :: GlobalState -> (Type,TType) -> ProofConstruction
+newProofC :: GlobalState -> DoubleType -> ProofConstruction
 newProofC g ty = PConstruction { tsubp = 1
                                , subps = [newSubProof (length $ fTypeContext $ g) ty]
                                , cglobal = g
-                               , term = [HoleT id]
+                               , term = [Hole id]
                                }
 
 -- Obtiene el lambda término final de la prueba construida.
-getLTermFromProof :: ProofConstruction -> (Type, TType) -> Term
-getLTermFromProof (PConstruction {term=[Term t]}) ty = t ::: ty
+getLTermFromProof :: ProofConstruction -> DoubleType -> LTerm2
+getLTermFromProof (PConstruction {term=[LamTe t]}) ty = t ::: ty
 getLTermFromProof _ _ = error "getTermFromProof: no debería pasar."
 
 -- Funciones auxiliares.
 -- Chequea si la prueba a terminado.
 isFinalTerm :: ProofConstruction -> Bool
-isFinalTerm (PConstruction {term=[Term _]}) = True
+isFinalTerm (PConstruction {term=[LamTe _]}) = True
 isFinalTerm _ = False

@@ -165,6 +165,7 @@ Además, NO renombramos las variables de tipo ligadas. Por ello, se pueden dar e
 Donde, la variable de tipo ligada "x", coincide con la variable de término "x".
 
 FALTA:
+- Chequear que el parser "prefixOps" funcione BIEN.
 - Añadir renombre de variables de tipos ligadas a los tipos, de modo tal de que no coincidan con los nombre
 de teoremas probados.
 - En el pretty printer de un lambda término sin nombre, hacer que las variables de términos ligadas sean

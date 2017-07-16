@@ -17,59 +17,47 @@ type TermVar = String
 
 type TypeVar = String
 
-data VarName = Free String
-             | Bound Int
-
-
+data VarName a = Free a
+               | Bound Int
+               deriving (Show)
   -- Tipo con nombre.
-type Type1 = Type () TypeVar
+type Type1 = Type TypeVar TypeVar
 
   -- Tipo sin nombre
-type Type2 = Type VarName ()
+type Type2 = Type () (VarName TypeVar)
 
   --Tipo con y sin nombre.
-type DoubleType = Type VarName TypeVar
+type DoubleType = Type TypeVar (TypeVar, VarName TypeVar)
 
-data Type a b = TVar b a
+data Type a b = TVar b
               | Fun (Type a b) (Type a b)
-              | ForAll b (Type a b)
-              | Exists b (Type a b)
-              | RenamedType b [Type a b]
+              | ForAll a (Type a b)
+              | Exists a (Type a b)
+              | RenamedType a [Type a b]
               deriving (Show, Eq)
 
+-- Lambda término con nombre, y tipos con nombres.
+type LTerm1 = LamTerm TermVar TermVar Type1
 
+-- Lambda término sin nombre, y tipos con y sin nombres.
+type LTerm2 = LamTerm () (VarName TermVar) DoubleType
 
-
-
-  -- Lambda términos con nombres.
--- data LamTerm  = LVar TermVar
---               | Abs TermVar Type LamTerm
---               | App LamTerm LamTerm
---               | BAbs TypeVar LamTerm
---               | BApp LamTerm Type
---               | EPack Type LamTerm Type
---               | EUnpack TypeVar TermVar LamTerm LamTerm
---               | As LamTerm Type
---               deriving (Show, Eq)
-
---   -- Lambda términos sin nombres.
--- data Term  = Bound Int
---            | Free TermVar
---            | Term :@: Term
---            | Lam (Type,TType) Term
---            | BLam TypeVar Term
---            | Term :!: (Type,TType)
---            | Pack (Type,TType) Term (Type,TType)
---            | Unpack TypeVar Term Term
---            | Term ::: (Type,TType)
---            deriving (Show, Eq)
+data LamTerm a b c = LVar b
+                   | Abs a c (LamTerm a b c)
+                   | BAbs TypeVar (LamTerm a b c)
+                   | LamTerm a b c :@: LamTerm a b c
+                   | LamTerm a b c :!: c
+                   | EPack c (LamTerm a b c) c
+                   | EUnpack TypeVar a (LamTerm a b c) (LamTerm a b c)
+                   | LamTerm a b c ::: c
+                   deriving (Show, Eq)
 
 -- Para cada variable de término, tenemos (por posición en la 4-tupla):
   -- 1. Su posición en el contexto, a la hora de imprimirlo.
   -- 2. La profundidad con la que se añadio al contexto,
   -- (la profundidad se refiere a la cantidad de cuantificadores construidos).
-  -- 3-4. Su tipo con y sin nombres, respectivamente.
-type TermVarWithType = (Int,Int,Type,TType)
+  -- 3. Su tipo con y sin nombre.
+type TermVarWithType = (Int, Int, DoubleType)
 
   -- Secuencia de variables de términos. 
 type TermContext = Seq TermVarWithType
@@ -90,13 +78,13 @@ type FTypeContext = Seq FTypeVar
 
 
   --Comandos.
-data Command = Ty String Type
+data Command = Ty String Type1
              | Ta Tactic
              | Types (Seq TypeVar)
              | Definition String BodyDef
              deriving (Show)
 
-data BodyDef = LTerm LamTerm
+data BodyDef = LTerm LTerm1
              | Type TypeDefinition
              | Ambiguous (GenTree String)
              deriving (Show)
@@ -106,34 +94,34 @@ data BodyDef = LTerm LamTerm
   -- 2. Cantidad de operandos.
   -- 3. Lista de los nombres de los argumentos.
   -- 4. Boleano. True sii es una operación binaria infija.
-type TypeDefinition = (Type, Operands, Seq TypeVar, Bool)
+type TypeDefinition = (Type1, Operands, Seq TypeVar, Bool)
 
   -- Tácticas.
 data Tactic = Assumption | Apply Int | Intro | Intros | Split
             | Elim Int | CLeft | CRight | Print String 
-            | CExists Type | Cut Type | Exact ExactB
-            | Infer LamTerm | Unfold String (Maybe Int)
-            | Absurd Type
+            | CExists Type1 | Cut Type1 | Exact ExactB
+            | Infer LTerm1 | Unfold String (Maybe Int)
+            | Absurd Type1
             deriving (Show)
 
-data ExactB = LamT LamTerm
-            | T Type
+data ExactB = LamT LTerm1
+            | T Type1
             | Appl (GenTree String)
             deriving (Show)
 
   -- Excepciones.
 data ProofExceptions = PNotFinished | PNotStarted | ExistE String
                      | NotExistE String | SyntaxE String | AssuE
-                     | IntroE1 | ApplyE1 Type Type | HypoE Int
+                     | IntroE1 | ApplyE1 Type1 Type1 | HypoE Int
                      | Unif1 | Unif2 | Unif3 | Unif4
                      | ElimE1 | CommandInvalid | TypeRepeated String
-                     | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 Type
-                     | ExactE2 Type | ExactE3 | PSE | EmptyType | TypeE String
-                     | InferE LamTerm InferExceptions | UnfoldE1 String
+                     | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 Type1
+                     | ExactE2 Type1 | ExactE3 | PSE | EmptyType | TypeE String
+                     | InferE LTerm1 InferExceptions | UnfoldE1 String
                      deriving (Show, Typeable)
 
-data InferExceptions = InferE1 String | InferE2 LamTerm Type
-                     | InferE3 LamTerm String | InferE4 LamTerm
+data InferExceptions = InferE1 String | InferE2 LTerm1 Type1
+                     | InferE3 LTerm1 String | InferE4 LTerm1
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions
@@ -147,7 +135,7 @@ data GenTree a = Nil | Node a [GenTree a]
 type Operands = Int
 
   -- Operación NO "foldeable".
-type NotFoldeableOp = (String, Int, Operands)
+type NotFoldeableOp = (String, Operands)
 
   -- Operación "foldeable", donde:
   -- 1. Identificador.
@@ -155,7 +143,7 @@ type NotFoldeableOp = (String, Int, Operands)
   -- 3. Cantidad de operandos.
   -- 4. Booleano. True sii es una operación binaria infija.
   -- Todas las operaciones que define el usuario son foldeables.
-type FoldeableOp = (String, (Type, TType), Operands, Bool)
+type FoldeableOp = (String, DoubleType, Operands, Bool)
 
   -- Operaciones "foldeables".
 type FOperations = Seq FoldeableOp

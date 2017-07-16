@@ -29,7 +29,7 @@ initialTheorems = [ ("intro_and", intro_and),
                   ]
 
 
-addTheorem :: String -> Term -> GlobalState -> GlobalState
+addTheorem :: String -> LTerm2 -> GlobalState -> GlobalState
 addTheorem name lt g = g {theorems = T.insert name lt $ theorems g}
 
 addOperator :: FoldeableOp -> GlobalState -> GlobalState
@@ -68,5 +68,5 @@ invalidName name g =  isTheorem name g
 addFreeVars :: S.Seq TypeVar -> GlobalState -> GlobalState
 addFreeVars vars g = g {fTypeContext = vars S.>< fTypeContext g}
 
-getLTermFromTheorems :: String -> GlobalState -> Term
+getLTermFromTheorems :: String -> GlobalState -> LTerm2
 getLTermFromTheorems name (Global {theorems = te}) = te T.! name

@@ -16,26 +16,26 @@ data ProverState = PSt { proof :: Maybe ProofState
 
   -- Estado de la prueba que se está construyendo.
 data ProofState = PState { name :: String
-                         , types :: (Type,TType)
+                         , types :: DoubleType
                          , constr :: ProofConstruction
                          }
 
 -- Genera una nueva prueba.
-newProof' :: GlobalState -> String -> (Type,TType) -> (Type, TType) -> ProofState
+newProof' :: GlobalState -> String -> DoubleType -> DoubleType -> ProofState
 newProof' g name ty tyr = PState { name = name
                                  , types = ty
                                  , constr = newProofC g tyr
                                  }
 
 -- Inicia una nueva prueba.
-newProof :: String -> (Type,TType) -> (Type, TType) -> ProverState -> ProverState
+newProof :: String -> DoubleType -> DoubleType -> ProverState -> ProverState
 newProof name ty tyr p = p {proof = Just $ newProof' (global p) name ty tyr}
 
 getProofC :: ProverState -> ProofConstruction
 getProofC (PSt {proof = Just pr}) = constr pr
 getProofC _ = error "error: getProofC, no debería pasar."
 
-getTypeProof :: ProverState -> (Type,TType)
+getTypeProof :: ProverState -> DoubleType
 getTypeProof (PSt {proof = Just pr}) = types pr
 getTypeProof _ = error "error: getTypeProof, no debería pasar."
 
@@ -49,7 +49,7 @@ newTheoremFromProof :: ProverState -> ProverState
 newTheoremFromProof p@(PSt {proof = Just pr}) =
   newTheorem (name pr) (getLTermFromProof (constr pr) (types pr)) p
 
-newTheorem :: String -> Term -> ProverState -> ProverState
+newTheorem :: String -> LTerm2 -> ProverState -> ProverState
 newTheorem name te  = modifyGlobal (checkConflictName name . addTheorem name te)
 
 -- Indica si se inicio una prueba.

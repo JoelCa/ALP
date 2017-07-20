@@ -20,13 +20,14 @@ type TypeVar = String
 data VarName a = Free a
                | Bound Int
                deriving (Show)
+
   -- Tipo con nombre.
 type Type1 = Type TypeVar TypeVar
 
   -- Tipo sin nombre
 type Type2 = Type () (VarName TypeVar)
 
-  --Tipo con y sin nombre.
+  -- Tipo con y sin nombre.
 type DoubleType = Type TypeVar (TypeVar, VarName TypeVar)
 
 data Type a b = TVar b
@@ -36,11 +37,13 @@ data Type a b = TVar b
               | RenamedType a [Type a b]
               deriving (Show, Eq)
 
--- Lambda término con nombre, y tipos con nombres.
+  -- Lambda término con nombre, y tipos con nombres.
 type LTerm1 = LamTerm TermVar TermVar Type1
 
--- Lambda término sin nombre, y tipos con y sin nombres.
+  -- Lambda término sin nombre, y tipos con y sin nombres.
 type LTerm2 = LamTerm () (VarName TermVar) DoubleType
+
+type DoubleLTerm = LamTerm TermVar (TermVar, VarName TermVar) DoubleType
 
 data LamTerm a b c = LVar b
                    | Abs a c (LamTerm a b c)
@@ -52,7 +55,7 @@ data LamTerm a b c = LVar b
                    | LamTerm a b c ::: c
                    deriving (Show, Eq)
 
--- Para cada variable de término, tenemos (por posición en la 4-tupla):
+  -- Para cada variable de término, tenemos (por posición en la 4-tupla):
   -- 1. Su posición en el contexto, a la hora de imprimirlo.
   -- 2. La profundidad con la que se añadio al contexto,
   -- (la profundidad se refiere a la cantidad de cuantificadores construidos).
@@ -203,5 +206,5 @@ maybeToEither _ (Just normalval) = return normalval
 fst4 :: (a, b, c, d) -> a
 fst4 (x, _, _, _) = x
 
-getElemIndex :: (a -> Bool) -> Seq a -> Maybe (Int, a)
-getElemIndex f xs = foldlWithIndex (\r i x -> if f x then Just (i, x) else r) Nothing xs
+-- getElemIndex :: (a -> Bool) -> Seq a -> Maybe (Int, a)
+-- getElemIndex f xs = foldlWithIndex (\r i x -> if f x then Just (i, x) else r) Nothing xs

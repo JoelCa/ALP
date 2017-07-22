@@ -66,30 +66,30 @@ typeSubs' n l fs bs rs op tn (RenamedType s xs) ts =
 
 
 -- Realiza la sust. de tipos. sin nombre.
--- ttypeSubs :: Int -> TType -> [TType] -> TType
--- ttypeSubs _ t [] = t
--- ttypeSubs l t xs = ttypeSubs' 0 l t xs
+typeSubsNoRename :: Int -> DoubleType -> [DoubleType] -> DoubleType
+typeSubsNoRename _ t [] = t
+typeSubsNoRename l t xs = typeSubsNoRename' 0 l t xs
 
--- -- Realiza la sust. de tipos sin nombre.
--- -- 1. Profundidad ("para todos"), procesados.
--- -- 2. Cantidad de tipos a reemplazar (podemos pensarlo como el número de corrimientos).
--- -- 3. Tipo sin nombre, sobre el que se hace la sust. Sin los "para todos" que se van a sustituir.
--- -- 4. Tipos sin nombre que se sustituyen.
--- ttypeSubs' :: Int -> Int -> TType -> [TType] -> TType
--- ttypeSubs' n l (TBound x) ts
---   | x < n = TBound x
---   | (n <= x) && (x < l) =
---       positiveShift n $ ts !! (l - x - 1)
---   | otherwise = TBound $ x - l + n
--- ttypeSubs' _ _ t@(TFree f) _ = t
--- ttypeSubs' n l (TForAll t1) ts =
---   TForAll $ ttypeSubs' (n+1) (l+1) t1 ts
--- ttypeSubs' n l (TExists t1) ts =
---   TExists $ ttypeSubs' (n+1) (l+1) t1 ts
--- ttypeSubs' n l (TFun t1 t2) ts =
---   TFun (ttypeSubs' n l t1 ts) (ttypeSubs' n l t2 ts)
--- ttypeSubs' n l (RenamedType op xs) ts =
---   RenamedType op $ map (\x -> ttypeSubs' n l x ts) xs
+-- Realiza la sust. de tipos, solo tiene en cuenta los tipos sin nombre.
+-- 1. Profundidad ("para todos"), procesados.
+-- 2. Cantidad de tipos a reemplazar (podemos pensarlo como el número de corrimientos).
+-- 3. Tipo sin nombre, sobre el que se hace la sust. Sin los "para todos" que se van a sustituir.
+-- 4. Tipos sin nombre que se sustituyen.
+typeSubsNoRename' :: Int -> Int -> DoubleType -> [DoubleType] -> DoubleType
+typeSubsNoRename' n l t@(TVar (a, Bound x)) ts
+  | x < n = t
+  | (n <= x) && (x < l) =
+      positiveShift n $ ts !! (l - x - 1)
+  | otherwise = TVar (a, Bound $ x - l + n)
+typeSubsNoRename' _ _ t@(TVar (_, Free _)) _ = t
+typeSubsNoRename' n l (ForAll v t) ts =
+  ForAll v $ typeSubsNoRename' (n+1) (l+1) t ts
+typeSubsNoRename' n l (Exists v t) ts =
+  Exists v $ typeSubsNoRename' (n+1) (l+1) t ts
+typeSubsNoRename' n l (Fun t1 t2) ts =
+  Fun (typeSubsNoRename' n l t1 ts) (typeSubsNoRename' n l t2 ts)
+typeSubsNoRename' n l (RenamedType op xs) ts =
+  RenamedType op $ map (\x -> typeSubsNoRename' n l x ts) xs
 
 -- Consideramos que el 1º argumento corresponde al cuerpo de una cuantificación ("para todo", "existe").
 -- Se reemplaza la variable ligada más "externa" por el 2º argumento.

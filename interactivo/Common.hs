@@ -19,7 +19,7 @@ type TypeVar = String
 
 data VarName a = Free a
                | Bound Int
-               deriving (Show)
+               deriving (Show, Eq)
 
   -- Tipo con nombre.
 type Type1 = Type TypeVar TypeVar
@@ -120,11 +120,11 @@ data ProofExceptions = PNotFinished | PNotStarted | ExistE String
                      | ElimE1 | CommandInvalid | TypeRepeated String
                      | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 Type1
                      | ExactE2 Type1 | ExactE3 | PSE | EmptyType | TypeE String
-                     | InferE LTerm1 InferExceptions | UnfoldE1 String
+                     | InferE DoubleLTerm InferExceptions | UnfoldE1 String
                      deriving (Show, Typeable)
 
-data InferExceptions = InferE1 String | InferE2 LTerm1 Type1
-                     | InferE3 LTerm1 String | InferE4 LTerm1
+data InferExceptions = InferE1 String | InferE2 DoubleLTerm DoubleType
+                     | InferE3 DoubleLTerm String | InferE4 DoubleLTerm
                      deriving (Show, Typeable)
                               
 instance Exception ProofExceptions

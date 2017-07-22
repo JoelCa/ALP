@@ -10,10 +10,11 @@ import qualified Data.Sequence as S
 
 -- Algoritmo de inferencia de tipos de un lambda término.
 
-basicTypeInference :: Theorems -> FOperations -> (LamTerm, Term)
-                   -> Either ProofExceptions (Type, TType)
+basicTypeInference :: Theorems -> FOperations -> DoubleLTerm
+                   -> Either ProofExceptions DoubleType
 basicTypeInference = typeInference 0 S.empty
 
+-- TERMINAR!!
 -- Infiere el tipo de un lambda término.
 -- Suponemos que ninguna de las pruebas de los teoremas son recursivas.
 -- Es decir, que su lambda término es recursivo.
@@ -25,62 +26,62 @@ basicTypeInference = typeInference 0 S.empty
 -- 4. Operaciones "foldeables".
 -- 5. Lambda término con y sin nombre, al que se le quiere inferir su tipo.
 typeInference :: Int -> TermContext -> Theorems -> FOperations
-              -> (LamTerm, Term) -> Either ProofExceptions (Type, TType)
+              -> DoubleLTerm -> Either ProofExceptions DoubleType
 typeInference n c te op t = case typeInference' n c te op t of
                           Right r -> return r
                           Left e -> throw $ InferE (fst t) e
 
 typeInference' :: Int -> TermContext -> Theorems -> FOperations
-          -> (LamTerm, Term) -> Either InferExceptions (Type, TType)
-typeInference' n _ te _ (_, Free x) =
+               -> DoubleLTerm -> Either InferExceptions DoubleType
+typeInference' n _ te _ (TVar (_, Free x)) =
   case T.lookup x te of
     Just (_ ::: t) -> return t
     Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean teoremas.
     _ -> error "error: typeInference', no debería pasar."
-typeInference' n c te _ (_, Bound x) =
-  let (_,m,t,t') = S.index c x
-  in return (t,positiveShift (n-m) t')
-typeInference' n c te op (Abs _ _ e, Lam (t,t') e') =
-  do (tt,tt') <- typeInference' n ((0,n,t,t') S.<| c) te op (e,e')
-     return (Fun t tt, TFun t' tt')
-typeInference' n c te op (App e1 e2, e1' :@: e2') =
-  do tt1 <- typeInference' n c te op (e1, e1')
+typeInference' n c te _ (TVar (_, Bound x)) =
+  let (_,m,t) = S.index c x
+  in return $ positiveShift (n-m) t
+typeInference' n c te op (Abs _ t e) =
+  do tt <- typeInference' n ((0,n,t) S.<| c) te op e
+     return $ Fun t tt
+typeInference' n c te op (e1 :@: e2) =
+  do tt1 <- typeInference' n c te op e1
      case tt1 of
-       (Fun t1 t2, TFun t1' t2') ->
-         do (tt2, tt2') <- typeInference' n c te op (e2, e2')
-            if compareTTypes op tt2' t1'
-              then return (t2, t2')
+       Fun t1 t2 ->
+         do tt2 <- typeInference' n c te op e2
+            if compareTypes op tt2 t1
+              then return t2
               else throw $ InferE2 e2 t1
        _ -> throw $ InferE3 e1 "* -> *"
-typeInference' n c te op (BAbs _ e, BLam v e') =
-  do (t,t') <- typeInference' (n+1) c te op (e, e')
-     return (ForAll v t, TForAll t')
-typeInference' n c te op (BApp e _, e' :!: (t,t')) =
-  do tt <- typeInference' n c te op (e, e')
+typeInference' n c te op (BAbs v e) =
+  do t <- typeInference' (n+1) c te op e
+     return $ ForAll v t
+typeInference' n c te op (e :!: t) =
+  do tt <- typeInference' n c te op e
      case tt of
-       (ForAll _ t1, TForAll t1') ->
-         return $ basicTypeSubs (t1,t1') (t,t')
+       (ForAll _ t1) ->
+         return $ basicTypeSubs t1 t
        _ -> throw $ InferE3 e "forall *"
-typeInference' n c te op (EPack _ e _, Pack t1 e' t@(Exists _ t2 , TExists t2')) =
-  do (_,tt1') <- typeInference' n c te op (e, e')
-     let (tt2, tt2') = basicTypeSubs (t2,t2') t1
-     if compareTTypes op tt1' tt2'
+typeInference' n c te op (EPack t1 e t@(Exists _ t2)) =
+  do tt1' <- typeInference' n c te op e
+     let tt2 = basicTypeSubs t2 t1
+     if compareTypes op tt1' tt2
        then return t
        else throw $ InferE2 e tt2
-typeInference' n c te op (EUnpack _ _ e1 e2, Unpack _ e1' e2') =
-  do t1 <- typeInference' n c te op (e1, e1')
+typeInference' n c te op (EUnpack _ _ e1 e2) =
+  do t1 <- typeInference' n c te op e1
      case t1 of
-       (Exists _ tt1, TExists tt1') -> 
-         do t2 <- typeInference' (n+1) ((0,n+1,tt1,tt1') S.<| c) te op (e2, e2')
+       (Exists _ tt1) -> 
+         do t2 <- typeInference' (n+1) ((0,n+1,tt1) S.<| c) te op e2
             case negativeShift 1 t2 of
               Just t2' -> return t2'
               Nothing -> throw $ InferE4 e2
        _ -> throw $ InferE3 e1 "exists *"
-typeInference' n c te op (As e _, e' ::: t@(tt,tt')) =
-  do (_, t1') <- typeInference' n c te op (e, e')
-     if compareTTypes op t1' tt'
+typeInference' n c te op (e ::: t) =
+  do t' <- typeInference' n c te op e
+     if compareTypes op t' t
        then return t
-       else throw $ InferE2 e tt
+       else throw $ InferE2 e t
 
 
 -- Compara los tipos sin nombres, extendiente las operaciones "foldeables".

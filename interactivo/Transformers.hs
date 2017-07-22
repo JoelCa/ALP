@@ -99,40 +99,53 @@ typeWithoutName fbs fs op (RenamedType s ts) =
   where args = length ts
 
 
--- renamedValidType1 :: BTypeContext -> FTypeContext ->  FOperations -> Theorems
---                   -> Type -> Type
--- renamedValidType1 bs ftc op te = renamedValidType' bs bs ftc op (theoremsNames te) 
+renamedValidType1 :: Int -> BTypeContext -> FTypeContext
+                  -> FOperations -> Theorems
+                  -> DoubleType -> DoubleType
+renamedValidType1 n bs ftc op te = positiveShiftAndRename n bs bs ftc op (theoremsNames te) 
 
--- renamedValidType2 :: BTypeContext -> FTypeContext ->  FOperations -> [String]
---                   -> Type -> Type
--- renamedValidType2 bs = renamedValidType' bs bs 
+renamedValidType2 :: Int -> BTypeContext -> FTypeContext
+                  -> FOperations -> [String]
+                  -> DoubleType -> DoubleType
+renamedValidType2 n bs = positiveShiftAndRename n bs bs
   
--- -- Renombra las variables de tipo ligadas de un tipo con nombre válido.
--- -- Se asume que el tipo dado por el 5º arg. está bien formado. Es decir que,
--- -- NO tiene variables escapadas que no han sido declaradas en el contexto.
--- -- Argumentos:
--- -- 1. Conjunto de variables de tipo ligadas renombradas.
--- -- 2. Conjunto de variables de tipo ligadas no renombradas.
--- -- 3. Conjunto de variables de tipos libres.
--- -- 4. Operaciones.
--- -- 5. Nombres de teoremas.
--- -- 6. Tipo sobre el que se realiza el renombramiento.
--- renamedValidType' :: BTypeContext -> BTypeContext -> FTypeContext
---                   -> FOperations -> [String] -> Type -> Type
--- renamedValidType' rs bs fs op _ (B x) =
---   case S.findIndexL (\(_,w) -> w == x) bs of
---     Just n -> B $ snd $ S.index rs n
---     Nothing -> B x
--- renamedValidType' rs bs fs op tn (ForAll x t) =
---   let v = getRename x (snd, rs) (id, fs) (fst4, op) (id, tn)
---   in ForAll v $ renamedValidType' (bTypeVar v S.<| rs) (bTypeVar x S.<| bs) fs op tn t
--- renamedValidType' rs bs fs op tn (Exists x t) =
---   let v = getRename x (snd, rs) (id, fs) (fst4, op) (id, tn)
---   in Exists v $ renamedValidType' (bTypeVar v S.<| rs) (bTypeVar x S.<| bs) fs op tn t
--- renamedValidType' rs bs fs op tn (Fun t1 t2) =
---   Fun (renamedValidType' rs bs fs op tn t1) (renamedValidType' rs bs fs op tn t2)
--- renamedValidType' rs bs fs op tn (RenamedType s args ts) =
---   RenamedType s args $ map (renamedValidType' rs bs fs op tn) ts
+-- Renombra las variables de tipo ligadas de un tipo válido.
+-- Se asume que el tipo dado por el 7º arg. está bien formado. Es decir que,
+-- NO tiene variables escapadas que no han sido declaradas en el contexto.
+-- Argumentos:
+-- 1. Corrimiento positivo.
+-- 2. Conjunto de variables de tipo ligadas renombradas.
+-- 3. Conjunto de variables de tipo ligadas no renombradas.
+-- 4. Conjunto de variables de tipos libres.
+-- 5. Operaciones.
+-- 6. Nombres de teoremas.
+-- 7. Tipo sobre el que se realiza el renombramiento.
+positiveShiftAndRename :: Int -> BTypeContext -> BTypeContext
+                       -> FTypeContext -> FOperations
+                       -> [String] -> DoubleType -> DoubleType
+positiveShiftAndRename 0 = \_ _ _ _ _ t -> t
+positiveShiftAndRename n = positiveShiftAndRename' 0 n
+
+positiveShiftAndRename' :: Int -> Int -> BTypeContext -> BTypeContext
+                        -> FTypeContext -> FOperations
+                        -> [String] -> DoubleType -> DoubleType
+positiveShiftAndRename' m n rs bs fs op _ (TVar (a, b@(Bound x)))
+  | x < m = case S.findIndexL (\(_,w) -> w == a) bs of
+              Just i -> TVar (snd $ S.index rs i, b)
+              Nothing -> error "error: positiveShiftAndRename', no debería pasar."
+  | otherwise = TVar (a, Bound (x+n)) 
+positiveShiftAndRename' _ _ _ _ _ _ _ (TVar (a, b@(Free x))) =
+  TVar (a, b)
+positiveShiftAndRename' m n rs bs fs op tn (ForAll x t) =
+  let v = getRename x (snd, rs) (id, fs) (fst4, op) (id, tn)
+  in ForAll v $ positiveShiftAndRename' (m+1) n (bTypeVar v S.<| rs) (bTypeVar x S.<| bs) fs op tn t
+positiveShiftAndRename' m n rs bs fs op tn (Exists x t) =
+  let v = getRename x (snd, rs) (id, fs) (fst4, op) (id, tn)
+  in Exists v $ positiveShiftAndRename' (m+1) n (bTypeVar v S.<| rs) (bTypeVar x S.<| bs) fs op tn t
+positiveShiftAndRename' m n rs bs fs op tn (Fun t1 t2) =
+  Fun (positiveShiftAndRename' m n rs bs fs op tn t1) (positiveShiftAndRename' m n rs bs fs op tn t2)
+positiveShiftAndRename' m n rs bs fs op tn (RenamedType s ts) =
+  RenamedType s $ map (positiveShiftAndRename' m n rs bs fs op tn) ts
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Trasformadores de lambda términos: Se pasa de un lambda término con nombre, a uno renombrado y al equivalente sin nombre.
@@ -306,17 +319,17 @@ negativeShift' m n (Exists v t) =
 -- Realiza un corrimiento "positivo" sobre las variables de tipo ligadas "escapadas".
 -- Argumentos:
 -- 1. Número de corrimiento.
--- 2. Tipo sin nombre sobre el que se realiza el corrimiento.
--- positiveShift :: Int -> TType -> TType
--- positiveShift 0 = id
--- positiveShift n = positiveShift' 0 n
+-- 2. Tipo sobre el que se realiza el corrimiento.
+positiveShift :: Int -> DoubleType -> DoubleType
+positiveShift 0 = id
+positiveShift n = positiveShift' 0 n
 
--- positiveShift' :: Int -> Int -> TType -> TType
--- positiveShift' n r t@(TBound x)
---   | x < n = t
---   | otherwise = TBound (x+r)
--- positiveShift' _ _ t@(TFree x) = t
--- positiveShift' n r (TForAll t) = TForAll $ positiveShift' (n+1) r t
--- positiveShift' n r (TExists t) = TExists $ positiveShift' (n+1) r t
--- positiveShift' n r (TFun t1 t2) = TFun (positiveShift' n r t1) (positiveShift' n r t2)
--- positiveShift' n r (RenamedType op ts) = RenamedType op $ map (positiveShift' n r) ts
+positiveShift' :: Int -> Int -> DoubleType -> DoubleType
+positiveShift' m n t@(TVar (x, Bound y))
+  | y < m = t
+  | otherwise = TVar (x, Bound (y+n))
+positiveShift' _ _ t@(TVar (_, Free _)) = t
+positiveShift' m n (ForAll v t) = ForAll v $ positiveShift' (m+1) n t
+positiveShift' m n (Exists v t) = Exists v $ positiveShift' (m+1) n t
+positiveShift' m n (Fun t1 t2) = Fun (positiveShift' m n t1) (positiveShift' m n t2)
+positiveShift' m n (RenamedType op ts) = RenamedType op $ map (positiveShift' m n) ts

@@ -15,17 +15,19 @@ import Control.Monad (unless, when)
 import qualified Data.Map.Strict as M (Map, lookup, insert, empty, size)
 import Data.Maybe (fromJust, isJust)
 import qualified Data.Sequence as S
+import Data.Foldable (find)
+
 
 -- Contruye la prueba.
 habitar :: Tactic -> Proof ()
 habitar Assumption =
   do x <- getType
-     (_,tw) <- maybeToProof EmptyType x 
+     t <- maybeToProof EmptyType x 
      c <- getTermContext
      q <- getTBTypeVars
-     i <- maybeToProof AssuE $ S.findIndexL (\(_,p,_,t) -> positiveShift (q - p) t == tw) c
+     i <- maybeToProof AssuE $ S.findIndexL (\(_,p,t') -> positiveShift (q - p) t' == t) c
      endSubProof
-     modifyTerm $ simplify $ Bound i
+     modifyTerm $ simplify $ LVar $ Bound i
 habitar Intro =
   do x <- getType
      introComm x
@@ -33,52 +35,52 @@ habitar Intros =
   introsComm
 habitar (Apply h) =
   do x <- getType
-     (t,t') <- maybeToProof EmptyType x
+     t <- maybeToProof EmptyType x
      n <- getTTermVars
      cn <- getConflictNames
      i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
      c <- getTermContext
      q <- getTBTypeVars
-     applyComm i (t,t') (getTypeVar q $ S.index c i)
+     applyComm i t (getTypeVar q $ S.index c i)
 habitar (Elim h) =
   do x <- getType
-     (t,t') <- maybeToProof EmptyType x
+     t <- maybeToProof EmptyType x
      n <- getTTermVars
      cn <- getConflictNames
      i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
      c <- getTermContext
      q <- getTBTypeVars
-     elimComm i (t,t') (getTypeVar q $ S.index c i)
+     elimComm i t (getTypeVar q $ S.index c i)
 habitar CLeft =
   do x <- getType
      case x of
-       Just (RenameTy _ 2 [t1,t2] , RenameTTy n [t1',t2']) ->
-         if n == or_code
-         then do replaceType (t1,t1')
-                 modifyTerm $ addHT (\x -> ((Free "intro_or1")
-                                             :!: (t1,t1') :!: (t2,t2'))
+       Just (RenamedType s [t1,t2]) ->
+         if s == or_id
+         then do replaceType t1
+                 modifyTerm $ addHT (\x -> ((LVar $ Free "intro_or1")
+                                             :!: t1 :!: t2)
                                            :@: x)
          else throw CommandInvalid
        _ -> throw CommandInvalid
 habitar CRight =
   do x <- getType
      case x of
-       Just (RenameTy _ 2 [t1,t2] , RenameTTy n [t1',t2']) ->
-         if n == or_code
-         then do replaceType (t2,t2')
-                 modifyTerm $ addHT (\x -> ((Free "intro_or2")
-                                             :!: (t1,t1') :!: (t2,t2'))
+       Just (RenamedType s [t1,t2]) ->
+         if s == or_id
+         then do replaceType t2
+                 modifyTerm $ addHT (\x -> ((LVar $ Free "intro_or2")
+                                             :!: t1 :!: t2)
                                            :@: x)
          else throw CommandInvalid
        _ -> throw CommandInvalid
 habitar Split =
   do x <- getType
      case x of
-       Just (RenameTy _ 2 [t1,t2], RenameTTy n [t1',t2']) ->
-         if n == and_code
-         then do newSubProofs 2 [Just (t1,t1'), Just (t2,t2')]
-                 modifyTerm $ addDHT (\x y -> ((Free "intro_and")
-                                                :!: (t1,t1') :!: (t2,t2'))
+       Just (RenamedType s [t1,t2]) ->
+         if s == and_id
+         then do newSubProofs 2 [Just t1, Just t2]
+                 modifyTerm $ addDHT (\x y -> ((LVar $ Free "intro_and")
+                                                :!: t1 :!: t2)
                                               :@: x :@: y)
          else throw CommandInvalid
        _ -> throw CommandInvalid
@@ -95,7 +97,7 @@ habitar (Exact (LamT te)) =
      exactTerm te' tt  
 habitar (Exact (T ty)) =
   do x <- getType
-     when (isJust x) $ throw $ ExactE2 $ fst $ fromJust x
+     when (isJust x) $ throw $ ExactE2 $ fromJust x
      op <- getUsrOpers
      btc <- getBTypeContext
      ftc <- getFTypeContext
@@ -115,88 +117,88 @@ habitar (Exact (Appl aps)) =
          do tt <- maybeToProof EmptyType x
             exactTerm te tt
        Left ty ->
-         do when (isJust x) $ throw $ ExactE2 $ fst $ fromJust x
+         do when (isJust x) $ throw $ ExactE2 $ fromJust x
             exactType ty
 habitar (Unfold s Nothing) =
   do x <- getType
-     (t,t') <- maybeToProof EmptyType x
+     t <- maybeToProof EmptyType x
      op <- getUsrOpers
-     (m, (_, (tt,tt'), _, _)) <- maybeToProof (UnfoldE1 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
+     (s', tt, _, _) <- maybeToProof (UnfoldE1 s) $ find (\(x,_,_,_) -> x == s) op
      btc <- getBTypeContext
      ftc <- getFTypeContext
      teo <- getTheorems
-     replaceType $ unfoldComm btc ftc op teo m (t,t') (tt,tt')
+     replaceType $ unfoldComm btc ftc op teo s' t tt
 habitar (Unfold s (Just h)) =
   do op <- getUsrOpers
-     (m, (_, (tt,tt'), _, _)) <- maybeToProof (UnfoldE1 s) $ getElemIndex (\(x,_,_,_) -> x == s) op
+     (s', tt, _, _) <- maybeToProof (UnfoldE1 s) $ find (\(x,_,_,_) -> x == s) op
      n <- getTTermVars
      cn <- getConflictNames
      i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
      c <- getTermContext
-     let (x,y,t,t') = S.index c i
+     let (x,y,t) = S.index c i
      btc <- getBTypeContext
      ftc <- getFTypeContext
      teo <- getTheorems
-     let (r,r') = unfoldComm btc ftc op teo m (t,t') (tt,tt')
-     updateTermContext i (x,y,r,r')
+     let r = unfoldComm btc ftc op teo s' t tt
+     updateTermContext i (x,y,r)
 habitar (Absurd ty) =
   do x <- getType
      case x of
-       Just (RenameTy _ 0 [] , RenameTTy n []) ->
-         if n == bottom_code
+       Just (RenamedType s []) ->
+         if s == bottom_id
          then do op <- getUsrOpers
                  btc <- getBTypeContext
                  ftc <- getFTypeContext
                  teo <- getTheorems
-                 (tty, tty') <- eitherToProof $ renamedType2 btc ftc op teo ty
-                 newSubProofs 2 [ Just (tty, tty')
-                                , Just (RenameTy not_text 1 [tty], RenameTTy not_code [tty']) ]
-                 modifyTerm $ addDHT (\x y -> ((Free "intro_bottom")
-                                                :!: (tty, tty'))
+                 tty <- eitherToProof $ renamedType2 btc ftc op teo ty
+                 newSubProofs 2 [ Just tty
+                                , Just (RenamedType not_id [tty]) ]
+                 modifyTerm $ addDHT (\x y -> ((LVar $ Free "intro_bottom")
+                                                :!: tty)
                                               :@: x :@: y)
          else throw CommandInvalid
        _ -> throw CommandInvalid
 habitar (CExists ty) =
   do x <- getType
      case x of
-       Just tt@(Exists v t, TExists t') ->
+       Just tt@(Exists v t) ->
          do op <- getUsrOpers
             btc <- getBTypeContext
             ftc <- getFTypeContext
             teo <- getTheorems
             ty' <- eitherToProof $ renamedType2 btc ftc op teo ty
-            replaceType $ typeSubs 1 btc ftc op teo (t,t') [ty']
-            modifyTerm $ addHT (\x -> Pack ty' x tt)
+            replaceType $ typeSubs 1 btc ftc op teo t [ty']
+            modifyTerm $ addHT (\x -> EPack ty' x tt)
        _ -> throw CommandInvalid
 habitar (Cut ty) =
   do x <- getType
-     (t,t') <- maybeToProof EmptyType x
+     t <- maybeToProof EmptyType x
      op <- getUsrOpers
      btc <- getBTypeContext
      ftc <- getFTypeContext
      teo <- getTheorems
-     (tty, tty') <- eitherToProof $ renamedType2 btc ftc op teo ty
-     newSubProofs 2 [ Just (Fun tty t, TFun tty' t')
-                    , Just (tty, tty') ]
+     tty <- eitherToProof $ renamedType2 btc ftc op teo ty
+     newSubProofs 2 [ Just (Fun tty t)
+                    , Just tty ]
      modifyTerm $ addDHT (\x y -> x :@: y)
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando INTRO e INTROS
 
-introComm :: Maybe (Type, TType) -> Proof ()
-introComm (Just (Fun t1 t2, TFun t1' t2')) =
+introComm :: Maybe DoubleType -> Proof ()
+introComm (Just (Fun t1 t2)) =
   do modifyTVars (+1)
      q <- getTBTypeVars
      tv <- getTVars
-     addTermContext (tv, q, t1, t1')
-     replaceType (t2, t2')
-     modifyTerm $ addHT (\x -> Lam (t1,t1') x)
-introComm (Just (ForAll v t, TForAll t')) =
+     addTermContext (tv, q, t1)
+     replaceType t2
+     modifyTerm $ addHT (\x -> Abs () t1 x)
+introComm (Just (ForAll v t)) =
   do modifyTVars (+1)
      tv <- getTVars
      addBTypeContext (tv, v)
-     replaceType (t, t')
-     modifyTerm $ addHT (\x -> BLam v x)
+     replaceType t
+     modifyTerm $ addHT (\x -> BAbs v x)
 introComm Nothing = throw EmptyType
 introComm _ = throw IntroE1
 
@@ -211,39 +213,39 @@ introsComm = catch (do habitar Intro
 -- Comando ELIM
 
 -- Asumimos que las tuplas del 2º arg. , tienen la forma correcta.
-elimComm :: Int -> (Type, TType) -> (Type, TType) -> Proof ()
-elimComm i (t,t') (Exists v tt, TExists tt') =
+elimComm :: Int -> DoubleType -> DoubleType -> Proof ()
+elimComm i t (Exists v tt) =
   do modifyTVars (+1)
      tv <- getTVars
      addBTypeContext (tv, v)
      modifyTVars (+1)
      q <- getTBTypeVars
      tv <- getTVars
-     addTermContext (tv, q, tt, tt')
+     addTermContext (tv, q, tt)
      btc <- getBTypeContext
      ftc <- getFTypeContext
      op <- getUsrOpers
      te <- getTheorems
-     replaceType (renamedValidType1 (bTypeVar v S.<| btc) ftc op te t, positiveShift 1 t')
-     modifyTerm $ addHT (\x -> Unpack v (Bound i) x)
-elimComm i (t,t') (RenameTy _ _ [t1,t2], RenameTTy n [t1',t2'])
-  | n == and_code =
-      do replaceType (Fun t1 (Fun t2 t), TFun t1' (TFun t2' t'))
-         modifyTerm $ addHT (\x -> ((Free "elim_and")
-                                     :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
-                                   :@: (Bound i) :@: x)
-  | n == or_code =
-      do newSubProofs 2 [ Just (Fun t1 t, TFun t1' t')
-                        , Just (Fun t2 t, TFun t2' t') ]
-         modifyTerm $ addDHT (\x y -> ((Free "elim_or")
-                                        :!: (t1,t1') :!: (t2,t2') :!: (t,t'))
-                                      :@: (Bound i) :@: x :@: y)
+     replaceType $ renamedValidType1 1 (bTypeVar v S.<| btc) ftc op te t
+     modifyTerm $ addHT (\x -> EUnpack v () (LVar $ Bound i) x)
+elimComm i t (RenamedType s [t1,t2])
+  | s == and_id =
+      do replaceType (Fun t1 (Fun t2 t))
+         modifyTerm $ addHT (\x -> ((LVar $ Free "elim_and")
+                                     :!: t1 :!: t2 :!: t)
+                                   :@: (LVar $ Bound i) :@: x)
+  | s == or_id =
+      do newSubProofs 2 [ Just (Fun t1 t)
+                        , Just (Fun t2 t) ]
+         modifyTerm $ addDHT (\x y -> ((LVar $ Free "elim_or")
+                                        :!: t1 :!: t2 :!: t)
+                                      :@: (LVar $ Bound i) :@: x :@: y)
   | otherwise =
       throw ElimE1
-elimComm i t (RenameTy _ _ [], RenameTTy n [])
-  | n == bottom_code =
+elimComm i t (RenamedType s [])
+  | s == bottom_id =
       do endSubProof
-         modifyTerm $ simplify $ (Free "elim_bottom") :!: t :@: (Bound i)
+         modifyTerm $ simplify $ (LVar $ Free "elim_bottom") :!: t :@: (LVar $ Bound i)
   | otherwise =
       throw ElimE1
 elimComm _ _ _ = throw ElimE1
@@ -251,61 +253,61 @@ elimComm _ _ _ = throw ElimE1
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando APPLY
 
-applyComm :: Int -> (Type, TType) -> (Type, TType) -> Proof ()
-applyComm i x ht@(Fun _ _, TFun _ _) = 
+applyComm :: Int -> DoubleType -> DoubleType -> Proof ()
+applyComm i x ht@(Fun _ _) = 
   do n <- compareTypes ht x
      evaluateSubProof n $ getTypesFun n ht
      modifyTerm $ getApplyTermFun n i
-applyComm i x ht@(ForAll _ _, TForAll _) =
-  do let equal = snd ht == snd x
-     let (ft, n) = getNestedTypeForAll equal (snd ht)
+applyComm i x ht@(ForAll _ _) =
+  do let equal = ht == x
+     let (ft, n) = getNestedTypeForAll equal ht
      r <- eitherToProof $ unification equal n ft x
      let m = n - M.size r
      evaluateSubProof m $ getTypesForAll m
-     modifyTerm $ getApplyTermForAll n r (Bound i)
-applyComm i (t1, t1') (t, t')
-  | t' == t1' = do evaluateSubProof 0 []
-                   modifyTerm $ simplify (Bound i)
-  | otherwise = throw $ ApplyE1 t t1
+     modifyTerm $ getApplyTermForAll n r (LVar $ Bound i)
+applyComm i x t
+  | t == x = do evaluateSubProof 0 []
+                modifyTerm $ simplify (LVar $ Bound i)
+  | otherwise = throw $ ApplyE1 t x
   
 
 -- Funciones auxiliares para la función applyComm'
 
-compareTypes :: (Type, TType) -> (Type, TType) -> Proof Int
-compareTypes x@(_,t') y@(_,t)
- | t' == t = return 0
+compareTypes :: DoubleType -> DoubleType -> Proof Int
+compareTypes x y
+ | x == y = return 0
  | otherwise =  compareTypes' x y
 
-compareTypes' :: (Type, TType) -> (Type, TType) -> Proof Int
-compareTypes' (Fun _ y1, TFun _ y1') t
-  | y1' == snd t = return 1
-  | otherwise = do n <- compareTypes' (y1, y1') t
+compareTypes' :: DoubleType -> DoubleType -> Proof Int
+compareTypes' (Fun _ x) t
+  | x == t = return 1
+  | otherwise = do n <- compareTypes' x t
                    return $ n + 1
-compareTypes' (x, _) (y, _) = throw $ ApplyE1 x y
+compareTypes' x y = throw $ ApplyE1 x y
 
 
-getTypesFun :: Int -> (Type, TType) -> [Maybe (Type, TType)]
-getTypesFun n (Fun t1 t2, TFun t1' t2')
-  | n > 0 = Just (t1,t1') : getTypesFun (n-1) (t2, t2')
+getTypesFun :: Int -> DoubleType -> [Maybe DoubleType]
+getTypesFun n (Fun t1 t2)
+  | n > 0 = Just t1 : getTypesFun (n-1) t2
   | otherwise = error "error: getTypesFun, no debería pasar 1."
 getTypesFun 0 _ = []
 getTypesFun _ _ = error $ "error: getTypesFun, no debería pasar 2."
 
 
-getNestedTypeForAll :: Bool -> TType -> (TType, Int)
+getNestedTypeForAll :: Bool -> DoubleType -> (DoubleType, Int)
 getNestedTypeForAll flag x
   | flag = (x, 0)
   | otherwise = getNestedTypeForAll' x
 
-getNestedTypeForAll' :: TType -> (TType, Int)
-getNestedTypeForAll' (TForAll x) = let (f, n) = getNestedTypeForAll' x
-                                   in (f, n+1)
+getNestedTypeForAll' :: DoubleType -> (DoubleType, Int)
+getNestedTypeForAll' (ForAll _ x) = let (f, n) = getNestedTypeForAll' x
+                                    in (f, n+1)
 getNestedTypeForAll' x = (x,0)
 
-getApplyTermFun :: Int -> Int -> [SpecialTerm] -> [SpecialTerm]
-getApplyTermFun 0 i ts = simplify (Bound i) ts
-getApplyTermFun 1 i ts = addHT (\x -> (Bound i) :@: x) ts
-getApplyTermFun 2 i ts = addDHT (\x y -> ((Bound i) :@: x) :@: y) ts
+getApplyTermFun :: Int -> Int -> [LTermHoles] -> [LTermHoles]
+getApplyTermFun 0 i ts = simplify (LVar $ Bound i) ts
+getApplyTermFun 1 i ts = addHT (\x -> (LVar $ Bound i) :@: x) ts
+getApplyTermFun 2 i ts = addDHT (\x y -> ((LVar $ Bound i) :@: x) :@: y) ts
 getApplyTermFun n i ts = getApplyTermFun (n-1) i $ addDHT (\x y -> x :@: y) ts
 
 
@@ -315,28 +317,28 @@ repeatElem n x
   | n > 0 = x : repeatElem (n-1) x
   | otherwise = error "error: repeatElem, no debería pasar."
 
-getTypesForAll :: Int -> [Maybe (Type, TType)]
+getTypesForAll :: Int -> [Maybe DoubleType]
 getTypesForAll m = repeatElem m Nothing
 
-getApplyTermForAll :: Int -> M.Map Int (Type, TType) -> Term -> [SpecialTerm] -> [SpecialTerm]
+getApplyTermForAll :: Int -> M.Map Int DoubleType -> LTerm2 -> [LTermHoles] -> [LTermHoles]
 getApplyTermForAll n sust t ts = case termForAll n t sust of
-                                  Term x -> simplify x ts
-                                  TypeH x -> TypeH x : ts
-                                  _ -> error "error: getApplyTermForAll, no debería pasar"
+                                   LamTe x -> simplify x ts
+                                   TypeHo x -> TypeHo x : ts
+                                   _ -> error "error: getApplyTermForAll, no debería pasar"
 
 
-termForAll :: Int -> Term -> M.Map Int (Type, TType) -> SpecialTerm
+termForAll :: Int -> LTerm2 -> M.Map Int DoubleType -> LTermHoles
 termForAll n t sust
-  | n == 0 = Term t
-  | n > 0 = termForAll' 0 (n-1) (Term t) sust
+  | n == 0 = LamTe t
+  | n > 0 = termForAll' 0 (n-1) (LamTe t) sust
   | otherwise = error "error: termForAll, no deberia pasar."
 
-termForAll' :: Int -> Int -> SpecialTerm -> M.Map Int (Type, TType)  -> SpecialTerm
+termForAll' :: Int -> Int -> LTermHoles -> M.Map Int DoubleType  -> LTermHoles
 termForAll' n m t sust
   | n < 0 = error "error: termForAll', no deberia pasar."
   | otherwise =
     case M.lookup n sust of
-      Nothing ->let tt = TypeH $ addTypeHole t
+      Nothing ->let tt = TypeHo $ addTypeHole t
                 in if n == m
                    then tt
                    else termForAll' (n+1) m tt sust
@@ -348,21 +350,21 @@ termForAll' n m t sust
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando EXACT
 
-exactType :: (Type, TType) -> Proof ()
+exactType :: DoubleType -> Proof ()
 exactType ty =
   endSubProof >>
   (modifyTerm $ simplifyTypeInTerm ty)
 
-exactTerm :: (LamTerm, Term) -> (Type, TType) -> Proof ()
-exactTerm te (tt, tt') =
+exactTerm :: DoubleLTerm -> DoubleType -> Proof ()
+exactTerm te tt =
   do c <- getTermContext
      teo <- getTheorems
      q <- getTBTypeVars
      op <- getUsrOpers
-     (_,t') <- eitherToProof $ typeInference q c teo op te
-     unless (t' == tt') $ throw $ ExactE1 tt
+     t <- eitherToProof $ typeInference q c teo op te
+     unless (t == tt) $ throw $ ExactE1 tt
      endSubProof
-     modifyTerm $ simplify (snd te)
+     modifyTerm $ simplify $ toNoName te
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando UNFOLD
@@ -370,35 +372,37 @@ exactTerm te (tt, tt') =
 -- Argumentos:
 -- 1. Contexto de variables de tipos ligadas.
 -- 2. Contexto de variables de tipos libres.
--- 3. Código de la operación a "unfoldear".
--- 4. Tipo (con y sin nombre) sobre el que se aplica el unfold.
--- 5. Tipo (con y sin nombre) que define al operador foldeado (sin los para todos).
+-- 3. Operaciones "foldeables".
+-- 4. Teoremas.
+-- 5. Nombre de la operación a "unfoldear".
+-- 6. Tipo sobre el que se aplica el unfold.
+-- 7. Tipo que define al operador foldeado (sin los para todos).
 unfoldComm :: BTypeContext -> FTypeContext -> FOperations -> Theorems
-           -> Int -> (Type, TType) -> (Type, TType) -> (Type, TType)
-unfoldComm _ _ _ _ _ t@(B _, _) _ = t
-unfoldComm btc ftc op te code (RenameTy s l ts, RenameTTy m ts') body
-  | m == code = typeSubs l btc ftc op te body mapUnfoldComm
-  | otherwise = let (xs, ys) = unzip mapUnfoldComm
-                in (RenameTy s l xs, RenameTTy m ys)
-    where mapUnfoldComm = map (\x -> unfoldComm btc ftc op te code x body) $ zip ts ts'
-unfoldComm btc ftc op te code (Fun t t', TFun tt tt') body =
-  let (t1,t1') = unfoldComm btc ftc op te code (t,tt) body 
-      (t2,t2') = unfoldComm btc ftc op te code (t',tt') body
-  in (Fun t1 t2, TFun t1' t2')
-unfoldComm btc ftc op te code (ForAll v t, TForAll t') body =
-  let (t1, t1') = unfoldComm (bTypeVar v S.<| btc) ftc op te code (t,t') body
-  in (ForAll v t1, TForAll t1')
-unfoldComm btc ftc op te code (Exists v t, TExists t') body =
-  let (t1, t1') = unfoldComm (bTypeVar v S.<| btc) ftc op te code (t,t') body
-  in (Exists v t1, TExists t1')
+           -> String -> DoubleType -> DoubleType -> DoubleType
+unfoldComm _ _ _ _ _ t@(TVar _) _ = t
+unfoldComm btc ftc op te oper (RenamedType s ts) body
+  | s == oper = typeSubs (length ts) btc ftc op te body mapUnfoldComm
+  | otherwise = let xs = mapUnfoldComm
+                in RenamedType s xs
+    where mapUnfoldComm = map (\x -> unfoldComm btc ftc op te oper x body) ts
+unfoldComm btc ftc op te oper (Fun t t') body =
+  let t1 = unfoldComm btc ftc op te oper t body 
+      t2 = unfoldComm btc ftc op te oper t' body
+  in Fun t1 t2
+unfoldComm btc ftc op te oper (ForAll v t) body =
+  let t' = unfoldComm (bTypeVar v S.<| btc) ftc op te oper t body
+  in (ForAll v t')
+unfoldComm btc ftc op te oper (Exists v t) body =
+  let t' = unfoldComm (bTypeVar v S.<| btc) ftc op te oper t body
+  in (Exists v t')
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Funciones auxiliares de "habitar".
 
--- Obtiene el tipo de la variable de término, renombrando su tipo sin nombres, de acuerdo
+-- Obtiene el tipo de la variable de término, renombrando su tipo sin nombre, de acuerdo
 -- a la profundidad dada por el 1º argumento.
-getTypeVar :: Int -> TermVarWithType -> (Type, TType)
-getTypeVar n (_,m, t, t') = (t, positiveShift (n-m) t')
+getTypeVar :: Int -> TermVarWithType -> DoubleType
+getTypeVar n (_,m, t) = positiveShift (n-m) t
 
 maybeToProof :: ProofExceptions -> Maybe a -> Proof a
 maybeToProof excep Nothing = throw excep

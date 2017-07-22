@@ -48,7 +48,7 @@ typeInference' n c te op (e1 :@: e2) =
      case tt1 of
        Fun t1 t2 ->
          do tt2 <- typeInference' n c te op e2
-            if equalTypes op tt2 t1
+            if fullEqualTypes op tt2 t1
               then return t2
               else throw $ InferE2 e2 t1
        _ -> throw $ InferE3 e1 "* -> *"
@@ -64,7 +64,7 @@ typeInference' n c te op (e :!: t) =
 typeInference' n c te op (EPack t1 e t@(Exists _ t2)) =
   do tt1' <- typeInference' n c te op e
      let tt2 = basicTypeSubs t2 t1
-     if equalTypes op tt1' tt2
+     if fullEqualTypes op tt1' tt2
        then return t
        else throw $ InferE2 e tt2
 typeInference' n c te op (EUnpack _ _ e1 e2) =
@@ -78,43 +78,29 @@ typeInference' n c te op (EUnpack _ _ e1 e2) =
        _ -> throw $ InferE3 e1 "exists *"
 typeInference' n c te op (e ::: t) =
   do t' <- typeInference' n c te op e
-     if equalTypes op t' t
+     if fullEqualTypes op t' t
        then return t
        else throw $ InferE2 e t
 
 
 -- Compara los tipos sin nombres, extiende las operaciones "foldeables".
-equalTypes :: FOperations -> DoubleType -> DoubleType -> Bool
-equalTypes op (Fun t1 t2) (Fun t1' t2') = equalTypes op t1 t1' && equalTypes op t2 t2'
-equalTypes op (ForAll _ t) (ForAll _ t') = equalTypes op t t'
-equalTypes op (Exists _ t) (Exists _ t') = equalTypes op t t'
-equalTypes op (RenamedType s xs) (RenamedType s' ys)
+fullEqualTypes :: FOperations -> DoubleType -> DoubleType -> Bool
+fullEqualTypes op (Fun t1 t2) (Fun t1' t2') = fullEqualTypes op t1 t1' && fullEqualTypes op t2 t2'
+fullEqualTypes op (ForAll _ t) (ForAll _ t') = fullEqualTypes op t t'
+fullEqualTypes op (Exists _ t) (Exists _ t') = fullEqualTypes op t t'
+fullEqualTypes op (RenamedType s xs) (RenamedType s' ys)
   | s == s' = aux xs ys
   | otherwise = False
   where aux [] [] = True
-        aux (x:xs) (y:ys) = if equalTypes op x y
+        aux (x:xs) (y:ys) = if fullEqualTypes op x y
                             then aux xs ys
                             else False
-equalTypes op (RenamedType s xs) t =
+fullEqualTypes op (RenamedType s xs) t =
   case find (\(a,_,_,_) -> a == s) op of
-    Just (_,tt,args,_)-> equalTypes op (typeSubsNoRename args tt xs) t
-    Nothing -> error "error: equalTypes, no debería pasar."
-equalTypes op t (RenamedType s ys) =
+    Just (_,tt,args,_)-> fullEqualTypes op (typeSubsNoRename args tt xs) t
+    Nothing -> error "error: fullEqualTypes, no debería pasar."
+fullEqualTypes op t (RenamedType s ys) =
   case find (\(a,_,_,_) -> a == s) op of
-    Just (_,tt,args,_)-> equalTypes op t (typeSubsNoRename args tt ys)
-    Nothing -> error "error: equalTypes, no debería pasar."    
-equalTypes _ t1 t2 = basicEqualTypes t1 t2
-
-basicEqualTypes :: DoubleType -> DoubleType -> Bool
-basicEqualTypes (TVar (_, x)) (TVar (_, y)) = x == y
-basicEqualTypes (Fun t1 t2) (Fun t1' t2') = basicEqualTypes t1 t1' && basicEqualTypes t2 t2'
-basicEqualTypes (ForAll _ t) (ForAll _ t') = basicEqualTypes t t'
-basicEqualTypes (Exists _ t) (Exists _ t') = basicEqualTypes t t'
-basicEqualTypes (RenamedType s xs) (RenamedType s' ys)
-  | s == s' = aux xs ys
-  | otherwise = False
-  where aux [] [] = True
-        aux (x:xs) (y:ys) = if basicEqualTypes x y
-                            then aux xs ys
-                            else False
-basicEqualTypes _ _ = False
+    Just (_,tt,args,_)-> fullEqualTypes op t (typeSubsNoRename args tt ys)
+    Nothing -> error "error: fullEqualTypes, no debería pasar."    
+fullEqualTypes _ t1 t2 = t1 == t2

@@ -3,7 +3,6 @@ module TypeUnification where
 import Common
 import Transformers (positiveShift, negativeShift)
 import qualified Data.Map.Strict as M (Map, lookup, insert, empty, size)
-import TypeInference (basicEqualTypes)
 
 -- Algoritmo de unificación para el comando APPLY.
 unification :: Bool -> Int -> DoubleType -> DoubleType
@@ -28,14 +27,14 @@ unif pos n sust t@(TVar (_, Bound i)) tt
          Nothing -> maybe (throw Unif1)
                     (\s -> return $ M.insert k s sust)
                     (negativeShift pos tt)
-         Just s -> if basicEqualTypes (positiveShift pos s) tt
+         Just s -> if positiveShift pos s == tt
                    then return sust
                    else throw Unif1
-  | i < pos = if basicEqualTypes t tt
+  | i < pos = if t == tt
               then return sust
               else throw Unif2
   | otherwise = maybe (throw Unif1)
-                (\t' -> if basicEqualTypes t' tt
+                (\t' -> if t' == tt
                         then return sust
                         else throw Unif2)
                 (negativeShift n t)  -- Probar este caso

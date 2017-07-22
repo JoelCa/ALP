@@ -2,7 +2,7 @@ module ErrorMsj where
 
 import Common
 import Text.PrettyPrint.HughesPJ (render)
-import PrettyPrinter (printType, printLamTerm)
+import PrettyPrinter (printType, printLTerm)
 import Hypothesis (printHypothesis)
 
 -- Mensajes de error.
@@ -41,7 +41,7 @@ errorMessage _ PSE = "error: operación sobre el estado interno inválida."
 errorMessage _ (TypeE x) =  "error: el tipo \"" ++ x ++ "\" no fue declarado."
 errorMessage op (InferE te e) =
   "error: en el término \"" ++
-  render (printLamTerm op te) ++
+  render (printLTerm op te) ++
   "\".\n" ++
   errorInfer op e
 errorMessage _ (UnfoldE1 s) =  "error: " ++ s ++ " no es un operador foldeable."
@@ -57,10 +57,10 @@ errorInfer op (InferE3 te s) =
   errorInfer' op te s
 errorInfer op (InferE4 te) =
   "error: tipo inesperado, en el término \""
-  ++ render (printLamTerm op te) ++ "\"."
+  ++ render (printLTerm op te) ++ "\"."
 
-errorInfer' :: FOperations -> LamTerm -> String -> String
+errorInfer' :: FOperations -> DoubleLTerm -> String -> String
 errorInfer' op te s =
   "Se esperaba el tipo \"" ++ s ++
   "\", en el término \"" ++
-  render (printLamTerm op te) ++ "\"."
+  render (printLTerm op te) ++ "\"."

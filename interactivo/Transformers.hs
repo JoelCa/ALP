@@ -41,7 +41,7 @@ renamedType3 bs ftc op te = renamedType (id, id, bs, bs) ftc op (theoremsNames t
 
 
 -- Obtiene el tipo renombrado, y sin nombre, de su 5º arg.
-renamedType :: (a -> TypeVar, TypeVar -> a, S.Seq a, S.Seq a) -> S.Seq TypeVar
+renamedType :: (a -> TypeVar, TypeVar -> a, S.Seq a, S.Seq a) -> FTypeContext
             -> FOperations -> [String] -> Type1 -> Either ProofExceptions DoubleType
 renamedType (f, _, rs, bs) fs op _ (TVar x) =
   getVarType (\_ zs m -> f $ S.index zs m) (f, rs, bs) fs op x
@@ -60,8 +60,12 @@ renamedType frbs fs op tn (Fun t1 t2) =
 renamedType frbs fs op tn (RenamedType s ts) =
   getOpType op s ts $ renamedType frbs fs op tn
 
+basicTypeWithoutName :: FTypeContext -> FOperations -> Type1
+                     -> Either ProofExceptions DoubleType
+basicTypeWithoutName = typeWithoutName (id, id, S.empty)
+
 -- Obtiene el tipo sin nombre de su 4º arg.
-typeWithoutName :: (a -> TypeVar, TypeVar -> a, S.Seq a) -> S.Seq TypeVar
+typeWithoutName :: (a -> TypeVar, TypeVar -> a, S.Seq a) -> FTypeContext
                 -> FOperations -> Type1 -> Either ProofExceptions DoubleType
 typeWithoutName (f, _, bs) fs op (TVar x) =
   case S.findIndexL (\w -> f w == x) bs of
@@ -333,3 +337,13 @@ positiveShift' m n (ForAll v t) = ForAll v $ positiveShift' (m+1) n t
 positiveShift' m n (Exists v t) = Exists v $ positiveShift' (m+1) n t
 positiveShift' m n (Fun t1 t2) = Fun (positiveShift' m n t1) (positiveShift' m n t2)
 positiveShift' m n (RenamedType op ts) = RenamedType op $ map (positiveShift' m n) ts
+
+toNoName :: DoubleLTerm -> LTerm2
+toNoName (LVar (_, x)) = LVar x
+toNoName (Abs _ t e) = Abs () t (toNoName e)
+toNoName (BAbs t e) = BAbs t (toNoName e)
+toNoName (x :@: y) = toNoName x :@: toNoName y
+toNoName (e :!: t) = toNoName e :!: t
+toNoName (EPack t1 e t2) = EPack t1 (toNoName e) t1
+toNoName (EUnpack v _ e1 e2) = EUnpack v () (toNoName e1) (toNoName e2)
+toNoName (e ::: t) = toNoName e ::: t

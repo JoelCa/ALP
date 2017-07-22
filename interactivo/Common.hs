@@ -27,15 +27,33 @@ type Type1 = Type TypeVar TypeVar
   -- Tipo sin nombre
 type Type2 = Type () (VarName TypeVar)
 
+type DoubleTypeVar = (TypeVar, VarName TypeVar)
+
   -- Tipo con y sin nombre.
-type DoubleType = Type TypeVar (TypeVar, VarName TypeVar)
+type DoubleType = Type TypeVar DoubleTypeVar
+
 
 data Type a b = TVar b
               | Fun (Type a b) (Type a b)
               | ForAll a (Type a b)
               | Exists a (Type a b)
               | RenamedType a [Type a b]
-              deriving (Show, Eq)
+              deriving (Show)
+
+instance Eq (DoubleType) where
+  (TVar (_,x)) == (TVar (_,y)) = x == y
+  (Fun t1 t2) == (Fun t1' t2') = t1 == t1' &&  t2 == t2'
+  (ForAll _ t) == (ForAll _ t') = t == t'
+  (Exists _ t) == (Exists _ t') = t == t'
+  (RenamedType s xs) == (RenamedType s' ys) =
+    if s == s'
+    then aux xs ys
+    else False
+    where aux [] [] = True
+          aux (x:xs) (y:ys) = if x == y
+                              then aux xs ys
+                              else False
+  _ == _ = False
 
   -- Lambda término con nombre, y tipos con nombres.
 type LTerm1 = LamTerm TermVar TermVar Type1
@@ -115,11 +133,11 @@ data ExactB = LamT LTerm1
   -- Excepciones.
 data ProofExceptions = PNotFinished | PNotStarted | ExistE String
                      | NotExistE String | SyntaxE String | AssuE
-                     | IntroE1 | ApplyE1 Type1 Type1 | HypoE Int
+                     | IntroE1 | ApplyE1 DoubleType DoubleType | HypoE Int
                      | Unif1 | Unif2 | Unif3 | Unif4
                      | ElimE1 | CommandInvalid | TypeRepeated String
-                     | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 Type1
-                     | ExactE2 Type1 | ExactE3 | PSE | EmptyType | TypeE String
+                     | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 DoubleType
+                     | ExactE2 DoubleType | ExactE3 | PSE | EmptyType | TypeE String
                      | InferE DoubleLTerm InferExceptions | UnfoldE1 String
                      deriving (Show, Typeable)
 
@@ -205,6 +223,3 @@ maybeToEither _ (Just normalval) = return normalval
 
 fst4 :: (a, b, c, d) -> a
 fst4 (x, _, _, _) = x
-
--- getElemIndex :: (a -> Bool) -> Seq a -> Maybe (Int, a)
--- getElemIndex f xs = foldlWithIndex (\r i x -> if f x then Just (i, x) else r) Nothing xs

@@ -7,7 +7,7 @@ import qualified Data.Sequence as S
 import Tactics (habitar)
 import Parser (reservedWords, getCommand, usrInfixParser, getParser)
 import Text.PrettyPrint.HughesPJ (render)
-import PrettyPrinter (printTerm, printProof, printType, printLamTerm)
+import PrettyPrinter (printLTermNoName, printProof, printType)
 import Transformers
 import ErrorMsj (errorMessage)
 import TypeInference (basicTypeInference)
@@ -66,8 +66,9 @@ checkCommand (Ty name ty) =
      when (proofStarted s) (throwIO PNotFinished)
      let g = global s
      when (invalidName name g) (throwIO $ ExistE name)
-     (tyr,tty) <- returnInput $ renamedType1 (fTypeContext g) (opers g) (theorems g) ty
-     lift $ modify $ newProof name (ty,tty) (tyr,tty)
+     tyr <- returnInput $ renamedType1 (fTypeContext g) (opers g) (theorems g) ty
+     ty' <- returnInput $ basicTypeWithoutName (fTypeContext g) (opers g) ty
+     lift $ modify $ newProof name ty' tyr
      s' <- lift get
      outputStrLn $ renderProof $ getProofC s'
      prover                          
@@ -94,10 +95,10 @@ checkCommand (Ta (Print x)) =
 checkCommand (Ta (Infer x)) =
   do s <- lift get
      let g = global s
-     (te,te') <- returnInput $ basicWithoutName (opers g) (fTypeContext g) (theorems g) x
+     te <- returnInput $ basicWithoutName (opers g) (fTypeContext g) (theorems g) x
      --outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
-     (ty,ty') <- returnInput $ basicTypeInference (theorems g) (opers g) (te,te')
-     --outputStrLn $ "Renombramiento: " ++ (render $ printTerm (opers $ global s) te')
+     ty <- returnInput $ basicTypeInference (theorems g) (opers g) te
+     --outputStrLn $ "Renombramiento: " ++ (render $ printLTermNoName (opers $ global s) te')
      --outputStrLn $ renderNoNameLTerm op te'
      outputStrLn $ renderType (opers g) ty
      prover                            
@@ -143,18 +144,18 @@ defCommand name (Ambiguous ap) =
             lamTermDefinition name te
 
 -- Función auxiliar de defCommand
-typeDefinition :: String -> (Type, TType) -> Int -> Bool -> ProverInputState ()
+typeDefinition :: String -> DoubleType -> Int -> Bool -> ProverInputState ()
 typeDefinition name t n isInfix =
   do lift $ modify $ modifyGlobal $ addOperator (name, t, n, isInfix)
      when isInfix $ lift $ modify $ modifyUsrParser $ usrInfixParser name . getParser
 
 -- Función auxiliar de defCommand
-lamTermDefinition :: String -> (LamTerm, Term) -> ProverInputState ()
+lamTermDefinition :: String -> DoubleLTerm -> ProverInputState ()
 lamTermDefinition name te =
   do s <- lift get
      let glo = global s
      ty <- returnInput $ basicTypeInference (theorems glo) (opers glo) te
-     lift $ modify $ newTheorem name (snd te ::: ty)
+     lift $ modify $ newTheorem name (toNoName te ::: ty)
 
 -- Función auxiliar del comando "Props/Types".
 typeRepeated :: S.Seq TypeVar -> (String -> Bool) -> (Maybe String, Maybe String)
@@ -170,15 +171,15 @@ typeRepeated ps f
                             
 
 -- Impresión de lambda término sin nombre, y tipos con nombres.
-renderNoNameLTerm :: FOperations -> Term -> String
-renderNoNameLTerm op = render . printTerm op
+renderNoNameLTerm :: FOperations -> LTerm2 -> String
+renderNoNameLTerm op = render . printLTermNoName op
 
 -- Impresión de lambda término con nombre, y tipos con nombres.
-renderLTerm :: FOperations -> LamTerm -> String
-renderLTerm op  = render . printLamTerm op
+-- renderLTerm :: FOperations -> LamTerm -> String
+-- renderLTerm op  = render . printLamTerm op
 
 -- Impresión de tipo con nombre.
-renderType :: FOperations -> Type -> String
+renderType :: FOperations -> DoubleType -> String
 renderType op = render . printType op
 
 -- Impresión de la prueba en construcción

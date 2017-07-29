@@ -12,7 +12,7 @@ import Control.Monad.State.Lazy
 import Text.Megaparsec
 import Control.Monad.Reader (Reader)
 import Data.Sequence (Seq, foldlWithIndex)
-  
+
 type TermVar = String
 
 type TypeVar = String
@@ -23,9 +23,6 @@ data VarName a = Free a
 
   -- Tipo con nombre.
 type Type1 = Type TypeVar TypeVar
-
-  -- Tipo sin nombre
-type Type2 = Type () (VarName TypeVar)
 
 type DoubleTypeVar = (TypeVar, VarName TypeVar)
 
@@ -90,7 +87,6 @@ type BTypeVar = (Int, TypeVar)
 
   -- Secuencia de variables de tipo ligadas.
 type BTypeContext = Seq BTypeVar
-
 
 type FTypeVar = TypeVar
 
@@ -171,12 +167,6 @@ type FOperations = Seq FoldeableOp
 
 getNumArgs :: FoldeableOp -> Operands
 getNumArgs (_,_,n,_) = n
-
-fst3 :: (a, b, c) -> a
-fst3 (x, _, _) = x
-
-snd3 :: (a, b, c) -> b
-snd3 (_, x, _) = x
 
 
   -- Instancias.

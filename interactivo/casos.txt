@@ -130,7 +130,7 @@ NO se probo. Para chequear definición de operadores.
 Para chequear el renombre de variables ligadas.
 - Theorem t51: forall w, forall w, w -> w.
 Lo resuelvo con: intro; exact (\h.\x:h.x).
-Para probar el exact, y el Checkidor.
+Para probar el exact, y el Chequeador.
 - (Props p, q.)
   op x = forall q, x -> q.
   Theorem t52: forall q, op q.

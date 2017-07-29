@@ -393,3 +393,6 @@ printBTypeVar (_,x) = text x
 
 getElemIndex :: (a -> Bool) -> S.Seq a -> Maybe (Int, a)
 getElemIndex f xs = S.foldlWithIndex (\r i x -> if f x then Just (i, x) else r) Nothing xs
+
+fst3 :: (a, b, c) -> a
+fst3 (x, _, _) = x

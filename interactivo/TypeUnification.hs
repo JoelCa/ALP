@@ -18,8 +18,9 @@ unification False n = unif 0 n M.empty
 -- Osea, si c1 < c2 => [t1/v1]..[t2/v2] (donde v1 y v2, son las variables con nombres de las variables sin nombres).
 -- 4. El tipo al que se le halla la unificación (sin los "para todos" externos).
 -- 5. El tipo con el debe unificar el tipo dado en el 4º arg.
-unif :: Int -> Int -> M.Map Int DoubleType -> DoubleType -> DoubleType ->
-  Either ProofExceptions (M.Map Int DoubleType)
+unif :: Int -> Int -> M.Map Int DoubleType
+     -> DoubleType -> DoubleType
+     -> Either ProofExceptions (M.Map Int DoubleType)
 unif pos n sust t@(TVar (_, Bound i)) tt
   | (pos <= i) && (i < n) =
     let k = n - 1 - i

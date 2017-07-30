@@ -82,10 +82,25 @@ symbolIdent = (lexeme . try) (p >>= check)
                 else return x
 
 
+hola = do result <- runParserT parserHola "hola.v" <$> readFile "hola.v"
+          case runReader result basicInfixParser of
+            Right x -> putStrLn $ show $ x
+            Left e -> putStrLn $ parseErrorPretty e
+
+parserHola = do result <- many $ double getPosition (space *> exprTy)
+                eof
+                return result
+
+double :: Monad m => m a -> m b -> m (a,b)
+double p1 p2 = do x <- p1
+                  y <- p2
+                  return (x, y)
+          
+
 getCommand :: String -> UsrParser -> ProofCommand
-getCommand s p = case runReader (runParserT (space *> exprTy) "" s) p of
-                   Right x -> Right x
-                   Left e -> Left $ SyntaxE $ parseErrorPretty e
+getCommand s p = case runReader (runParserT (space *> exprTy <* eof) "" s) p of
+                      Right x -> Right x
+                      Left e -> Left $ SyntaxE $ parseErrorPretty e
 
 testeo :: Show a => Parser a -> String -> IO ()
 testeo p s = case runReader (runParserT p "" s) (PP unit4) of
@@ -109,6 +124,21 @@ exprTy = do rword "Theorem"
                 return $ Ta tac
          <|> do (name, def) <- definition
                 return $ Definition name def
+         <|> do string ":quit" <|> string ":q"
+                return $ Escaped Exit
+         <|> do string ":reset" <|> string ":r"
+                return $ Escaped Reset
+         <|> do string ":load" <|> string ":l"
+                spaceChar
+                name <- fileName
+                return $ Escaped $ Load name
+
+fileName :: Parser String
+fileName = do name <- many $ satisfy (\x -> x /= '.')
+              (do string ".pr"
+                  return $ name ++ ".pr"
+               <|> return (name ++ ".pr"))
+              
 
 --------------------------------------------------------------------------------------
 -- Parser del lambda término con nombre.

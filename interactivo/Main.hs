@@ -5,7 +5,7 @@ import Data.Maybe
 import Data.List (isPrefixOf)
 import qualified Data.Sequence as S
 import Tactics (habitar)
-import Parser (reservedWords, getCommand, usrInfixParser, getParser)
+import Parser (hola, reservedWords, getCommand, usrInfixParser, getParser) --SACAR HOLA
 import Text.PrettyPrint.HughesPJ (render)
 import PrettyPrinter (printLTermNoName, printProof, printType)
 import Transformers
@@ -49,9 +49,6 @@ prover = do s <- lift get
             minput <- getInputLine $ prompt s
             case minput of
               Nothing -> return ()
-              Just "-quit" -> do outputStrLn "Saliendo."
-                                 return ()
-              Just "-r" -> resetProof >> prover
               Just "" -> prover
               Just x -> catch (do command <- returnInput $ getCommand x (infixParser s)
                                   checkCommand command)
@@ -114,6 +111,12 @@ checkCommand (Ta ta) =
               ++ renderNoNameLTerm (opers $ global s) (getLTermFromProof pc' typ))
              >> reloadProver)
        else outputStrLn $ renderProof pc'
+     prover
+checkCommand (Escaped Exit) = outputStrLn "Saliendo."
+checkCommand (Escaped Reset) = resetProof >> prover
+checkCommand (Escaped (Load file)) =
+  do outputStrLn $ "File: " ++ file ++ "\n"
+     lift $ lift $ hola --TERMINAR
      prover
 
 -- Trata el comando de definición.

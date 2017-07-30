@@ -99,7 +99,13 @@ data Command = Ty String Type1
              | Ta Tactic
              | Types (Seq TypeVar)
              | Definition String BodyDef
+             | Escaped ECommand
              deriving (Show)
+
+data ECommand = Exit
+              | Reset
+              | Load String
+              deriving (Show)
 
 data BodyDef = LTerm LTerm1
              | Type TypeDefinition

@@ -9,7 +9,7 @@ import System.Console.Haskeline.MonadException (Exception)
 import Data.Map (Map)
 import Control.Monad (ap, liftM)
 import Control.Monad.State.Lazy
-import Text.Megaparsec
+import Text.Megaparsec (ParseError, Dec)
 import Control.Monad.Reader (Reader)
 import Data.Sequence (Seq, foldlWithIndex)
 
@@ -94,13 +94,16 @@ type FTypeVar = TypeVar
 type FTypeContext = Seq FTypeVar
 
 
-  --Comandos.
+  --Comandos del lenguaje.
 data Command = Ty String Type1
              | Ta Tactic
              | Types (Seq TypeVar)
              | Definition String BodyDef
-             | Escaped ECommand
              deriving (Show)
+
+-- Comandos de la línea de comandos
+data CLICommand = Escaped ECommand
+                | Lang Command
 
 data ECommand = Exit
               | Reset
@@ -134,13 +137,14 @@ data ExactB = LamT LTerm1
 
   -- Excepciones.
 data ProofExceptions = PNotFinished | PNotStarted | ExistE String
-                     | NotExistE String | SyntaxE String | AssuE
+                     | NotExistE String | SyntaxE (ParseError Char Dec) | AssuE
                      | IntroE1 | ApplyE1 DoubleType DoubleType | HypoE Int
                      | Unif1 | Unif2 | Unif3 | Unif4
                      | ElimE1 | CommandInvalid | TypeRepeated String
                      | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 DoubleType
                      | ExactE2 DoubleType | ExactE3 | PSE | EmptyType | TypeE String
                      | InferE DoubleLTerm InferExceptions | UnfoldE1 String
+                     | FileE IOError
                      deriving (Show, Typeable)
 
 data InferExceptions = InferE1 String | InferE2 DoubleLTerm DoubleType

@@ -4,10 +4,13 @@ import Common
 import Text.PrettyPrint.HughesPJ (render)
 import PrettyPrinter (printType, printLTerm)
 import Hypothesis (printHypothesis)
+import Text.Megaparsec (parseErrorPretty)
 
 -- Mensajes de error.
 errorMessage :: FOperations -> ProofExceptions -> String
-errorMessage _ (SyntaxE e) = "error de sintaxis.\n" ++ e
+errorMessage _ (SyntaxE e) = "error de sintaxis.\n" ++
+                             parseErrorPretty e
+errorMessage _ (FileE e) = show e
 errorMessage _ PNotFinished = "error: prueba no terminada."
 errorMessage _ PNotStarted = "error: prueba no comenzada."
 errorMessage _ (ExistE s) = "error: \""++ s ++"\" ya existe."

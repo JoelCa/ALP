@@ -120,9 +120,11 @@ Qed.
 *)
 
 (* Casos para chequear la precedencia. *)
-Variables p q r t g w: Prop.
+Variables p q r t
+ g w: Prop.
 
-Theorem k: p -> q -> p /\ q /\ p /\ p -> q.
+Theorem k: p -> q -> 
+p /\ q /\ p /\ p -> q.
 
 Theorem k2: ~ (p /\ ~(q  -> ~p -> p /\ ~r -> q)) /\ r.
 
@@ -133,7 +135,10 @@ Theorem k4: p \/ q -> p.
 Theorem k5: w -> g \/ p \/ q /\ r \/ w.
 
 
-Definition asd x y := forall w:Prop, forall v:Prop, x /\ y.
+Definition asd x y 
+:= forall w:Prop, 
+forall v:Prop, 
+x /\ y.
 
 Notation "A -- B" := (asd A B) (at level 75).
 

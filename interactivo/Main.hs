@@ -5,7 +5,7 @@ import Data.Maybe
 import Data.List (isPrefixOf)
 import qualified Data.Sequence as S
 import Tactics (habitar)
-import Parser (hola, reservedWords, getCommand, usrInfixParser, getParser) --SACAR HOLA
+import Parser (commandsFromFile, reservedWords, getCommand, usrInfixParser, getParser)
 import Text.PrettyPrint.HughesPJ (render)
 import PrettyPrinter (printLTermNoName, printProof, printType)
 import Transformers
@@ -28,7 +28,7 @@ reloadProver = lift $ modify $ finishProof . newTheoremFromProof
 
 
 main :: IO ()
-main = evalStateT (runInputT settings prover) initialProver
+main = evalStateT (runInputT settings proverFromCLI) initialProver
 
 searchCompl :: String -> [Completion]
 searchCompl str = map simpleCompletion $ filter (str `isPrefixOf`) reservedWords
@@ -43,22 +43,49 @@ prompt :: ProverState -> String
 prompt s = if proofStarted s
            then theoremName s ++ " < "
            else "> "
-            
-prover :: ProverInputState ()
-prover = do s <- lift get
-            minput <- getInputLine $ prompt s
-            case minput of
-              Nothing -> return ()
-              Just "" -> prover
-              Just x -> catch (do command <- returnInput $ getCommand x (infixParser s)
-                                  checkCommand command)
-                        (\e -> outputStrLn (errorMessage (opers $ global s) (e :: ProofExceptions))
-                               >> prover)
+
+proverFromCLI :: ProverInputState ()
+proverFromCLI = prover Nothing
+
+proverFromFile :: String -> ProverInputState ()
+proverFromFile file = prover $ Just file
+
+prover :: Maybe String -> ProverInputState ()
+prover Nothing =
+  do s <- lift get
+     minput <- getInputLine $ prompt s
+     case minput of
+       Nothing -> return ()
+       Just "" -> prover Nothing
+       Just x -> catch (do command <- returnInput $ getCommand x
+                                      (infixParser s)
+                           checkCliCommand command)
+                 (\e -> outputStrLn (errorMessage (opers $ global s)
+                                     (e :: ProofExceptions))
+                        >> prover Nothing)
+prover (Just file) =
+  do s <- lift get
+     r <- lift $ lift $ commandsFromFile file (infixParser s)
+     catch (do commands <- returnInput r
+               checkCommand commands)
+       (\e -> outputStrLn (errorMessage (opers $ global s)
+                           (e :: ProofExceptions))
+              >> prover Nothing)
+
+checkCliCommand :: CLICommand -> ProverInputState ()
+checkCliCommand (Escaped Exit) = outputStrLn "Saliendo."
+checkCliCommand (Escaped Reset) = resetProof >> proverFromCLI
+checkCliCommand (Escaped (Load file)) =
+  do outputStrLn $ "File: " ++ file ++ "\n"
+     proverFromFile file
+checkCliCommand (Lang c) = checkCommand [c]
 
 
+-- TERMINAR
 -- Tratamiento de los comandos.
-checkCommand :: Command -> ProverInputState ()
-checkCommand (Ty name ty) =
+checkCommand :: [Command] -> ProverInputState ()
+checkCommand [] = proverFromCLI
+checkCommand ((Ty name ty):cs) =
   do s <- lift get
      when (proofStarted s) (throwIO PNotFinished)
      let g = global s
@@ -68,28 +95,28 @@ checkCommand (Ty name ty) =
      lift $ modify $ newProof name ty' tyr
      s' <- lift get
      outputStrLn $ renderProof $ getProofC s'
-     prover                          
-checkCommand (Types ps) =
+     checkCommand cs                   
+checkCommand ((Types ps):cs) =
   do s <- lift get
      when (proofStarted s) (throwIO PNotFinished)
      let (tr1, tr2) = typeRepeated ps (\t -> invalidName t $ global s)
      when (isJust tr1) (throwIO $ TypeRepeated $ fromJust tr1)
      when (isJust tr2) (throwIO $ ExistE $ fromJust tr2)
      lift $ modify $ modifyGlobal $ addFreeVars ps
-     prover
-checkCommand (Definition name body) =
+     checkCommand cs
+checkCommand ((Definition name body):cs) =
   do s <- lift get
      when (proofStarted s) (throwIO PNotFinished)
      when (invalidName name $ global s) (throwIO $ ExistE name)
      defCommand name body
-     prover
-checkCommand (Ta (Print x)) =
+     checkCommand cs
+checkCommand ((Ta (Print x)):cs) =
   do s <- lift get
      let g = global s
      when (not $ isTheorem x g) (throwIO $ NotExistE x)
      outputStrLn $ renderNoNameLTerm (opers g) $ getLTermFromTheorems x g
-     prover
-checkCommand (Ta (Infer x)) =
+     checkCommand cs
+checkCommand ((Ta (Infer x)):cs) =
   do s <- lift get
      let g = global s
      te <- returnInput $ basicWithoutName (opers g) (fTypeContext g) (theorems g) x
@@ -98,8 +125,8 @@ checkCommand (Ta (Infer x)) =
      --outputStrLn $ "Renombramiento: " ++ (render $ printLTermNoName (opers $ global s) te')
      --outputStrLn $ renderNoNameLTerm op te'
      outputStrLn $ renderType (opers g) ty
-     prover                            
-checkCommand (Ta ta) =
+     checkCommand cs                            
+checkCommand ((Ta ta):cs) =
   do s <- lift get
      when (not $ proofStarted s) (throwIO PNotStarted)
      let pc = getProofC s
@@ -111,13 +138,7 @@ checkCommand (Ta ta) =
               ++ renderNoNameLTerm (opers $ global s) (getLTermFromProof pc' typ))
              >> reloadProver)
        else outputStrLn $ renderProof pc'
-     prover
-checkCommand (Escaped Exit) = outputStrLn "Saliendo."
-checkCommand (Escaped Reset) = resetProof >> prover
-checkCommand (Escaped (Load file)) =
-  do outputStrLn $ "File: " ++ file ++ "\n"
-     lift $ lift $ hola --TERMINAR
-     prover
+     checkCommand cs
 
 -- Trata el comando de definición.
 -- Define el término dado por el 2º argumento.

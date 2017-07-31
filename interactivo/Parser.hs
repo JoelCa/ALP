@@ -9,14 +9,20 @@ import Control.Applicative (empty)
 import Control.Monad (void)
 import Control.Monad.Reader
 import qualified Data.Sequence as S (Seq, empty, (<|), (|>), singleton, fromList)
-
+import qualified Control.Exception as E (try)
+import Data.List (isSuffixOf)
+import Data.Char (isSpace)
+  
 type UsrParser = ParserParser Type1
 
 type Parser = ParsecT Dec String (Reader UsrParser)
 
 newtype ParserParser a = PP { getParser :: Parser a }
 
-type ProofCommand = Either ProofExceptions Command
+type ProofCommands = Either ProofExceptions [Command]
+
+type CommandLineCommand = Either ProofExceptions CLICommand
+
 
 reservedWords = ["Propositions", "Types", "Theorem", "Print", "Check", "forall", "exists",
                  "let", "in", "as", "False", "assumption", "intro", "intros", "split",
@@ -82,14 +88,20 @@ symbolIdent = (lexeme . try) (p >>= check)
                 else return x
 
 
-hola = do result <- runParserT parserHola "hola.v" <$> readFile "hola.v"
-          case runReader result basicInfixParser of
-            Right x -> putStrLn $ show $ x
-            Left e -> putStrLn $ parseErrorPretty e
+commandsFromFile :: String -> UsrParser -> IO ProofCommands
+commandsFromFile file p =
+  do content <- E.try $ readFile file
+     case content of
+       Right r ->
+         case runReader (runParserT (space *> commands) file r) p of
+           Right x -> return $ Right x
+           Left e -> return $ Left $ SyntaxE  e
+       Left e -> return $ Left $ FileE e
 
-parserHola = do result <- many $ double getPosition (space *> exprTy)
-                eof
-                return result
+
+commands :: Parser [Command]
+commands = many command
+
 
 double :: Monad m => m a -> m b -> m (a,b)
 double p1 p2 = do x <- p1
@@ -97,10 +109,16 @@ double p1 p2 = do x <- p1
                   return (x, y)
           
 
-getCommand :: String -> UsrParser -> ProofCommand
-getCommand s p = case runReader (runParserT (space *> exprTy <* eof) "" s) p of
+getCommand :: String -> UsrParser -> CommandLineCommand
+getCommand s p = case runReader (runParserT (space *> cliCommand <* eof) "" s) p of
                       Right x -> Right x
-                      Left e -> Left $ SyntaxE $ parseErrorPretty e
+                      Left e -> Left $ SyntaxE  e
+
+cliCommand :: Parser CLICommand
+cliCommand = do c <- command
+                return $ Lang c
+             <|> do ec <- escapedCommand
+                    return $ Escaped ec
 
 testeo :: Show a => Parser a -> String -> IO ()
 testeo p s = case runReader (runParserT p "" s) (PP unit4) of
@@ -109,13 +127,13 @@ testeo p s = case runReader (runParserT p "" s) (PP unit4) of
 
 --------------------------------------------------------------------------------------
 -- Parser de los comandos.
-exprTy :: Parser Command
-exprTy = do rword "Theorem"
-            name <- identifier
-            colon
-            t <- typeTerm
-            dot
-            return $ Ty name t
+command :: Parser Command
+command = do rword "Theorem"
+             name <- identifier
+             colon
+             t <- typeTerm
+             dot
+             return $ Ty name t
          <|> do rword "Propositions" <|> rword "Types"
                 ps <- sepByCommaSeq identifier
                 dot
@@ -124,20 +142,24 @@ exprTy = do rword "Theorem"
                 return $ Ta tac
          <|> do (name, def) <- definition
                 return $ Definition name def
-         <|> do string ":quit" <|> string ":q"
-                return $ Escaped Exit
-         <|> do string ":reset" <|> string ":r"
-                return $ Escaped Reset
-         <|> do string ":load" <|> string ":l"
-                spaceChar
-                name <- fileName
-                return $ Escaped $ Load name
 
+escapedCommand :: Parser ECommand
+escapedCommand =
+  do string ":quit" <|> string ":q"
+     return Exit
+  <|> do string ":reset" <|> string ":r"
+         return Reset
+  <|> do string ":load" <|> string ":l"
+         spaceChar
+         name <- fileName
+         return $ Load name
+
+-- VER
 fileName :: Parser String
-fileName = do name <- many $ satisfy (\x -> x /= '.')
-              (do string ".pr"
-                  return $ name ++ ".pr"
-               <|> return (name ++ ".pr"))
+fileName = do name <- many $ satisfy (not . isSpace)
+              if isSuffixOf ".pr" name
+                then return name
+                else return (name ++ ".pr")
               
 
 --------------------------------------------------------------------------------------

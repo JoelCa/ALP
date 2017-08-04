@@ -12,6 +12,7 @@ import Control.Monad.State.Lazy
 import Text.Megaparsec (ParseError, Dec)
 import Control.Monad.Reader (Reader)
 import Data.Sequence (Seq, foldlWithIndex)
+import Text.Megaparsec.Pos (SourcePos)
 
 type TermVar = String
 
@@ -136,22 +137,24 @@ data ExactB = LamT LTerm1
             deriving (Show)
 
   -- Excepciones.
-data ProofExceptions = PNotFinished | PNotStarted | ExistE String
-                     | NotExistE String | SyntaxE (ParseError Char Dec) | AssuE
-                     | IntroE1 | ApplyE1 DoubleType DoubleType | HypoE Int
-                     | Unif1 | Unif2 | Unif3 | Unif4
-                     | ElimE1 | CommandInvalid | TypeRepeated String
-                     | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 DoubleType
-                     | ExactE2 DoubleType | ExactE3 | PSE | EmptyType | TypeE String
-                     | InferE DoubleLTerm InferExceptions | UnfoldE1 String
-                     | FileE IOError
-                     deriving (Show, Typeable)
+data ProofException = PNotFinished | PNotStarted | ExistE String
+                    | NotExistE String | SyntaxE (ParseError Char Dec) | AssuE
+                    | IntroE1 | ApplyE1 DoubleType DoubleType | HypoE Int
+                    | Unif1 | Unif2 | Unif3 | Unif4
+                    | ElimE1 | CommandInvalid | TypeRepeated String
+                    | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 DoubleType
+                    | ExactE2 DoubleType | ExactE3 | PSE | EmptyType | TypeE String
+                    | InferE DoubleLTerm InferException | UnfoldE1 String
+                    | FileE IOError
+                    deriving (Show, Typeable)
 
-data InferExceptions = InferE1 String | InferE2 DoubleLTerm DoubleType
-                     | InferE3 DoubleLTerm String | InferE4 DoubleLTerm
+type ExceptionPos = (SourcePos, ProofException)
+
+data InferException = InferE1 String | InferE2 DoubleLTerm DoubleType
+                    | InferE3 DoubleLTerm String | InferE4 DoubleLTerm
                      deriving (Show, Typeable)
                               
-instance Exception ProofExceptions
+instance Exception ExceptionPos --ProofExceptions
 
   -- Arbol general.
 data GenTree a = Nil | Node a [GenTree a]

@@ -19,10 +19,12 @@ type Parser = ParsecT Dec String (Reader UsrParser)
 
 newtype ParserParser a = PP { getParser :: Parser a }
 
-type ProofCommands = Either ProofExceptions [Command]
+type ProofCommands = Either ProofException [(SourcePos, Command)]
 
-type CommandLineCommand = Either ProofExceptions CLICommand
+type CommandLineCommand = Either ProofException (SourcePos, CLICommand)
 
+
+emptyPos = initialPos ""
 
 reservedWords = ["Propositions", "Types", "Theorem", "Print", "Check", "forall", "exists",
                  "let", "in", "as", "False", "assumption", "intro", "intros", "split",
@@ -99,9 +101,8 @@ commandsFromFile file p =
        Left e -> return $ Left $ FileE e
 
 
-commands :: Parser [Command]
-commands = many command
-
+commands :: Parser [(SourcePos, Command)]
+commands = many ((\x y -> (x,y)) <$> getPosition <*> command)
 
 double :: Monad m => m a -> m b -> m (a,b)
 double p1 p2 = do x <- p1
@@ -110,7 +111,7 @@ double p1 p2 = do x <- p1
           
 
 getCommand :: String -> UsrParser -> CommandLineCommand
-getCommand s p = case runReader (runParserT (space *> cliCommand <* eof) "" s) p of
+getCommand s p = case runReader (runParserT (space *> ((\ x -> (initialPos "", x)) <$> cliCommand) <* eof) "" s) p of
                       Right x -> Right x
                       Left e -> Left $ SyntaxE  e
 

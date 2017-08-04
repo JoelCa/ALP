@@ -4,10 +4,17 @@ import Common
 import Text.PrettyPrint.HughesPJ (render)
 import PrettyPrinter (printType, printLTerm)
 import Hypothesis (printHypothesis)
-import Text.Megaparsec (parseErrorPretty)
+import Text.Megaparsec (sourcePosPretty, parseErrorPretty)
+
+showError :: FOperations -> ExceptionPos -> String
+showError op (pos, e) = sourcePosPretty pos ++ "\n" ++
+                        errorMessage op e 
+
+showErrorNoPos :: FOperations -> ExceptionPos -> String
+showErrorNoPos op (_, e) = errorMessage op e 
 
 -- Mensajes de error.
-errorMessage :: FOperations -> ProofExceptions -> String
+errorMessage :: FOperations -> ProofException -> String
 errorMessage _ (SyntaxE e) = "error de sintaxis.\n" ++
                              parseErrorPretty e
 errorMessage _ (FileE e) = show e
@@ -51,7 +58,7 @@ errorMessage _ (UnfoldE1 s) =  "error: " ++ s ++ " no es un operador foldeable."
 errorMessage _ (HypoE i) = "error: la hipótesis " ++ printHypothesis i ++ " no existe."
   
 
-errorInfer :: FOperations -> InferExceptions -> String
+errorInfer :: FOperations -> InferException -> String
 errorInfer _ (InferE1 x) =
   "La variable de término \"" ++ x ++ "\" no fue declarada."
 errorInfer op (InferE2 te ty) =

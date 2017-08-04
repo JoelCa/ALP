@@ -8,14 +8,14 @@ import Control.Monad.State.Lazy (get, modify)
 import qualified Data.Sequence as S
 import Data.IntSet (IntSet)
 
-type Proof = StateExceptions ProofConstruction ProofExceptions
+type Proof = StateExceptions ProofConstruction ProofException
 
 
   -- Construcción de la prueba.
 data ProofConstruction = PConstruction { tsubp :: Int              -- Cantidad total de subpruebas activas.
                                        , subps :: [SubProof]       -- Datos de las subpruebas, ordenas por nivel.
                                        , cglobal :: GlobalState    -- Copia de los datos globales.
-                                       , term :: [LTermHoles]     -- Lambda termino.
+                                       , term :: [LTermHoles]      -- Lambda termino.
                                        }
 
   -- Conjunto de subpruebas.

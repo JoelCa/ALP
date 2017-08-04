@@ -11,7 +11,7 @@ import Data.Foldable (find)
 -- Algoritmo de inferencia de tipos de un lambda término.
 
 basicTypeInference :: Theorems -> FOperations -> DoubleLTerm
-                   -> Either ProofExceptions DoubleType
+                   -> Either ProofException DoubleType
 basicTypeInference = typeInference 0 S.empty
 
 -- Infiere el tipo de un lambda término.
@@ -25,13 +25,13 @@ basicTypeInference = typeInference 0 S.empty
 -- 4. Operaciones "foldeables".
 -- 5. Lambda término con y sin nombre, al que se le quiere inferir su tipo.
 typeInference :: Int -> TermContext -> Theorems -> FOperations
-              -> DoubleLTerm -> Either ProofExceptions DoubleType
+              -> DoubleLTerm -> Either ProofException DoubleType
 typeInference n c te op t = case typeInference' n c te op t of
                           Right r -> return r
                           Left e -> throw $ InferE t e
 
 typeInference' :: Int -> TermContext -> Theorems -> FOperations
-               -> DoubleLTerm -> Either InferExceptions DoubleType
+               -> DoubleLTerm -> Either InferException DoubleType
 typeInference' n _ te _ (LVar (_, Free x)) =
   case T.lookup x te of
     Just (_ ::: t) -> return t

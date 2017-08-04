@@ -5,16 +5,17 @@ import Data.Maybe
 import Data.List (isPrefixOf)
 import qualified Data.Sequence as S
 import Tactics (habitar)
-import Parser (commandsFromFile, reservedWords, getCommand, usrInfixParser, getParser)
+import Parser (emptyPos, commandsFromFile, reservedWords, getCommand, usrInfixParser, getParser)
 import Text.PrettyPrint.HughesPJ (render)
 import PrettyPrinter (printLTermNoName, printProof, printType)
 import Transformers
-import ErrorMsj (errorMessage)
+import ErrorMsj (showError, showErrorNoPos)
 import TypeInference (basicTypeInference)
 import ProverState
 import GlobalState
 import Proof (ProofConstruction, getLTermFromProof, isFinalTerm, cglobal, tsubp, subps)
-
+import Text.Megaparsec (SourcePos)
+  
 type ProverInputState a = InputT (StateT ProverState IO) a
 
 
@@ -57,115 +58,172 @@ prover Nothing =
      case minput of
        Nothing -> return ()
        Just "" -> prover Nothing
-       Just x -> catch (do command <- returnInput $ getCommand x
-                                      (infixParser s)
-                           checkCliCommand command)
-                 (\e -> outputStrLn (errorMessage (opers $ global s)
-                                     (e :: ProofExceptions))
-                        >> prover Nothing)
+       Just x ->
+         catch (do command <- returnInput emptyPos $ getCommand x $ infixParser s
+                   checkCliCommand command)
+         (\e -> outputStrLn (showErrorNoPos (opers $ global s) e)
+                >> prover Nothing)
 prover (Just file) =
   do s <- lift get
      r <- lift $ lift $ commandsFromFile file (infixParser s)
-     catch (do commands <- returnInput r
+     catch (do commands <- returnInput emptyPos r
                checkCommand commands)
-       (\e -> outputStrLn (errorMessage (opers $ global s)
-                           (e :: ProofExceptions))
+       (\e -> outputStrLn (showError (opers $ global s) e)
               >> prover Nothing)
 
-checkCliCommand :: CLICommand -> ProverInputState ()
-checkCliCommand (Escaped Exit) = outputStrLn "Saliendo."
-checkCliCommand (Escaped Reset) = resetProof >> proverFromCLI
-checkCliCommand (Escaped (Load file)) =
+checkCliCommand :: (SourcePos, CLICommand) -> ProverInputState ()
+checkCliCommand (pos, Escaped Exit) = outputStrLn "Saliendo."
+checkCliCommand (pos, Escaped Reset) = resetProof >> proverFromCLI
+checkCliCommand (pos, Escaped (Load file)) =
   do outputStrLn $ "File: " ++ file ++ "\n"
      proverFromFile file
-checkCliCommand (Lang c) = checkCommand [c]
+checkCliCommand (pos, Lang c) = checkCommand [(pos, c)]
 
 
--- TERMINAR
--- Tratamiento de los comandos.
-checkCommand :: [Command] -> ProverInputState ()
-checkCommand [] = proverFromCLI
-checkCommand ((Ty name ty):cs) =
+theoremCommand :: SourcePos -> String -> Type1 -> ProverInputState ()
+theoremCommand pos name ty =
   do s <- lift get
-     when (proofStarted s) (throwIO PNotFinished)
+     when (proofStarted s) $ throwIO (pos, PNotFinished)
      let g = global s
-     when (invalidName name g) (throwIO $ ExistE name)
-     tyr <- returnInput $ renamedType1 (fTypeContext g) (opers g) (theorems g) ty
-     ty' <- returnInput $ basicTypeWithoutName (fTypeContext g) (opers g) ty
+     when (invalidName name g) $ throwIO (pos, ExistE name)
+     tyr <- returnInput pos $ renamedType1 (fTypeContext g) (opers g) (theorems g) ty
+     ty' <- returnInput pos $ basicTypeWithoutName (fTypeContext g) (opers g) ty
      lift $ modify $ newProof name ty' tyr
-     s' <- lift get
-     outputStrLn $ renderProof $ getProofC s'
-     checkCommand cs                   
-checkCommand ((Types ps):cs) =
+
+typesVarCommand :: SourcePos -> S.Seq TypeVar -> ProverInputState ()
+typesVarCommand pos ps =
   do s <- lift get
-     when (proofStarted s) (throwIO PNotFinished)
+     when (proofStarted s) $ throwIO (pos, PNotFinished)
      let (tr1, tr2) = typeRepeated ps (\t -> invalidName t $ global s)
-     when (isJust tr1) (throwIO $ TypeRepeated $ fromJust tr1)
-     when (isJust tr2) (throwIO $ ExistE $ fromJust tr2)
+     when (isJust tr1) $ throwIO (pos, TypeRepeated $ fromJust tr1)
+     when (isJust tr2) $ throwIO (pos, ExistE $ fromJust tr2)
      lift $ modify $ modifyGlobal $ addFreeVars ps
-     checkCommand cs
-checkCommand ((Definition name body):cs) =
+
+definitionCommand :: SourcePos -> String -> BodyDef -> ProverInputState ()
+definitionCommand pos name body = 
   do s <- lift get
-     when (proofStarted s) (throwIO PNotFinished)
-     when (invalidName name $ global s) (throwIO $ ExistE name)
-     defCommand name body
-     checkCommand cs
-checkCommand ((Ta (Print x)):cs) =
+     when (proofStarted s) $ throwIO (pos, PNotFinished)
+     when (invalidName name $ global s) $ throwIO (pos, ExistE name)
+     defCommand pos name body
+
+tacticCommand :: Bool -> SourcePos -> Tactic -> ProverInputState () 
+tacticCommand printing pos (Print x) =
+ do printCommand pos x
+    if printing
+      then printCommandPrinting x
+      else return ()
+tacticCommand printing pos (Infer x) =
+  do ty <- inferCommand pos x
+     if printing
+       then inferCommandPrinting ty
+       else return ()
+tacticCommand printing pos ta =
+  do (op, ty, pc) <- otherTacticsCommand pos ta
+     if printing
+       then otherTacticsCPrinting op ty pc
+       else return ()
+
+       
+-- Procesa todas las tácticas que no son "Print" ni "Infer".
+otherTacticsCommand :: SourcePos -> Tactic -> ProverInputState (FOperations, DoubleType, ProofConstruction)
+otherTacticsCommand _ (Print _) =
+  error "error: otherTacticsCommand, no debería pasar."
+otherTacticsCommand _ (Infer _) =
+  error "error: otherTacticsCommand, no debería pasar."
+otherTacticsCommand pos ta =
   do s <- lift get
-     let g = global s
-     when (not $ isTheorem x g) (throwIO $ NotExistE x)
-     outputStrLn $ renderNoNameLTerm (opers g) $ getLTermFromTheorems x g
-     checkCommand cs
-checkCommand ((Ta (Infer x)):cs) =
-  do s <- lift get
-     let g = global s
-     te <- returnInput $ basicWithoutName (opers g) (fTypeContext g) (theorems g) x
-     --outputStrLn $ "Renombramiento: " ++ (render $ printLamTerm (opers $ global s) te)
-     ty <- returnInput $ basicTypeInference (theorems g) (opers g) te
-     --outputStrLn $ "Renombramiento: " ++ (render $ printLTermNoName (opers $ global s) te')
-     --outputStrLn $ renderNoNameLTerm op te'
-     outputStrLn $ renderType (opers g) ty
-     checkCommand cs                            
-checkCommand ((Ta ta):cs) =
-  do s <- lift get
-     when (not $ proofStarted s) (throwIO PNotStarted)
+     when (not $ proofStarted s) $ throwIO (pos, PNotStarted)
      let pc = getProofC s
          typ = getTypeProof s
-     (_ , pc') <- returnInput $ runStateExceptions (habitar ta) pc
+     (_ , pc') <- returnInput pos $ runStateExceptions (habitar ta) pc
      lift $ modify $ setProofC pc'
-     if (isFinalTerm pc')
-       then ((outputStrLn $ "Prueba completa.\n"
-              ++ renderNoNameLTerm (opers $ global s) (getLTermFromProof pc' typ))
-             >> reloadProver)
-       else outputStrLn $ renderProof pc'
+     if isFinalTerm pc'
+       then reloadProver 
+       else return ()
+     return (opers $ global s, getTypeProof s, pc')
+
+printCommand :: SourcePos -> String -> ProverInputState ()
+printCommand pos x =
+  do s <- lift get
+     let g = global s
+     when (not $ isTheorem x g) $ throwIO (pos, NotExistE x)
+
+inferCommand :: SourcePos -> LTerm1 -> ProverInputState DoubleType
+inferCommand pos x =
+  do s <- lift get
+     let g = global s
+     te <- returnInput pos $ basicWithoutName (opers g) (fTypeContext g) (theorems g) x
+     returnInput pos $ basicTypeInference (theorems g) (opers g) te
+
+printCommandPrinting :: String -> ProverInputState ()
+printCommandPrinting x =
+  do s <- lift get
+     let g = global s
+     outputStrLn $ renderNoNameLTerm (opers g) $ getLTermFromTheorems x g
+
+inferCommandPrinting :: DoubleType -> ProverInputState ()
+inferCommandPrinting ty =
+  do s <- lift get
+     outputStrLn $ renderType (opers $ global s) ty
+
+otherTacticsCPrinting :: FOperations ->  DoubleType ->  ProofConstruction
+                      -> ProverInputState ()
+otherTacticsCPrinting op ty pc
+  | isFinalTerm pc = outputStrLn $ "Prueba completa.\n" ++
+                     renderNoNameLTerm op (getLTermFromProof pc ty)
+  | otherwise = outputStrLn $ renderProof pc
+  
+
+-- Tratamiento de los comandos.
+checkCommand :: [(SourcePos, Command)] -> ProverInputState ()
+checkCommand [] = proverFromCLI
+checkCommand [(pos, Ty name ty)] =
+  do theoremCommand pos name ty
+     s <- lift get
+     outputStrLn $ renderProof $ getProofC s
+     proverFromCLI
+checkCommand [(pos, Ta ta)] =
+  do tacticCommand True pos ta
+     proverFromCLI
+checkCommand ((pos,Ty name ty):cs) =
+  do theoremCommand pos name ty
+     checkCommand cs
+checkCommand ((pos, Types ps):cs) =
+  do typesVarCommand pos ps
+     checkCommand cs
+checkCommand ((pos, Definition name body):cs) =
+  do definitionCommand pos name body
+     checkCommand cs
+checkCommand ((pos, Ta ta):cs) =
+  do tacticCommand False pos ta
      checkCommand cs
 
 -- Trata el comando de definición.
 -- Define el término dado por el 2º argumento.
-defCommand :: String -> BodyDef -> ProverInputState ()
-defCommand name (Type (body, n, args, isInfix)) =
+defCommand :: SourcePos -> String -> BodyDef -> ProverInputState ()
+defCommand pos name (Type (body, n, args, isInfix)) =
   do s <- lift get
      let glo = global s   
-     t <- returnInput $ renamedType3 args (fTypeContext glo) (opers glo) (theorems glo) body
+     t <- returnInput pos $ renamedType3 args (fTypeContext glo) (opers glo) (theorems glo) body
      --outputStrLn $ renderType (opers glo) $ fst t
      typeDefinition name t n isInfix
-defCommand name (LTerm body) =
+defCommand pos name (LTerm body) =
   do s <- lift get
      let glo = global s
-     te  <- returnInput $ basicWithoutName (opers glo) (fTypeContext glo) (theorems glo) body
+     te  <- returnInput pos $ basicWithoutName (opers glo) (fTypeContext glo) (theorems glo) body
      --outputStrLn $ "Renombramiento: " ++ (renderLTerm (opers glo) $ fst te)
-     lamTermDefinition name te
-defCommand name (Ambiguous ap) =
+     lamTermDefinition pos name te
+defCommand pos name (Ambiguous ap) =
   do s <- lift get
      let glo = global s
-     t <- returnInput $ basicDisambiguatedTerm (fTypeContext glo) (opers glo) ap
+     t <- returnInput pos $ basicDisambiguatedTerm (fTypeContext glo) (opers glo) ap
      case t of
        Left ty ->
          do --outputStrLn $ renderType (opers glo) $ fst ty
             typeDefinition name ty 0 False
        Right te ->
          do --outputStrLn $ "Renombramiento: " ++ (renderLTerm (opers glo) $ fst te)
-            lamTermDefinition name te
+            lamTermDefinition pos name te
 
 -- Función auxiliar de defCommand
 typeDefinition :: String -> DoubleType -> Int -> Bool -> ProverInputState ()
@@ -174,11 +232,11 @@ typeDefinition name t n isInfix =
      when isInfix $ lift $ modify $ modifyUsrParser $ usrInfixParser name . getParser
 
 -- Función auxiliar de defCommand
-lamTermDefinition :: String -> DoubleLTerm -> ProverInputState ()
-lamTermDefinition name te =
+lamTermDefinition :: SourcePos -> String -> DoubleLTerm -> ProverInputState ()
+lamTermDefinition pos name te =
   do s <- lift get
      let glo = global s
-     ty <- returnInput $ basicTypeInference (theorems glo) (opers glo) te
+     ty <- returnInput pos $ basicTypeInference (theorems glo) (opers glo) te
      lift $ modify $ newTheorem name (toNoName te ::: ty)
 
 -- Función auxiliar del comando "Props/Types".
@@ -211,6 +269,6 @@ renderProof :: ProofConstruction -> String
 renderProof p = render $ printProof (tsubp p) (conflict $ cglobal p) (opers $ cglobal p) (fTypeContext $ cglobal p) (subps p)
 
 
-returnInput :: Either ProofExceptions a -> ProverInputState a
-returnInput (Left exception) = throwIO exception
-returnInput (Right x) = return x
+returnInput :: SourcePos -> Either ProofException a -> ProverInputState a
+returnInput pos (Left exception) = throwIO (pos, exception)
+returnInput pos (Right x) = return x

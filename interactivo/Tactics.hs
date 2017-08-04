@@ -207,7 +207,7 @@ introComm _ = throw IntroE1
 introsComm :: Proof ()
 introsComm = catch (do habitar Intro
                        introsComm)
-             ((\e -> return ()) :: ProofExceptions -> Proof ())
+             ((\e -> return ()) :: ProofException -> Proof ())
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando ELIM
@@ -404,10 +404,10 @@ unfoldComm btc ftc op te oper (Exists v t) body =
 getTypeVar :: Int -> TermVarWithType -> DoubleType
 getTypeVar n (_,m, t) = positiveShift (n-m) t
 
-maybeToProof :: ProofExceptions -> Maybe a -> Proof a
+maybeToProof :: ProofException -> Maybe a -> Proof a
 maybeToProof excep Nothing = throw excep
 maybeToProof _ (Just val) = return val
 
-eitherToProof :: Either ProofExceptions a -> Proof a
+eitherToProof :: Either ProofException a -> Proof a
 eitherToProof (Left e) = throw e
 eitherToProof (Right x) = return x

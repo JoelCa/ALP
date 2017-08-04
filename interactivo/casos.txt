@@ -205,3 +205,7 @@ Para chequear renombre del pretty printer de d4.
 
    TERMINAR de ver:
 Ver caso de CBool y CBool2, en test.f
+
+VER:
+
+Error en el archivo "../prueba.pr"

@@ -3,10 +3,10 @@ module Parser where
 import Common
 import DefaultOperators
 import Text.Megaparsec hiding (State)
-import qualified Text.Megaparsec.Lexer as L
-import qualified Text.Megaparsec.String as S
+import qualified Text.Megaparsec.Char.Lexer as L
+import Text.Megaparsec.Char
 import Control.Applicative (empty)
-import Control.Monad (void)
+import Data.Void (Void)
 import Control.Monad.Reader
 import qualified Data.Sequence as S (Seq, empty, (<|), (|>), singleton, fromList)
 import qualified Control.Exception as E (try)
@@ -15,16 +15,17 @@ import Data.Char (isSpace)
   
 type UsrParser = ParserParser Type1
 
-type Parser = ParsecT Dec String (Reader UsrParser)
+type Parser = ParsecT Void String (Reader UsrParser)
 
 newtype ParserParser a = PP { getParser :: Parser a }
 
-type ProofCommands = Either ProofException [(SourcePos, Command)]
+type ProofCommands = Either ProofException [(LinePos, Command)]
 
-type CommandLineCommand = Either ProofException (SourcePos, CLICommand)
+type CommandLineCommand = Either ProofException (LinePos, CLICommand)
 
 
-emptyPos = initialPos ""
+emptyPos :: LinePos
+emptyPos = 1
 
 reservedWords = ["Propositions", "Types", "Theorem", "Print", "Check", "forall", "exists",
                  "let", "in", "as", "False", "assumption", "intro", "intros", "split",
@@ -33,7 +34,7 @@ reservedWords = ["Propositions", "Types", "Theorem", "Print", "Check", "forall",
 reservedSymbols = ["=", "~"]
 
 sc :: Parser ()
-sc = L.space (void spaceChar) lineCmnt empty
+sc = L.space space1 lineCmnt empty
   where lineCmnt  = L.skipLineComment "//"
 
 lexeme :: Parser a -> Parser a
@@ -68,7 +69,7 @@ equal :: Parser String
 equal = symbol "="
 
 nat :: Parser Int
-nat = fromInteger <$> lexeme L.integer
+nat = fromInteger <$> lexeme L.decimal
 
 rword :: String -> Parser ()
 rword w = try $ string w *> notFollowedBy alphaNumChar *> sc
@@ -101,17 +102,15 @@ commandsFromFile file p =
        Left e -> return $ Left $ FileE e
 
 
-commands :: Parser [(SourcePos, Command)]
-commands = many ((\x y -> (x,y)) <$> getPosition <*> command)
+commands :: Parser [(LinePos, Command)]
+commands = many ((\x y -> (x,y)) <$> (getLinePos <$> getPosition) <*> command)
 
-double :: Monad m => m a -> m b -> m (a,b)
-double p1 p2 = do x <- p1
-                  y <- p2
-                  return (x, y)
-          
+getLinePos :: SourcePos -> LinePos
+getLinePos (SourcePos n l c) = unPos l
+    
 
 getCommand :: String -> UsrParser -> CommandLineCommand
-getCommand s p = case runReader (runParserT (space *> ((\ x -> (initialPos "", x)) <$> cliCommand) <* eof) "" s) p of
+getCommand s p = case runReader (runParserT (space *> ((\x -> (emptyPos, x)) <$> cliCommand) <* eof) "" s) p of
                       Right x -> Right x
                       Left e -> Left $ SyntaxE  e
 
@@ -151,7 +150,7 @@ escapedCommand =
   <|> do string ":reset" <|> string ":r"
          return Reset
   <|> do string ":load" <|> string ":l"
-         spaceChar
+         space1
          name <- fileName
          return $ Load name
 
@@ -473,14 +472,16 @@ ambiguousArgs p = do a <- p
 
 --------------------------------------------------------------------------------------
 -- Parser del nombre de una hipótesis.
-sc2 :: S.Parser ()
-sc2 = L.space (void spaceChar) empty empty
+type SParser = Parsec Void String
 
-lexeme2 :: S.Parser a -> S.Parser a
+sc2 :: SParser ()
+sc2 = L.space space1 empty empty
+
+lexeme2 :: SParser a -> SParser a
 lexeme2 = L.lexeme sc2
 
-nat2 :: S.Parser Int
-nat2 = fromInteger <$> lexeme2 L.integer
+nat2 :: SParser Int
+nat2 = fromInteger <$> lexeme2 L.decimal
 
 getHypothesisValue :: String -> Maybe Int
 getHypothesisValue s = parseMaybe (char 'H' >> nat2) s

@@ -1,6 +1,7 @@
 module TypeInference where
 
 import Common
+import DefaultOperators (isNotFoldeableOp)
 import Theorems (Theorems)
 import qualified Theorems as T (lookup)
 import Transformers (positiveShift, negativeShift)
@@ -88,19 +89,31 @@ fullEqualTypes :: FOperations -> DoubleType -> DoubleType -> Bool
 fullEqualTypes op (Fun t1 t2) (Fun t1' t2') = fullEqualTypes op t1 t1' && fullEqualTypes op t2 t2'
 fullEqualTypes op (ForAll _ t) (ForAll _ t') = fullEqualTypes op t t'
 fullEqualTypes op (Exists _ t) (Exists _ t') = fullEqualTypes op t t'
-fullEqualTypes op (RenamedType s xs) (RenamedType s' ys)
+fullEqualTypes op t1@(RenamedType s xs) t2@(RenamedType s' ys)
   | s == s' = aux xs ys
-  | otherwise = False
+  | isNotFoldeableOp s && isNotFoldeableOp s' = False
+  | isNotFoldeableOp s =
+      case find (\(a,_,_,_) -> a == s') op of
+        Just (_,tt,args,_)-> fullEqualTypes op t1 (typeSubsNoRename args tt ys)
+        Nothing -> error "error: fullEqualTypes, no debería pasar."
+  | isNotFoldeableOp s' =
+      case find (\(a,_,_,_) -> a == s) op of
+        Just (_,tt,args,_)-> fullEqualTypes op (typeSubsNoRename args tt xs) t2
+        Nothing -> error "error: fullEqualTypes, no debería pasar."
   where aux [] [] = True
         aux (x:xs) (y:ys) = if fullEqualTypes op x y
                             then aux xs ys
                             else False
-fullEqualTypes op (RenamedType s xs) t =
-  case find (\(a,_,_,_) -> a == s) op of
-    Just (_,tt,args,_)-> fullEqualTypes op (typeSubsNoRename args tt xs) t
-    Nothing -> error "error: fullEqualTypes, no debería pasar."
-fullEqualTypes op t (RenamedType s ys) =
-  case find (\(a,_,_,_) -> a == s) op of
-    Just (_,tt,args,_)-> fullEqualTypes op t (typeSubsNoRename args tt ys)
-    Nothing -> error "error: fullEqualTypes, no debería pasar."    
+fullEqualTypes op (RenamedType s xs) t
+  | isNotFoldeableOp s = False
+  | otherwise =
+    case find (\(a,_,_,_) -> a == s) op of
+      Just (_,tt,args,_)-> fullEqualTypes op (typeSubsNoRename args tt xs) t
+      Nothing -> error "error: fullEqualTypes, no debería pasar."
+fullEqualTypes op t (RenamedType s ys)
+  | isNotFoldeableOp s = False
+  | otherwise =
+    case find (\(a,_,_,_) -> a == s) op of
+      Just (_,tt,args,_)-> fullEqualTypes op t (typeSubsNoRename args tt ys)
+      Nothing -> error "error: fullEqualTypes, no debería pasar."    
 fullEqualTypes _ t1 t2 = t1 == t2

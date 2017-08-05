@@ -9,10 +9,10 @@ import System.Console.Haskeline.MonadException (Exception)
 import Data.Map (Map)
 import Control.Monad (ap, liftM)
 import Control.Monad.State.Lazy
-import Text.Megaparsec (ParseError, Dec)
+import Data.Void (Void)
+import Text.Megaparsec (ParseError)
 import Control.Monad.Reader (Reader)
 import Data.Sequence (Seq, foldlWithIndex)
-import Text.Megaparsec.Pos (SourcePos)
 
 type TermVar = String
 
@@ -138,7 +138,7 @@ data ExactB = LamT LTerm1
 
   -- Excepciones.
 data ProofException = PNotFinished | PNotStarted | ExistE String
-                    | NotExistE String | SyntaxE (ParseError Char Dec) | AssuE
+                    | NotExistE String | SyntaxE (ParseError Char Void) | AssuE
                     | IntroE1 | ApplyE1 DoubleType DoubleType | HypoE Int
                     | Unif1 | Unif2 | Unif3 | Unif4
                     | ElimE1 | CommandInvalid | TypeRepeated String
@@ -148,7 +148,9 @@ data ProofException = PNotFinished | PNotStarted | ExistE String
                     | FileE IOError
                     deriving (Show, Typeable)
 
-type ExceptionPos = (SourcePos, ProofException)
+type LinePos = Int
+
+type ExceptionPos = (LinePos, ProofException)
 
 data InferException = InferE1 String | InferE2 DoubleLTerm DoubleType
                     | InferE3 DoubleLTerm String | InferE4 DoubleLTerm

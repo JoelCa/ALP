@@ -6,6 +6,9 @@ cabal install exceptions
 cabal install vector
 cabal install megaparsec
 
+Usaba megaparsec-5.3.1.
+Ahora uso megaparsec-6.0.2
+
 Dato de la instalación de la libreria ncurses en Debian:
 Una vez instalada ncurses, tuve que crear un enlace simbólico: libtinfo.so -> libtinfo.so.5
 root@joel:/lib/x86_64-linux-gnu# ln -s libtinfo.so.5 libtinfo.so
@@ -165,6 +168,7 @@ Además, NO renombramos las variables de tipo ligadas. Por ello, se pueden dar e
 Donde, la variable de tipo ligada "x", coincide con la variable de término "x".
 
 FALTA:
+- Chequear el parser de las hipotesis.
 - Chequear que el parser "prefixOps" funcione BIEN.
 - Añadir renombre de variables de tipos ligadas a los tipos, de modo tal de que no coincidan con los nombre
 de teoremas probados.

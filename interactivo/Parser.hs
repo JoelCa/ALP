@@ -12,24 +12,25 @@ import qualified Data.Sequence as S (Seq, empty, (<|), (|>), singleton, fromList
 import qualified Control.Exception as E (try)
 import Data.List (isSuffixOf)
 import Data.Char (isSpace)
-  
+
 type UsrParser = ParserParser Type1
 
 type Parser = ParsecT Void String (Reader UsrParser)
 
 newtype ParserParser a = PP { getParser :: Parser a }
 
-type ProofCommands = Either ProofException [(LinePos, Command)]
+type ProofCommands = Either ProofException [(EPosition, Command)]
 
-type CommandLineCommand = Either ProofException (LinePos, CLICommand)
+type CommandLineCommand = Either ProofException (EPosition, CLICommand)
 
 
-emptyPos :: LinePos
-emptyPos = 1
+emptyPos :: EPosition
+emptyPos = ("",1)
 
 reservedWords = ["Propositions", "Types", "Theorem", "Print", "Check", "forall", "exists",
                  "let", "in", "as", "False", "assumption", "intro", "intros", "split",
-                 "left", "right", "apply", "elim", "absurd", "cut", "unfold", "exact"]
+                 "left", "right", "apply", "elim", "absurd", "cut", "unfold", "exact",
+                 ":load", ":reset", ":quit", ":help", ":l", ":r", ":q", ":h"]
 
 reservedSymbols = ["=", "~"]
 
@@ -91,22 +92,22 @@ symbolIdent = (lexeme . try) (p >>= check)
                 else return x
 
 
-commandsFromFile :: String -> UsrParser -> IO ProofCommands
-commandsFromFile file p =
-  do content <- E.try $ readFile file
-     case content of
-       Right r ->
-         case runReader (runParserT (space *> commands) file r) p of
-           Right x -> return $ Right x
+commandsFromFiles :: [String] -> UsrParser -> IO ProofCommands
+commandsFromFiles files p =
+  do content <- mapM (\f -> either Left (\x -> Right (f, x)) <$> (E.try $ readFile f)) files
+     case sequence content of
+       Right xs ->
+         case mapM (\(f,s) -> runReader (runParserT (space *> commands) f s) p) xs of
+           Right x -> return $ Right $ concat x
            Left e -> return $ Left $ SyntaxE  e
        Left e -> return $ Left $ FileE e
 
 
-commands :: Parser [(LinePos, Command)]
+commands :: Parser [(EPosition, Command)]
 commands = many ((\x y -> (x,y)) <$> (getLinePos <$> getPosition) <*> command)
 
-getLinePos :: SourcePos -> LinePos
-getLinePos (SourcePos n l c) = unPos l
+getLinePos :: SourcePos -> EPosition
+getLinePos (SourcePos n l c) = (n, unPos l)
     
 
 getCommand :: String -> UsrParser -> CommandLineCommand
@@ -145,21 +146,22 @@ command = do rword "Theorem"
 
 escapedCommand :: Parser ECommand
 escapedCommand =
-  do string ":quit" <|> string ":q"
+  do rword ":quit" <|> rword ":q"
      return Exit
-  <|> do string ":reset" <|> string ":r"
+  <|> do rword ":reset" <|> rword ":r"
          return Reset
-  <|> do string ":load" <|> string ":l"
-         space1
-         name <- fileName
-         return $ Load name
+  <|> do rword ":load" <|> rword ":l"
+         names <- many (fileName <* space)
+         return $ Load names
+  <|> do rword ":help" <|> rword ":h"
+         return Help
 
--- VER
+
 fileName :: Parser String
 fileName = do name <- many $ satisfy (not . isSpace)
               if isSuffixOf ".pr" name
                 then return name
-                else return (name ++ ".pr")
+                else empty
               
 
 --------------------------------------------------------------------------------------
@@ -484,10 +486,20 @@ nat2 :: SParser Int
 nat2 = fromInteger <$> lexeme2 L.decimal
 
 getHypothesisValue :: String -> Maybe Int
-getHypothesisValue s = parseMaybe (char 'H' >> nat2) s
+getHypothesisValue = parseMaybe $ char 'H' >> nat2
 
 getInt :: String -> Maybe Int
 getInt s = parseMaybe nat2 s
+
+--------------------------------------------------------------------------------------
+-- Parser para identificar el comando escapado "load".
+isLoadCommand :: String -> Bool
+isLoadCommand s = case parse (space *> rword2 ":load" <|> rword2 ":l") "" s of
+                    Left _ -> False
+                    Right _ -> True 
+
+rword2 :: String -> SParser ()
+rword2 w = try $ string w *> sc2
 
 --------------------------------------------------------------------------------------
 -- Construcción del parser de las operaciones del usuario.

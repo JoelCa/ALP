@@ -396,6 +396,3 @@ getElemIndex f xs = S.foldlWithIndex (\r i x -> if f x then Just (i, x) else r) 
 
 fst3 :: (a, b, c) -> a
 fst3 (x, _, _) = x
-
---------------------------------------------------------------------------------------------  
--- Pretty-printer de los errores.

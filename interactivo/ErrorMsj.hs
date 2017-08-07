@@ -6,17 +6,17 @@ import PrettyPrinter (printType, printLTerm)
 import Hypothesis (printHypothesis)
 import Text.Megaparsec (parseErrorPretty)
 
-printError :: String -> FOperations -> ExceptionPos -> Doc
-printError _ op (_, e@(SyntaxE _)) =
+printError :: FOperations -> ExceptionPos -> Doc
+printError op (_, e@(SyntaxE _)) =
   errorMessage op e
-printError file op (pos, e) =  
+printError op ((file,pos), e) =  
   filePos file pos $$
   errorMessage op e 
 
 printErrorNoPos :: FOperations -> ExceptionPos -> Doc
 printErrorNoPos op (_, e) = errorMessage op e 
 
-filePos :: String -> LinePos -> Doc
+filePos :: String -> Int -> Doc
 filePos file line =
   text file <>
   colon <>

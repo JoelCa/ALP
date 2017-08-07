@@ -108,7 +108,8 @@ data CLICommand = Escaped ECommand
 
 data ECommand = Exit
               | Reset
-              | Load String
+              | Load [String]
+              | Help
               deriving (Show)
 
 data BodyDef = LTerm LTerm1
@@ -148,9 +149,9 @@ data ProofException = PNotFinished | PNotStarted | ExistE String
                     | FileE IOError
                     deriving (Show, Typeable)
 
-type LinePos = Int
+type EPosition = (String, Int)
 
-type ExceptionPos = (LinePos, ProofException)
+type ExceptionPos = (EPosition, ProofException)
 
 data InferException = InferE1 String | InferE2 DoubleLTerm DoubleType
                     | InferE3 DoubleLTerm String | InferE4 DoubleLTerm

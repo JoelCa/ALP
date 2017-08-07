@@ -5,7 +5,7 @@ import Data.Maybe
 import Data.List (isPrefixOf)
 import qualified Data.Sequence as S
 import Tactics (habitar)
-import Parser (emptyPos, commandsFromFile, reservedWords, getCommand, usrInfixParser, getParser)
+import Parser (isLoadCommand, emptyPos, commandsFromFiles, reservedWords, getCommand, usrInfixParser, getParser)
 import Text.PrettyPrint (render)
 import PrettyPrinter (printLTermNoName, printProof, printType)
 import Transformers
@@ -14,6 +14,7 @@ import TypeInference (basicTypeInference)
 import ProverState
 import GlobalState
 import Proof (ProofConstruction, getLTermFromProof, isFinalTerm, cglobal, tsubp, subps)
+import Data.List (isSuffixOf)
   
 type ProverInputState a = InputT (StateT ProverState IO) a
 
@@ -30,12 +31,18 @@ reloadProver = lift $ modify $ finishProof . newTheoremFromProof
 main :: IO ()
 main = evalStateT (runInputT settings proverFromCLI) initialProver
 
-searchCompl :: String -> [Completion]
-searchCompl str = map simpleCompletion $ filter (str `isPrefixOf`) reservedWords
+searchCompl :: String -> String -> StateT ProverState IO [Completion]
+searchCompl prev str
+  | isLoadCommand $ reverse prev = getProofFile <$> listFiles str
+  | otherwise = return $ map simpleCompletion $ filter (str `isPrefixOf`) reservedWords
+
+
+getProofFile :: [Completion] -> [Completion]
+getProofFile = filter (\(Completion x _ _) -> isSuffixOf ".pr" x)
 
 settings :: Settings (StateT ProverState IO)
 settings = Settings { historyFile = Nothing
-                    , complete = completeWord Nothing " \t" $ return . searchCompl
+                    , complete = completeWordWithPrev Nothing " \t" $ searchCompl
                     , autoAddHistory = True
                     }
 
@@ -45,41 +52,42 @@ prompt s = if proofStarted s
            else "> "
 
 proverFromCLI :: ProverInputState ()
-proverFromCLI = prover Nothing
-
-proverFromFile :: String -> ProverInputState ()
-proverFromFile file = prover $ Just file
-
-prover :: Maybe String -> ProverInputState ()
-prover Nothing =
+proverFromCLI =
   do s <- lift get
      minput <- getInputLine $ prompt s
      case minput of
        Nothing -> return ()
-       Just "" -> prover Nothing
+       Just "" -> proverFromCLI
        Just x ->
          catch (do command <- returnInput emptyPos $ getCommand x $ infixParser s
                    checkCliCommand command)
          (\e -> outputStrLn (render $ printErrorNoPos (opers $ global s) e)
-                >> prover Nothing)
-prover (Just file) =
+                >> proverFromCLI)
+
+proverFromFiles :: [String] -> ProverInputState ()
+proverFromFiles files =
   do s <- lift get
-     r <- lift $ lift $ commandsFromFile file (infixParser s)
+     r <- lift $ lift $ commandsFromFiles files (infixParser s)
      catch (do commands <- returnInput emptyPos r
                checkCommand commands)
-       (\e -> outputStrLn (render $ printError file (opers $ global s) e)
-              >> prover Nothing)
+       (\e -> outputStrLn (render $ printError (opers $ global s) e)
+              >> proverFromCLI)
 
-checkCliCommand :: (LinePos, CLICommand) -> ProverInputState ()
-checkCliCommand (pos, Escaped Exit) = outputStrLn "Saliendo."
-checkCliCommand (pos, Escaped Reset) = resetProof >> proverFromCLI
-checkCliCommand (pos, Escaped (Load file)) =
-  do outputStrLn $ "File: " ++ file ++ "\n"
-     proverFromFile file
-checkCliCommand (pos, Lang c) = checkCommand [(pos, c)]
+-- TERMINAR help
+checkCliCommand :: (EPosition, CLICommand) -> ProverInputState ()
+checkCliCommand (_, Escaped Exit) =
+  outputStrLn "Saliendo."
+checkCliCommand (_, Escaped Reset) =
+  resetProof >> proverFromCLI
+checkCliCommand (_, Escaped (Load files)) =
+  proverFromFiles files
+checkCliCommand (_, Escaped Help) =
+  outputStrLn "Ver manual." >> proverFromCLI
+checkCliCommand (pos, Lang c) =
+  checkCommand [(pos, c)]
 
 
-theoremCommand :: LinePos -> String -> Type1 -> ProverInputState ()
+theoremCommand :: EPosition -> String -> Type1 -> ProverInputState ()
 theoremCommand pos name ty =
   do s <- lift get
      when (proofStarted s) $ throwIO (pos, PNotFinished)
@@ -89,7 +97,7 @@ theoremCommand pos name ty =
      ty' <- returnInput pos $ basicTypeWithoutName (fTypeContext g) (opers g) ty
      lift $ modify $ newProof name ty' tyr
 
-typesVarCommand :: LinePos -> S.Seq TypeVar -> ProverInputState ()
+typesVarCommand :: EPosition -> S.Seq TypeVar -> ProverInputState ()
 typesVarCommand pos ps =
   do s <- lift get
      when (proofStarted s) $ throwIO (pos, PNotFinished)
@@ -98,14 +106,14 @@ typesVarCommand pos ps =
      when (isJust tr2) $ throwIO (pos, ExistE $ fromJust tr2)
      lift $ modify $ modifyGlobal $ addFreeVars ps
 
-definitionCommand :: LinePos -> String -> BodyDef -> ProverInputState ()
+definitionCommand :: EPosition -> String -> BodyDef -> ProverInputState ()
 definitionCommand pos name body = 
   do s <- lift get
      when (proofStarted s) $ throwIO (pos, PNotFinished)
      when (invalidName name $ global s) $ throwIO (pos, ExistE name)
      defCommand pos name body
 
-tacticCommand :: Bool -> LinePos -> Tactic -> ProverInputState () 
+tacticCommand :: Bool -> EPosition -> Tactic -> ProverInputState () 
 tacticCommand printing pos (Print x) =
  do printCommand pos x
     if printing
@@ -124,7 +132,7 @@ tacticCommand printing pos ta =
 
        
 -- Procesa todas las tácticas que no son "Print" ni "Infer".
-otherTacticsCommand :: LinePos -> Tactic -> ProverInputState (FOperations, DoubleType, ProofConstruction)
+otherTacticsCommand :: EPosition -> Tactic -> ProverInputState (FOperations, DoubleType, ProofConstruction)
 otherTacticsCommand _ (Print _) =
   error "error: otherTacticsCommand, no debería pasar."
 otherTacticsCommand _ (Infer _) =
@@ -141,13 +149,13 @@ otherTacticsCommand pos ta =
        else return ()
      return (opers $ global s, getTypeProof s, pc')
 
-printCommand :: LinePos -> String -> ProverInputState ()
+printCommand :: EPosition -> String -> ProverInputState ()
 printCommand pos x =
   do s <- lift get
      let g = global s
      when (not $ isTheorem x g) $ throwIO (pos, NotExistE x)
 
-inferCommand :: LinePos -> LTerm1 -> ProverInputState DoubleType
+inferCommand :: EPosition -> LTerm1 -> ProverInputState DoubleType
 inferCommand pos x =
   do s <- lift get
      let g = global s
@@ -174,7 +182,7 @@ otherTacticsCPrinting op ty pc
   
 
 -- Tratamiento de los comandos.
-checkCommand :: [(LinePos, Command)] -> ProverInputState ()
+checkCommand :: [(EPosition, Command)] -> ProverInputState ()
 checkCommand [] = proverFromCLI
 checkCommand [(pos, Ty name ty)] =
   do theoremCommand pos name ty
@@ -199,7 +207,7 @@ checkCommand ((pos, Ta ta):cs) =
 
 -- Trata el comando de definición.
 -- Define el término dado por el 2º argumento.
-defCommand :: LinePos -> String -> BodyDef -> ProverInputState ()
+defCommand :: EPosition -> String -> BodyDef -> ProverInputState ()
 defCommand pos name (Type (body, n, args, isInfix)) =
   do s <- lift get
      let glo = global s   
@@ -231,7 +239,7 @@ typeDefinition name t n isInfix =
      when isInfix $ lift $ modify $ modifyUsrParser $ usrInfixParser name . getParser
 
 -- Función auxiliar de defCommand
-lamTermDefinition :: LinePos -> String -> DoubleLTerm -> ProverInputState ()
+lamTermDefinition :: EPosition -> String -> DoubleLTerm -> ProverInputState ()
 lamTermDefinition pos name te =
   do s <- lift get
      let glo = global s
@@ -268,6 +276,6 @@ renderProof :: ProofConstruction -> String
 renderProof p = render $ printProof (tsubp p) (conflict $ cglobal p) (opers $ cglobal p) (fTypeContext $ cglobal p) (subps p)
 
 
-returnInput :: LinePos -> Either ProofException a -> ProverInputState a
+returnInput :: EPosition -> Either ProofException a -> ProverInputState a
 returnInput pos (Left exception) = throwIO (pos, exception)
 returnInput pos (Right x) = return x

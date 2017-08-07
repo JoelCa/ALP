@@ -5,7 +5,7 @@ import Data.Maybe
 import Data.List (isPrefixOf)
 import qualified Data.Sequence as S
 import Tactics (habitar)
-import Parser (isLoadCommand, emptyPos, commandsFromFiles, reservedWords, getCommand, usrInfixParser, getParser)
+import Parser (isLoadCommand, emptyPos, commandsFromFiles, reservedWords, getCommand)
 import Text.PrettyPrint (render)
 import PrettyPrinter (printLTermNoName, printProof, printType)
 import Transformers
@@ -59,7 +59,7 @@ proverFromCLI =
        Nothing -> return ()
        Just "" -> proverFromCLI
        Just x ->
-         catch (do command <- returnInput emptyPos $ getCommand x $ infixParser s
+         catch (do command <- returnInput emptyPos $ getCommand x
                    checkCliCommand command)
          (\e -> outputStrLn (render $ printErrorNoPos (opers $ global s) e)
                 >> proverFromCLI)
@@ -67,7 +67,7 @@ proverFromCLI =
 proverFromFiles :: [String] -> ProverInputState ()
 proverFromFiles files =
   do s <- lift get
-     r <- lift $ lift $ commandsFromFiles files (infixParser s)
+     r <- lift $ lift $ commandsFromFiles files
      catch (do commands <- returnInput emptyPos r
                checkCommand commands)
        (\e -> outputStrLn (render $ printError (opers $ global s) e)
@@ -236,7 +236,7 @@ defCommand pos name (Ambiguous ap) =
 typeDefinition :: String -> DoubleType -> Int -> Bool -> ProverInputState ()
 typeDefinition name t n isInfix =
   do lift $ modify $ modifyGlobal $ addOperator (name, t, n, isInfix)
-     when isInfix $ lift $ modify $ modifyUsrParser $ usrInfixParser name . getParser
+     --when isInfix $ lift $ modify $ modifyUsrParser $ usrInfixParser name . getParser
 
 -- Función auxiliar de defCommand
 lamTermDefinition :: EPosition -> String -> DoubleLTerm -> ProverInputState ()

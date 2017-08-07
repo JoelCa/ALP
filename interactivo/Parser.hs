@@ -13,11 +13,11 @@ import qualified Control.Exception as E (try)
 import Data.List (isSuffixOf)
 import Data.Char (isSpace)
 
-type UsrParser = ParserParser Type1
+--type UsrParser = ParserParser Type1
 
-type Parser = ParsecT Void String (Reader UsrParser)
+type Parser = Parsec Void String
 
-newtype ParserParser a = PP { getParser :: Parser a }
+--newtype ParserParser a = PP { getParser :: Parser a }
 
 type ProofCommands = Either ProofException [(EPosition, Command)]
 
@@ -25,7 +25,7 @@ type CommandLineCommand = Either ProofException (EPosition, CLICommand)
 
 
 emptyPos :: EPosition
-emptyPos = ("",1)
+emptyPos = ("", 1)
 
 reservedWords = ["Propositions", "Types", "Theorem", "Print", "Check", "forall", "exists",
                  "let", "in", "as", "False", "assumption", "intro", "intros", "split",
@@ -92,12 +92,12 @@ symbolIdent = (lexeme . try) (p >>= check)
                 else return x
 
 
-commandsFromFiles :: [String] -> UsrParser -> IO ProofCommands
-commandsFromFiles files p =
+commandsFromFiles :: [String] -> IO ProofCommands
+commandsFromFiles files =
   do content <- mapM (\f -> either Left (\x -> Right (f, x)) <$> (E.try $ readFile f)) files
      case sequence content of
        Right xs ->
-         case mapM (\(f,s) -> runReader (runParserT (space *> commands) f s) p) xs of
+         case mapM (\(f,s) -> parse (space *> commands) f s) xs of
            Right x -> return $ Right $ concat x
            Left e -> return $ Left $ SyntaxE  e
        Left e -> return $ Left $ FileE e
@@ -110,10 +110,10 @@ getLinePos :: SourcePos -> EPosition
 getLinePos (SourcePos n l c) = (n, unPos l)
     
 
-getCommand :: String -> UsrParser -> CommandLineCommand
-getCommand s p = case runReader (runParserT (space *> ((\x -> (emptyPos, x)) <$> cliCommand) <* eof) "" s) p of
-                      Right x -> Right x
-                      Left e -> Left $ SyntaxE  e
+getCommand :: String -> CommandLineCommand
+getCommand s = case parse (space *> ((\x -> (emptyPos, x)) <$> cliCommand) <* eof) "" s  of
+                 Right x -> Right x
+                 Left e -> Left $ SyntaxE  e
 
 cliCommand :: Parser CLICommand
 cliCommand = do c <- command
@@ -122,7 +122,7 @@ cliCommand = do c <- command
                     return $ Escaped ec
 
 testeo :: Show a => Parser a -> String -> IO ()
-testeo p s = case runReader (runParserT p "" s) (PP unit4) of
+testeo p s = case parse p "" s of
                Left e -> putStrLn $ parseErrorPretty e
                Right x -> putStrLn $ show x
 
@@ -240,8 +240,15 @@ unit2 :: Parser Type1
 unit2 = infixP or_id (\x y -> RenamedType or_id [x,y]) unit3
 
 unit3 :: Parser Type1
-unit3 = do infixOps <- ask
-           infixP and_id (\x y -> RenamedType and_id [x,y]) (getParser infixOps)
+unit3 = infixP and_id (\x y -> RenamedType and_id [x,y]) infixOps
+
+infixOps :: Parser Type1
+infixOps = do x <- unit4
+              (do s <- symbolIdent
+                  y <- infixOps
+                  return $ RenamedType s [x,y]
+               <|> return x)
+
 
 unit4 :: Parser Type1
 unit4 = do symbol not_id
@@ -508,8 +515,8 @@ rword2 w = try $ string w *> sc2
 -- Argumentos:
 -- 1º La nueva operación infija.
 -- 2º El parser de operaciones infijas (con más precedencia),
-usrInfixParser :: String -> Parser Type1 -> UsrParser
-usrInfixParser s p = PP $ infixP s (\x y -> RenamedType s [x, y]) p
+-- usrInfixParser :: String -> Parser Type1 -> UsrParser
+-- usrInfixParser s p = PP $ infixP s (\x y -> RenamedType s [x, y]) p
 
-basicInfixParser :: UsrParser
-basicInfixParser = PP unit4
+-- basicInfixParser :: UsrParser
+-- basicInfixParser = PP unit4

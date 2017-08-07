@@ -1,7 +1,6 @@
 module ProverState where
 
 import Common
-import Parser (UsrParser, basicInfixParser)
 import GlobalState
 import Proof (ProofConstruction, newProofC, getLTermFromProof)
 import Data.Maybe (isJust)
@@ -10,7 +9,6 @@ import Data.Sequence (Seq)
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState
                        , global :: GlobalState
-                       , infixParser :: UsrParser
                        }
 
 
@@ -60,14 +58,13 @@ proofStarted p = isJust $ proof p
 initialProver :: ProverState
 initialProver = PSt { global = initialGlobal
                     , proof = Nothing
-                    , infixParser = basicInfixParser
                     }
 
 modifyGlobal :: (GlobalState -> GlobalState) -> ProverState -> ProverState
 modifyGlobal f p = p {global = f $ global p}
 
-modifyUsrParser :: (UsrParser -> UsrParser) -> ProverState -> ProverState
-modifyUsrParser f p = p {infixParser = f $ infixParser p}
+-- modifyUsrParser :: (UsrParser -> UsrParser) -> ProverState -> ProverState
+-- modifyUsrParser f p = p {infixParser = f $ infixParser p}
 
 setProofC :: ProofConstruction -> ProverState -> ProverState
 setProofC pc p@(PSt {proof = Just pr}) = p {proof = Just $ pr {constr = pc}}

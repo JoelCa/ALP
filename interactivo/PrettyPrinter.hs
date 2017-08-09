@@ -21,7 +21,6 @@ vars = [ c : n | n <- "" : map show nats, c <- ['x','y','z'] ++ ['p'..'w'] ]
   where nats :: [Integer]
         nats = [1..]
 
-
 varsAndOps :: DoubleType -> Set String
 varsAndOps (TVar (x,_)) = Set.singleton x
 varsAndOps (Fun t u) = Set.union (varsAndOps t) (varsAndOps u)
@@ -233,72 +232,74 @@ printLTermNoName' _ _ _ [] (Abs _ _ _) =
 -- Obs: Basta con que la primera componente de la tripleta, que se pasa como argumento a
 -- printType', sea mayor o igual a 7, para asegurar que no aparescan paréntesis "externos".
 printType :: FOperations -> DoubleType -> Doc
-printType = printType' (7,7,False)
+printType = printType' (7,False)
 
-
-printType' :: (Int, Int, Bool) -> FOperations -> DoubleType -> Doc
+-- Argumentos:
+-- 1. Si el argumento número 3 "x", es un argumento de una operación "op",
+-- estonces la componente número uno de la túpla indica la precedencia
+-- de "op", mientras que el argumento número 2, nos dice si "x" es la
+-- componente izquierda de "op".
+-- 2. Operaciones foldeables.
+-- 3. Tipo.
+printType' :: (Int, Bool) -> FOperations -> DoubleType -> Doc
 printType' _ _ (TVar (v, _)) =
   text v
 printType' prec op (Fun t1 t2) =
   printBinInfix (\x t -> printType' x op t) "->" prec 5 t1 t2
-printType' (i,j,k) op (ForAll v t) =
-  parenIf (i < 7) $
+printType' (p,left) op (ForAll v t) =
+  parenIf (p < 7) $
   sep $
   text "forall" <+>
   text v <>
   text "," :
-  [nest 2 $ printType' (7,j,k) op t]
-printType' (i,j,k) op (Exists v t) =
-  parenIf (i < 7) $
+  [nest 2 $ printType' (7,left) op t]
+printType' (p,left) op (Exists v t) =
+  parenIf (p < 7) $
   sep $
   text "exists" <+>
   text v <>
   text "," :
-  [nest 2 $ printType' (7,j,k) op t]
-printType' prec@(i,j,k) op (RenamedType s [t1, t2])
+  [nest 2 $ printType' (7,left) op t]
+printType' prec@(p,left) op (RenamedType s [t1, t2])
   | s == and_id = printBinInfix (\x t -> printType' x op t) s prec 3 t1 t2
   | s == or_id = printBinInfix (\x t -> printType' x op t) s prec 4 t1 t2
   | s == iff_id = printBinInfix (\x t -> printType' x op t) s prec 6 t1 t2
-  | otherwise = case getElemIndex (\(x,_,_,_) -> x == s) op of
-          Just (_, (_,_,_,False)) ->
+  | otherwise = case find (\(x,_,_,_) -> x == s) op of
+          Just (_,_,_,False) ->
             printPrefix (\x t -> printType' x op t) s prec [t1,t2]
-          Just (n, (_,_,_,True)) ->
-            parenIf ( i < 2 || ( i == 2 && ( j < n || ( j == n && k )))) $
-            sep $
-            printType' (2, n, True) op t1 :
-            [ text s <+>
-              printType' (2, n, False) op t2 ]
+          Just (_,_,_,True) ->
+            printBinInfix (\x t -> printType' x op t) s prec 2 t1 t2
           _ -> error "error: printType' no debería pasar."
 printType' prec op (RenamedType s ts) =
   printPrefix (\x t -> printType' x op t) s prec ts
 
 
-printBinInfix :: ((Int, Int, Bool) -> a -> Doc) -> String
-              -> (Int, Int, Bool) -> Int -> a -> a -> Doc              
-printBinInfix f s (i,j,k) n t1 t2 =
-  parenIf (i < n || ( (i == n) && k)) $
+printBinInfix :: ((Int, Bool) -> a -> Doc) -> String
+              -> (Int, Bool) -> Int -> a -> a -> Doc              
+printBinInfix f s (p,left) n t1 t2 =
+  parenIf (p < n || ( (p == n) && left)) $
   sep $
-  f (n, j, True) t1 :
+  f (n, True) t1 :
   [ text s <+>
-    f (n, j, False) t2 ]
+    f (n, False) t2 ]
 
 
-printPrefix :: ((Int, Int, Bool) -> a -> Doc) -> String
-            -> (Int, Int, Bool) -> [a] -> Doc
+printPrefix :: ((Int, Bool) -> a -> Doc) -> String
+            -> (Int, Bool) -> [a] -> Doc
 printPrefix f s _ [] 
   | s == bottom_id = text $ bottom_id
   | otherwise = text s
-printPrefix f s (i, j, k) [t]
-  | s == not_id = parenIf (i < 1) $
+printPrefix f s (p, left) [t]
+  | s == not_id = parenIf (p < 1) $
                   text s <+>
-                  f (1, j, k) t
-  | otherwise = parenIf (i == 0) $
+                  f (1, left) t
+  | otherwise = parenIf (p == 0) $
                 text s <+>
-                f (0, j, k) t
-printPrefix f s (i, j, k) ts =
-  parenIf (i == 0) $
+                f (0, left) t
+printPrefix f s (p, left) ts =
+  parenIf (p == 0) $
   text s <+>
-  foldl (\r t -> r <+> f (0,j,k) t) empty ts
+  foldl (\r t -> r <+> f (0,left) t) empty ts
   
 --------------------------------------------------------------------------------------------  
 -- Pretty-printer de la prueba.
@@ -390,9 +391,6 @@ printTermVar n op (_,_,t) =
 
 printBTypeVar :: BTypeVar -> Doc
 printBTypeVar (_,x) = text x
-
-getElemIndex :: (a -> Bool) -> S.Seq a -> Maybe (Int, a)
-getElemIndex f xs = S.foldlWithIndex (\r i x -> if f x then Just (i, x) else r) Nothing xs
 
 fst3 :: (a, b, c) -> a
 fst3 (x, _, _) = x

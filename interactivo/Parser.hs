@@ -13,11 +13,8 @@ import qualified Control.Exception as E (try)
 import Data.List (isSuffixOf)
 import Data.Char (isSpace)
 
---type UsrParser = ParserParser Type1
 
 type Parser = Parsec Void String
-
---newtype ParserParser a = PP { getParser :: Parser a }
 
 type ProofCommands = Either ProofException [(EPosition, Command)]
 
@@ -507,16 +504,3 @@ isLoadCommand s = case parse (space *> rword2 ":load" <|> rword2 ":l") "" s of
 
 rword2 :: String -> SParser ()
 rword2 w = try $ string w *> sc2
-
---------------------------------------------------------------------------------------
--- Construcción del parser de las operaciones del usuario.
-
--- Genera el parser de la operaciones infijas definidas por el usuario.
--- Argumentos:
--- 1º La nueva operación infija.
--- 2º El parser de operaciones infijas (con más precedencia),
--- usrInfixParser :: String -> Parser Type1 -> UsrParser
--- usrInfixParser s p = PP $ infixP s (\x y -> RenamedType s [x, y]) p
-
--- basicInfixParser :: UsrParser
--- basicInfixParser = PP unit4

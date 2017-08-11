@@ -235,8 +235,7 @@ defCommand pos name (Ambiguous ap) =
 -- Función auxiliar de defCommand
 typeDefinition :: String -> DoubleType -> Int -> Bool -> ProverInputState ()
 typeDefinition name t n isInfix =
-  do lift $ modify $ modifyGlobal $ addOperator (name, t, n, isInfix)
-     --when isInfix $ lift $ modify $ modifyUsrParser $ usrInfixParser name . getParser
+  lift $ modify $ modifyGlobal $ addOperator (name, t, n, isInfix)
 
 -- Función auxiliar de defCommand
 lamTermDefinition :: EPosition -> String -> DoubleLTerm -> ProverInputState ()

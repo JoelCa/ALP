@@ -63,9 +63,6 @@ initialProver = PSt { global = initialGlobal
 modifyGlobal :: (GlobalState -> GlobalState) -> ProverState -> ProverState
 modifyGlobal f p = p {global = f $ global p}
 
--- modifyUsrParser :: (UsrParser -> UsrParser) -> ProverState -> ProverState
--- modifyUsrParser f p = p {infixParser = f $ infixParser p}
-
 setProofC :: ProofConstruction -> ProverState -> ProverState
 setProofC pc p@(PSt {proof = Just pr}) = p {proof = Just $ pr {constr = pc}}
 setProofC _ _ = error "error: setProofC, no debería pasar."

@@ -7,7 +7,7 @@ import qualified Data.Sequence as S
 import Tactics (habitar)
 import Parser (isLoadCommand, emptyPos, commandsFromFiles, reservedWords, getCommand)
 import Text.PrettyPrint (render)
-import PrettyPrinter (printLTermNoName, printProof, printType)
+import PrettyPrinter (help, printLTermNoName, printProof, printType)
 import Transformers
 import ErrorMsj (printError, printErrorNoPos)
 import TypeInference (basicTypeInference)
@@ -82,7 +82,7 @@ checkCliCommand (_, Escaped Reset) =
 checkCliCommand (_, Escaped (Load files)) =
   proverFromFiles files
 checkCliCommand (_, Escaped Help) =
-  outputStrLn "Ver manual." >> proverFromCLI
+  outputStrLn help >> proverFromCLI
 checkCliCommand (pos, Lang c) =
   checkCommand [(pos, c)]
 

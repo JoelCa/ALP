@@ -394,3 +394,38 @@ printBTypeVar (_,x) = text x
 
 fst3 :: (a, b, c) -> a
 fst3 (x, _, _) = x
+
+--------------------------------------------------------------------------------------------  
+-- Help
+
+--TERMINAR
+helpMessage :: [(String, String)]
+helpMessage = [("Propositions/Types <var>, <var>, ...",
+               "Declaración de variables proposicionales.\n"),
+               ("<op> <var> <var> ... = <logic term>",
+               "Declaración de un operador lógico prefijo.\n"),
+               ("<var> <sym> <var> = <logic term>",
+               "Declaración de un operador lógico binario infijo.\n"),
+               ("<name> = <lambda term>",
+               "Declaración de un lambda término.\n"),
+               ("Theorem <name> : <logic term>",
+               "Inicia la prueba de un teorema.\n"),
+               ("<tactic>",
+               "Táctica de una prueba.\n"),
+               (":load <files>",
+               "Carga de archivos.\n"),
+               (":print <name>",
+               "Imprime el lambda término asociado.\n"),
+               (":infer <lambda term>",
+               "Infiere el tipo del lambda término.\n"),
+               (":reset",
+               "Cancela la prueba de un teorema.\n"),
+               (":quit",
+               "Salir.\n"),
+               (":help",
+               "Imprime este mensaje de ayuda.\n")
+               ]
+
+help :: String
+help =
+  concat $ map (\(x,y) -> x ++ replicate ((40 - length x) `max` 2) ' ' ++ y) helpMessage  

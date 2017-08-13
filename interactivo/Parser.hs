@@ -132,6 +132,12 @@ command = do rword "Theorem"
              t <- typeTerm
              dot
              return $ Ty name t
+         <|> do rword "Axiom"
+             name <- identifier
+             colon
+             t <- typeTerm
+             dot
+             return $ Axiom name t
          <|> do rword "Propositions" <|> rword "Types"
                 ps <- sepByCommaSeq identifier
                 dot

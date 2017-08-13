@@ -96,10 +96,11 @@ type FTypeContext = Seq FTypeVar
 
 
   --Comandos del lenguaje.
-data Command = Ty String Type1
+data Command = Theorem String Type1
              | Ta Tactic
              | Types (Seq TypeVar)
              | Definition String BodyDef
+             | Axiom String Type1
              deriving (Show)
 
 -- Comandos de la línea de comandos

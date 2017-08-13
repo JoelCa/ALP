@@ -164,6 +164,19 @@ intro.
 
 Print All.
 
+Print k7.
+
+Axiom k81 : forall x:Prop, x -> x.
+
+Print k81.
+
+Theorem k82 : forall x:Prop, x -> x.
+Proof.
+  exact k81.
+Qed.
+
+Print k82.
+
 intros.
 auto.
 

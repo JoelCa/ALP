@@ -243,7 +243,7 @@ lamTermDefinition pos name te =
   do s <- lift get
      let glo = global s
      ty <- returnInput pos $ basicTypeInference (theorems glo) (opers glo) te
-     lift $ modify $ newTheorem name (toNoName te ::: ty)
+     lift $ modify $ newTheorem name (toNoName te ::: ty) ty
 
 -- Función auxiliar del comando "Props/Types".
 typeRepeated :: S.Seq TypeVar -> (String -> Bool) -> (Maybe String, Maybe String)

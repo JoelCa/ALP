@@ -2,8 +2,8 @@ module GlobalState where
 
 import Common
 import Data.IntSet
-import Theorems (Theorems)
-import qualified Theorems as T
+import LambdaTermsContext (Definitions)
+import qualified LambdaTermsContext as LTC
 import qualified Data.Sequence as S
 import Parser (getHypothesisValue)
 import Rules
@@ -13,13 +13,13 @@ type TheoremsNames = IntSet
 
 -- Definiciones globales.
 data GlobalState = Global { fTypeContext :: FTypeContext
-                          , theorems :: Theorems             -- Teoremas.
+                          , definitions :: Definitions       -- Definiciones.
                           , opers :: FOperations             -- Operaciones "foldeables"
                           , conflict :: TheoremsNames        -- Nombres de teoremas conflictivos.
                           }
 
 -- Teoremas iniciales.
-initialTheorems = [ ("intro_and", intro_and),
+initialTheorems = [ ("intro_and", intro_and, ),
                     ("elim_and", elim_and),
                     ("intro_or1", intro_or1),
                     ("intro_or2", intro_or2),
@@ -29,8 +29,8 @@ initialTheorems = [ ("intro_and", intro_and),
                   ]
 
 
-addTheorem :: String -> LTerm2 -> GlobalState -> GlobalState
-addTheorem name lt g = g {theorems = T.insert name lt $ theorems g}
+addTheorem :: String -> LTerm2 -> DoubleType -> GlobalState -> GlobalState
+addTheorem name lt ty g = g {definitions = LTC.insert name lt ty $ definitions g}
 
 addOperator :: FoldeableOp -> GlobalState -> GlobalState
 addOperator op g = g {opers = (opers g) S.|> op}
@@ -44,14 +44,14 @@ addConflictName s c = case getHypothesisValue s of
                         Nothing -> c
 
 initialGlobal :: GlobalState
-initialGlobal = Global { theorems = T.fromList initialTheorems
+initialGlobal = Global { definitions = LTC.fromList initialTheorems
                        , fTypeContext = S.empty
                        , opers = S.fromList [not_op, iff_op]
                        , conflict = empty
                        }
 
 isTheorem :: String -> GlobalState -> Bool
-isTheorem name g = T.member name $ theorems g
+isTheorem name g = LTC.member name $ definitions g
 
 isFreeVar :: String -> GlobalState -> Bool
 isFreeVar name g = elem name $ fTypeContext g
@@ -68,5 +68,5 @@ invalidName name g =  isTheorem name g
 addFreeVars :: S.Seq TypeVar -> GlobalState -> GlobalState
 addFreeVars vars g = g {fTypeContext = vars S.>< fTypeContext g}
 
-getLTermFromTheorems :: String -> GlobalState -> LTerm2
-getLTermFromTheorems name (Global {theorems = te}) = te T.! name
+getLTermFromTheorems :: String -> GlobalState -> Maybe LTerm2
+getLTermFromTheorems name (Global {definitions = te}) = te LTC.! name

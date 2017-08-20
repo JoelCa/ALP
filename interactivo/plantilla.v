@@ -140,6 +140,8 @@ Definition asd x y
 forall v:Prop, 
 x /\ y.
 
+Print and.
+
 Notation "A -- B" := (asd A B) (at level 75).
 
 Theorem k6: p -- q /\ r -- w.
@@ -208,6 +210,7 @@ Check (fun (aa : Prop) (H : aa) => fun (aa:Prop) => H).
 Definition k14 := fun (aa : Prop) (H : aa) => fun (aa:Prop) (H2 : aa )=> H.
 
 Print k14.
+
 
 Theorem k15 : forall bb:Prop, forall aa : Prop, aa -> forall aa0 : Prop, aa0 -> aa.
 Proof.

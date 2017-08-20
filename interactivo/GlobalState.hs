@@ -2,35 +2,35 @@ module GlobalState where
 
 import Common
 import Data.IntSet
-import Theorems (Theorems)
-import qualified Theorems as T
+import LambdaTermDefinition as LTD
 import qualified Data.Sequence as S
 import Parser (getHypothesisValue)
 import Rules
 import DefaultOperators
 
-type TheoremsNames = IntSet
+type ConflictNames = IntSet
 
 -- Definiciones globales.
 data GlobalState = Global { fTypeContext :: FTypeContext
-                          , theorems :: Theorems             -- Teoremas.
-                          , opers :: FOperations             -- Operaciones "foldeables"
-                          , conflict :: TheoremsNames        -- Nombres de teoremas conflictivos.
+                          , lamDef :: LamDefs               -- Lambda términos definidos.
+                          , typeDef :: TypeDefs             -- Tipos definidos.
+                          , conflict :: ConflictNames       -- Nombres de teoremas conflictivos
+                                                            -- con los nombres de hipótesis.
                           }
 
 -- Teoremas iniciales.
-initialTheorems = [ ("intro_and", intro_and),
-                    ("elim_and", elim_and),
-                    ("intro_or1", intro_or1),
-                    ("intro_or2", intro_or2),
-                    ("elim_or", elim_or),
-                    ("intro_bottom", intro_bottom),
-                    ("elim_bottom", elim_bottom)
-                  ]
+-- initialTheorems = [ ("intro_and", intro_and),
+--                     ("elim_and", elim_and),
+--                     ("intro_or1", intro_or1),
+--                     ("intro_or2", intro_or2),
+--                     ("elim_or", elim_or),
+--                     ("intro_bottom", intro_bottom),
+--                     ("elim_bottom", elim_bottom)
+--                   ]
 
 
 addTheorem :: String -> LTerm2 -> GlobalState -> GlobalState
-addTheorem name lt g = g {theorems = T.insert name lt $ theorems g}
+addTheorem name lt g = g {lamDef = T.insert name lt $ lamDef g}
 
 addOperator :: FoldeableOp -> GlobalState -> GlobalState
 addOperator op g = g {opers = (opers g) S.|> op}
@@ -38,20 +38,20 @@ addOperator op g = g {opers = (opers g) S.|> op}
 checkConflictName :: String -> GlobalState -> GlobalState
 checkConflictName s g = g {conflict = addConflictName s $ conflict g}
 
-addConflictName :: String -> TheoremsNames -> TheoremsNames
+addConflictName :: String -> ConflictNames -> ConflictNames
 addConflictName s c = case getHypothesisValue s of
                         Just n -> insert n c
                         Nothing -> c
 
 initialGlobal :: GlobalState
-initialGlobal = Global { theorems = T.fromList initialTheorems
+initialGlobal = Global { lamDef = LTD.
                        , fTypeContext = S.empty
                        , opers = S.fromList [not_op, iff_op]
                        , conflict = empty
                        }
 
 isTheorem :: String -> GlobalState -> Bool
-isTheorem name g = T.member name $ theorems g
+isTheorem name g = T.member name $ lamDef g
 
 isFreeVar :: String -> GlobalState -> Bool
 isFreeVar name g = elem name $ fTypeContext g
@@ -68,5 +68,5 @@ invalidName name g =  isTheorem name g
 addFreeVars :: S.Seq TypeVar -> GlobalState -> GlobalState
 addFreeVars vars g = g {fTypeContext = vars S.>< fTypeContext g}
 
-getLTermFromTheorems :: String -> GlobalState -> LTerm2
-getLTermFromTheorems name (Global {theorems = te}) = te T.! name
+getLamTerm :: String -> GlobalState -> LTerm2
+getLamTerm name (Global {lamDef = te}) = te T.! name

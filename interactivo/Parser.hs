@@ -131,19 +131,19 @@ command = do rword "Theorem"
              colon
              t <- typeTerm
              dot
-             return $ Ty name t
+             return $ Theorem name t
          <|> do rword "Axiom"
-             name <- identifier
-             colon
-             t <- typeTerm
-             dot
-             return $ Axiom name t
+                name <- identifier
+                colon
+                t <- typeTerm
+                dot
+                return $ Axiom name t
          <|> do rword "Propositions" <|> rword "Types"
                 ps <- sepByCommaSeq identifier
                 dot
                 return $ Types ps
          <|> do tac <- tactic
-                return $ Ta tac
+                return $ Tac tac
          <|> do (name, def) <- definition
                 return $ Definition name def
 

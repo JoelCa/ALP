@@ -47,8 +47,8 @@ newTheoremFromProof :: ProverState -> ProverState
 newTheoremFromProof p@(PSt {proof = Just pr}) =
   newTheorem (name pr) (getLTermFromProof (constr pr) (types pr)) p
 
-newTheorem :: String -> LTerm2 -> ProverState -> ProverState
-newTheorem name te  = modifyGlobal (checkConflictName name . addTheorem name te)
+newTheorem :: String -> LTerm2 -> DoubleType -> ProverState -> ProverState
+newTheorem name te ty  = modifyGlobal (checkConflictName name . addTheorem name te ty)
 
 -- Indica si se inicio una prueba.
 proofStarted :: ProverState -> Bool

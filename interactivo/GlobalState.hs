@@ -30,7 +30,7 @@ data GlobalState = Global { fTypeContext :: FTypeContext
 
 
 addTheorem :: String -> LTerm2 -> GlobalState -> GlobalState
-addTheorem name lt g = g {lamDef = T.insert name lt $ lamDef g}
+addTheorem name lt g = g {lamDef = LTD.insert name lt $ lamDef g}
 
 addOperator :: FoldeableOp -> GlobalState -> GlobalState
 addOperator op g = g {opers = (opers g) S.|> op}
@@ -44,14 +44,14 @@ addConflictName s c = case getHypothesisValue s of
                         Nothing -> c
 
 initialGlobal :: GlobalState
-initialGlobal = Global { lamDef = LTD.
+initialGlobal = Global { lamDef = LTD.empty
                        , fTypeContext = S.empty
                        , opers = S.fromList [not_op, iff_op]
                        , conflict = empty
                        }
 
-isTheorem :: String -> GlobalState -> Bool
-isTheorem name g = T.member name $ lamDef g
+isLamDef :: String -> GlobalState -> Bool
+isLamDef name g = LTD.member name $ lamDef g
 
 isFreeVar :: String -> GlobalState -> Bool
 isFreeVar name g = elem name $ fTypeContext g
@@ -69,4 +69,4 @@ addFreeVars :: S.Seq TypeVar -> GlobalState -> GlobalState
 addFreeVars vars g = g {fTypeContext = vars S.>< fTypeContext g}
 
 getLamTerm :: String -> GlobalState -> LTerm2
-getLamTerm name (Global {lamDef = te}) = te T.! name
+getLamTerm name (Global {lamDef = te}) = te LTD.! name

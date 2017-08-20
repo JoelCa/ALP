@@ -97,7 +97,7 @@ type FTypeContext = Seq FTypeVar
 
   --Comandos del lenguaje.
 data Command = Theorem String Type1
-             | Ta Tactic
+             | Tac Tactic
              | Types (Seq TypeVar)
              | Definition String BodyDef
              | Axiom String Type1

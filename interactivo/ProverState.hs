@@ -43,12 +43,12 @@ finishProof :: ProverState -> ProverState
 finishProof p = p {proof = Nothing}
 
 -- La prueba pasa a ser un teorema.
-newTheoremFromProof :: ProverState -> ProverState
-newTheoremFromProof p@(PSt {proof = Just pr}) =
-  newTheorem (name pr) (getLTermFromProof (constr pr) (types pr)) p
+newLamDefFromProof :: ProverState -> ProverState
+newLamDefFromProof p@(PSt {proof = Just pr}) =
+  newLamDefinition (name pr) (getLTermFromProof (constr pr) (types pr)) (types pr) p
 
-newTheorem :: String -> LTerm2 -> DoubleType -> ProverState -> ProverState
-newTheorem name te ty  = modifyGlobal (checkConflictName name . addTheorem name te ty)
+newLamDefinition :: String -> LTerm2 -> DoubleType -> ProverState -> ProverState
+newLamDefinition name te ty  = modifyGlobal (checkConflictName name . addLamDefinition name te ty)
 
 -- Indica si se inicio una prueba.
 proofStarted :: ProverState -> Bool

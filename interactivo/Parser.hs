@@ -1,7 +1,6 @@
 module Parser where
 
 import Common
-import DefaultOperators
 import Text.Megaparsec hiding (State)
 import qualified Text.Megaparsec.Char.Lexer as L
 import Text.Megaparsec.Char
@@ -12,7 +11,6 @@ import qualified Data.Sequence as S (Seq, empty, (<|), (|>), singleton, fromList
 import qualified Control.Exception as E (try)
 import Data.List (isSuffixOf)
 import Data.Char (isSpace)
-
 
 type Parser = Parsec Void String
 
@@ -454,19 +452,19 @@ definition = do x <- identifier
                              equal
                              t <- typeTerm
                              dot
-                             return (x, Type (t, n, xs, False)))
+                             return (x, Type ((t, xs), n, False)))
                  <|> do y <- symbolIdent
                         z <- identifier
                         equal
                         t <- typeTerm
                         dot
-                        return (y, Type (t, 2, S.fromList [z, x], True)))
+                        return (y, Type ((t, S.fromList [z, x]), 2, True)))
              <|> do name <- symbolIdent
                     (n, xs) <- seqReverseOrd1 identifier
                     equal
                     t <- typeTerm
                     dot
-                    return (name, Type (t, n, xs, False))
+                    return (name, Type ((t, xs), n, False))
 
 --------------------------------------------------------------------------------------
 -- Parser de aplicaciones "ambiguas".                            

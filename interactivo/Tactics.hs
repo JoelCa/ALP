@@ -1,9 +1,8 @@
 module Tactics where
 
 import Common
-import Theorems (Theorems)
+import LambdaTermDefinition (LamDefs)
 import Proof
-import DefaultOperators
 import TermsWithHoles
 import RenamedVariables
 import Hypothesis
@@ -92,7 +91,7 @@ habitar (Exact (LamT te)) =
      cn <- getConflictNames
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     teo <- getTheorems
+     ld <- getLamDefinitions
      te' <- eitherToProof $ withoutName op ftc btc (cn,n) teo te
      exactTerm te' tt  
 habitar (Exact (T ty)) =
@@ -101,7 +100,7 @@ habitar (Exact (T ty)) =
      op <- getUsrOpers
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     teo <- getTheorems
+     ld <- getLamDefinitions
      ty' <- eitherToProof $ renamedType2 btc ftc op teo ty
      exactType ty'     
 habitar (Exact (Appl aps)) =
@@ -126,7 +125,7 @@ habitar (Unfold s Nothing) =
      (s', tt, _, _) <- maybeToProof (UnfoldE1 s) $ find (\(x,_,_,_) -> x == s) op
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     teo <- getTheorems
+     ld <- getLamDefinitions
      replaceType $ unfoldComm btc ftc op teo s' t tt
 habitar (Unfold s (Just h)) =
   do op <- getUsrOpers
@@ -138,7 +137,7 @@ habitar (Unfold s (Just h)) =
      let (x,y,t) = S.index c i
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     teo <- getTheorems
+     ld <- getLamDefinitions
      let r = unfoldComm btc ftc op teo s' t tt
      updateTermContext i (x,y,r)
 habitar (Absurd ty) =
@@ -149,7 +148,7 @@ habitar (Absurd ty) =
          then do op <- getUsrOpers
                  btc <- getBTypeContext
                  ftc <- getFTypeContext
-                 teo <- getTheorems
+                 ld <- getLamDefinitions
                  tty <- eitherToProof $ renamedType2 btc ftc op teo ty
                  newSubProofs 2 [ Just tty
                                 , Just (RenamedType not_id [tty]) ]
@@ -165,7 +164,7 @@ habitar (CExists ty) =
          do op <- getUsrOpers
             btc <- getBTypeContext
             ftc <- getFTypeContext
-            teo <- getTheorems
+            ld <- getLamDefinitions
             ty' <- eitherToProof $ renamedType2 btc ftc op teo ty
             replaceType $ typeSubs 1 btc ftc op teo t [ty']
             modifyTerm $ addHT (\x -> EPack ty' x tt)
@@ -176,7 +175,7 @@ habitar (Cut ty) =
      op <- getUsrOpers
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     teo <- getTheorems
+     ld <- getLamDefinitions
      tty <- eitherToProof $ renamedType2 btc ftc op teo ty
      newSubProofs 2 [ Just (Fun tty t)
                     , Just tty ]
@@ -225,7 +224,7 @@ elimComm i t (Exists v tt) =
      btc <- getBTypeContext
      ftc <- getFTypeContext
      op <- getUsrOpers
-     te <- getTheorems
+     ld <- getLamDefinitions
      replaceType $ renamedValidType1 1 (bTypeVar v S.<| btc) ftc op te t
      modifyTerm $ addHT (\x -> EUnpack v () (LVar $ Bound i) x)
 elimComm i t (RenamedType s [t1,t2])
@@ -358,7 +357,7 @@ exactType ty =
 exactTerm :: DoubleLTerm -> DoubleType -> Proof ()
 exactTerm te tt =
   do c <- getTermContext
-     teo <- getTheorems
+     ld <- getLamDefinitions
      q <- getTBTypeVars
      op <- getUsrOpers
      t <- eitherToProof $ typeInference q c teo op te
@@ -377,7 +376,7 @@ exactTerm te tt =
 -- 5. Nombre de la operación a "unfoldear".
 -- 6. Tipo sobre el que se aplica el unfold.
 -- 7. Tipo que define al operador foldeado (sin los para todos).
-unfoldComm :: BTypeContext -> FTypeContext -> FOperations -> Theorems
+unfoldComm :: BTypeContext -> FTypeContext -> FOperations -> LamDefs
            -> String -> DoubleType -> DoubleType -> DoubleType
 unfoldComm _ _ _ _ _ t@(TVar _) _ = t
 unfoldComm btc ftc op te oper (RenamedType s ts) body

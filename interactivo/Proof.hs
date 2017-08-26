@@ -1,12 +1,12 @@
 module Proof where
 
 import Common
-import Theorems (Theorems)
+import LambdaTermDefinition (LamDefs)
+import TypeDefinition (TypeDefs)
 import GlobalState
 import TermsWithHoles
 import Control.Monad.State.Lazy (get, modify)
 import qualified Data.Sequence as S
-import Data.IntSet (IntSet)
 
 type Proof = StateExceptions ProofConstruction ProofException
 
@@ -54,16 +54,16 @@ getTermContext = getAttribute termContext
 getBTypeContext :: Proof BTypeContext
 getBTypeContext = getAttribute bTypeContext
 
-getUsrOpers :: Proof FOperations
-getUsrOpers = getGlobalAttr opers
+getTypeDefinitions :: Proof TypeDefs
+getTypeDefinitions = getGlobalAttr typeDef
 
-getTheorems :: Proof Theorems
-getTheorems = getGlobalAttr theorems
+getLamDefinitions :: Proof LamDefs
+getLamDefinitions = getGlobalAttr lamDef
 
 getFTypeContext :: Proof FTypeContext
 getFTypeContext = getGlobalAttr fTypeContext
 
-getConflictNames :: Proof IntSet
+getConflictNames :: Proof ConflictNames
 getConflictNames = getGlobalAttr conflict
 
 getTVars :: Proof Int

@@ -1,7 +1,8 @@
 module TypeSubstitution where
 
 import Common
-import Theorems (Theorems, theoremsNames)
+import LambdaTermDefinition (LamDefs, getNames)
+import TypeDefinition
 import qualified Data.Sequence as S
 import Transformers
 import RenamedVariables
@@ -22,9 +23,9 @@ import RenamedVariables
 -- 5. Teoremas.
 -- 6. Tipo (con nombres y sin nombres), sobre el que se realiza la sust.
 -- 7. Tipos T1,..,Tn.
-typeSubs :: Int -> BTypeContext -> FTypeContext -> FOperations -> Theorems
+typeSubs :: Int -> BTypeContext -> FTypeContext -> TypeDefs -> LamDefs
          -> DoubleType -> [DoubleType] -> DoubleType
-typeSubs l bs fs op te = typeSubs' 0 l fs bs bs op (theoremsNames te)
+typeSubs l bs fs op te = typeSubs' 0 l fs bs bs (getTypesNames op) (getNames te)
 
 -- Realiza la sust. de tipos.
 -- 1. Profundidad ("para todos"), procesados.
@@ -37,7 +38,7 @@ typeSubs l bs fs op te = typeSubs' 0 l fs bs bs op (theoremsNames te)
 -- 7. Nombres de los teoremas.
 -- 8. Tipo sobre el que se hace la sust. Sin los "para todos" que se van a sustituir.
 -- 9. Tipos que se sustituyen.
-typeSubs' :: Int -> Int -> FTypeContext -> BTypeContext -> BTypeContext -> FOperations
+typeSubs' :: Int -> Int -> FTypeContext -> BTypeContext -> BTypeContext -> [String]
           -> [String] -> DoubleType -> [DoubleType] -> DoubleType
 typeSubs' n l fs bs rs op tn (TVar (v, Bound x)) ts
   | x < n = case S.findIndexL (\(_,x) -> x == v) bs of
@@ -49,11 +50,11 @@ typeSubs' n l fs bs rs op tn (TVar (v, Bound x)) ts
   | otherwise = TVar (v, Bound $ x - l + n)
 typeSubs' _ _ _ _ _ _ _ x@(TVar (_, Free _)) _ = x
 typeSubs' n l fs bs rs op tn (ForAll v t1) ts =
-  let v' = getRename v (snd, rs) (id, fs) (fst4, op) (id, tn)
+  let v' = getRename v (snd, rs) (id, fs) (id, op) (id, tn)
       tt = typeSubs' (n+1) (l+1) fs (bTypeVar v S.<| bs) (bTypeVar v' S.<| rs) op tn t1 ts
   in ForAll v' tt
 typeSubs' n l fs bs rs op tn (Exists v t1) ts =
-  let v' = getRename v (snd, rs) (id, fs) (fst4, op) (id, tn) 
+  let v' = getRename v (snd, rs) (id, fs) (id, op) (id, tn) 
       tt = typeSubs' (n+1) (l+1) fs (bTypeVar v S.<| bs) (bTypeVar v' S.<| rs) op tn t1 ts
   in Exists v' tt
 typeSubs' n l fs bs rs op tn (Fun t1 t2) ts =

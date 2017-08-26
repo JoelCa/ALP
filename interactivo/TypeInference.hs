@@ -1,17 +1,16 @@
 module TypeInference where
 
 import Common
-import DefaultOperators (isNotFoldeableOp)
-import Theorems (Theorems)
-import qualified Theorems as T (lookup)
+import LambdaTermDefinition (LamDefs)
+import qualified LambdaTermDefinition as LTD (lookup)
+import TypeDefinition
 import Transformers (positiveShift, negativeShift)
 import TypeSubstitution
 import qualified Data.Sequence as S
-import Data.Foldable (find)
 
 -- Algoritmo de inferencia de tipos de un lambda término.
 
-basicTypeInference :: Theorems -> FOperations -> DoubleLTerm
+basicTypeInference :: LamDefs -> TypeDefs -> DoubleLTerm
                    -> Either ProofException DoubleType
 basicTypeInference = typeInference 0 S.empty
 
@@ -22,22 +21,21 @@ basicTypeInference = typeInference 0 S.empty
 -- 1. Indica la profundidad (respecto al cuantificador "para todo")
 -- desde la que se quiere inferir.
 -- 2. Contexto de variables de términos, desde el que se quiere inferir.
--- 3. Teoremas.
--- 4. Operaciones "foldeables".
+-- 3. Lambda términos definidos.
+-- 4. Tipos definidos.
 -- 5. Lambda término con y sin nombre, al que se le quiere inferir su tipo.
-typeInference :: Int -> TermContext -> Theorems -> FOperations
+typeInference :: Int -> TermContext -> LamDefs -> TypeDefs
               -> DoubleLTerm -> Either ProofException DoubleType
 typeInference n c te op t = case typeInference' n c te op t of
-                          Right r -> return r
-                          Left e -> throw $ InferE t e
+                              Right r -> return r
+                              Left e -> throw $ InferE t e
 
-typeInference' :: Int -> TermContext -> Theorems -> FOperations
+typeInference' :: Int -> TermContext -> LamDefs -> TypeDefs
                -> DoubleLTerm -> Either InferException DoubleType
 typeInference' n _ te _ (LVar (_, Free x)) =
-  case T.lookup x te of
-    Just (_ ::: t) -> return t
+  case LTD.lookup x te of
+    Just (_, t) -> return t
     Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean teoremas.
-    _ -> error "error: typeInference', no debería pasar."
 typeInference' n c te _ (LVar (_, Bound x)) =
   let (_,m,t) = S.index c x
   in return $ positiveShift (n-m) t
@@ -83,37 +81,27 @@ typeInference' n c te op (e ::: t) =
        then return t
        else throw $ InferE2 e t
 
-
--- Compara los tipos sin nombres, extiende las operaciones "foldeables".
-fullEqualTypes :: FOperations -> DoubleType -> DoubleType -> Bool
+-- Compara los tipos sin nombres, extiende la definición de los tipos.
+fullEqualTypes :: TypeDefs -> DoubleType -> DoubleType -> Bool
 fullEqualTypes op (Fun t1 t2) (Fun t1' t2') = fullEqualTypes op t1 t1' && fullEqualTypes op t2 t2'
 fullEqualTypes op (ForAll _ t) (ForAll _ t') = fullEqualTypes op t t'
 fullEqualTypes op (Exists _ t) (Exists _ t') = fullEqualTypes op t t'
 fullEqualTypes op t1@(RenamedType s xs) t2@(RenamedType s' ys)
   | s == s' = aux xs ys
-  | isNotFoldeableOp s && isNotFoldeableOp s' = False
-  | isNotFoldeableOp s =
-      case find (\(a,_,_,_) -> a == s') op of
-        Just (_,tt,args,_)-> fullEqualTypes op t1 (typeSubsNoRename args tt ys)
-        Nothing -> error "error: fullEqualTypes, no debería pasar."
-  | isNotFoldeableOp s' =
-      case find (\(a,_,_,_) -> a == s) op of
-        Just (_,tt,args,_)-> fullEqualTypes op (typeSubsNoRename args tt xs) t2
+  | otherwise =
+      case getTypeData s op of
+        Just (tt,args,_)-> fullEqualTypes op (typeSubsNoRename args tt xs) t2
         Nothing -> error "error: fullEqualTypes, no debería pasar."
   where aux [] [] = True
         aux (x:xs) (y:ys) = if fullEqualTypes op x y
                             then aux xs ys
                             else False
-fullEqualTypes op (RenamedType s xs) t
-  | isNotFoldeableOp s = False
-  | otherwise =
-    case find (\(a,_,_,_) -> a == s) op of
-      Just (_,tt,args,_)-> fullEqualTypes op (typeSubsNoRename args tt xs) t
-      Nothing -> error "error: fullEqualTypes, no debería pasar."
-fullEqualTypes op t (RenamedType s ys)
-  | isNotFoldeableOp s = False
-  | otherwise =
-    case find (\(a,_,_,_) -> a == s) op of
-      Just (_,tt,args,_)-> fullEqualTypes op t (typeSubsNoRename args tt ys)
-      Nothing -> error "error: fullEqualTypes, no debería pasar."    
+fullEqualTypes op (RenamedType s xs) t =
+  case getTypeData s op of
+    Just (tt,args,_) -> fullEqualTypes op (typeSubsNoRename args tt xs) t
+    Nothing -> error "error: fullEqualTypes, no debería pasar."
+fullEqualTypes op t (RenamedType s ys) =
+  case getTypeData s op of
+    Just (tt,args,_)-> fullEqualTypes op t (typeSubsNoRename args tt ys)
+    Nothing -> error "error: fullEqualTypes, no debería pasar."    
 fullEqualTypes _ t1 t2 = t1 == t2

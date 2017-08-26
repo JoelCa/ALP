@@ -103,7 +103,7 @@ data Command = Theorem String Type1
              | Axiom String Type1
              deriving (Show)
 
--- Comandos de la línea de comandos
+  -- Comandos de la línea de comandos
 data CLICommand = Escaped ECommand
                 | Lang Command
 
@@ -114,16 +114,21 @@ data ECommand = Exit
               deriving (Show)
 
 data BodyDef = LTerm LTerm1
-             | Type TypeDefinition
+             | Type TypeDefWithName
              | Ambiguous (GenTree String)
              deriving (Show)
 
-  -- Definición de una "operación".
-  -- 1. Cuerpo de la operación.
-  -- 2. Cantidad de operandos.
-  -- 3. Lista de los nombres de los argumentos.
-  -- 4. Boleano. True sii es una operación binaria infija.
-type TypeDefinition = (Type1, Operands, Seq TypeVar, Bool)
+  -- Datos de una definición de tipo.
+  -- Donde:
+  -- 1. Algún dato.
+  -- 2. Cantidad de argumentos.
+  -- 3. Boleano. True sii es un tipo binario infijo.
+type TypeDef a = (a, Int, Bool)
+
+  -- Definición de un tipo (tipo con nombre). 
+type TypeDefWithName = TypeDef (Type1, Seq TypeVar)
+
+type TypeDefNoName = TypeDef DoubleType
 
   -- Tácticas.
 data Tactic = Assumption | Apply Int | Intro | Intros | Split
@@ -165,25 +170,18 @@ data GenTree a = Nil | Node a [GenTree a]
                deriving (Show)
 
 
-  -- Cantidad de operandos de una operación.
-type Operands = Int
-
   -- Operación NO "foldeable".
-type NotFoldeableOp = (String, Operands)
+--type NotFoldeableOp = (String, Operands)
 
-  -- Operación "foldeable", donde:
-  -- 1. Identificador.
-  -- 2. Cuerpo de la operación (sin los para todos).
-  -- 3. Cantidad de operandos.
-  -- 4. Booleano. True sii es una operación binaria infija.
-  -- Todas las operaciones que define el usuario son foldeables.
-type FoldeableOp = (String, DoubleType, Operands, Bool)
+  -- Tipos dados por default.
+and_id = ['/', '\\']
+or_id = ['\\', '/']
+bottom_id = "False"
+iff_id = "<->"
+not_id = "~"
 
-  -- Operaciones "foldeables".
-type FOperations = Seq FoldeableOp
-
-getNumArgs :: FoldeableOp -> Operands
-getNumArgs (_,_,n,_) = n
+-- getNumArgs :: FoldeableOp -> Operands
+-- getNumArgs (_,_,n,_) = n
 
 
   -- Instancias.

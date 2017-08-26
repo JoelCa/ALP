@@ -1,15 +1,15 @@
 module Transformers where
 
 import Common
-import Theorems (Theorems, theoremsNames)
-import DefaultOperators
 import Data.List (find)
 import RenamedVariables
 import Hypothesis
 import Parser (getHypothesisValue)
 import Data.IntSet (IntSet, empty)
 import qualified Data.Sequence as S
-
+import TypeDefinition hiding (empty)
+import LambdaTermDefinition (LamDefs, getNames)
+  
 -- Retorna el tipo con nombre, posiblemente renombrado, de su 3º arg.
 -- A fin de respetar la Convención 1.
 -- Además, genera el tipo sin nombre.
@@ -19,38 +19,38 @@ import qualified Data.Sequence as S
 -- 3. Teoremas.
 -- 4. Tipo a procesar.
 -- OBS: Utilizamos esta función sobre tipos que NO requieren del contexto de tipos "ligados".
-renamedType1 :: FTypeContext -> FOperations -> Theorems -> Type1
+renamedType1 :: FTypeContext -> TypeDefs -> LamDefs -> Type1
              -> Either ProofException DoubleType
-renamedType1 ftc op te = renamedType (id, id, S.empty, S.empty) ftc op (theoremsNames te)
+renamedType1 ftc op te = renamedType (id, id, S.empty, S.empty) ftc op (getNames te)
 
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
 -- por el 5º argumento.
 -- El renombramiento se realiza de modo tal que se respete la Convención 1.
 -- OBS: Utilizamos esta función sobre tipos que requieren del contexto de tipos "ligados".
-renamedType2 :: BTypeContext -> FTypeContext ->  FOperations -> Theorems
+renamedType2 :: BTypeContext -> FTypeContext ->  TypeDefs -> LamDefs
              -> Type1 -> Either ProofException DoubleType
-renamedType2 bs ftc op te = renamedType (snd, bTypeVar, bs, bs) ftc op (theoremsNames te)
+renamedType2 bs ftc op te = renamedType (snd, bTypeVar, bs, bs) ftc op (getNames te)
 
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
 -- por el 5º argumento.
 -- El renombramiento se realiza de modo tal que se respete la Convención 1.
 -- OBS: Solo la utilizamos en el renombramiento del cuerpo de una operación.
-renamedType3 :: S.Seq TypeVar -> FTypeContext ->  FOperations -> Theorems
+renamedType3 :: S.Seq TypeVar -> FTypeContext ->  TypeDefs -> LamDefs
              -> Type1 -> Either ProofException DoubleType
-renamedType3 bs ftc op te = renamedType (id, id, bs, bs) ftc op (theoremsNames te)
+renamedType3 bs ftc op te = renamedType (id, id, bs, bs) ftc op (getNames te)
 
 
 -- Obtiene el tipo renombrado, y sin nombre, de su 5º arg.
 renamedType :: (a -> TypeVar, TypeVar -> a, S.Seq a, S.Seq a) -> FTypeContext
-            -> FOperations -> [String] -> Type1 -> Either ProofException DoubleType
+            -> TypeDefs -> [String] -> Type1 -> Either ProofException DoubleType
 renamedType (f, _, rs, bs) fs op _ (TVar x) =
-  getVarType (\_ zs m -> f $ S.index zs m) (f, rs, bs) fs op x
+  transfromVarType (\_ zs m -> f $ S.index zs m) (f, rs, bs) fs op x
 renamedType (f, f', rs, bs) fs op tn (ForAll x t) =
-  do let v = getRename x (f, rs) (id, fs) (fst4, op) (id, tn)
+  do let v = getRename x (f, rs) (id, fs) (id, getTypesNames op) (id, tn)
      tt <- renamedType (f, f', (f' v S.<| rs), (f' x S.<| bs)) fs op tn t
      return $ ForAll v tt
 renamedType (f, f', rs, bs) fs op tn (Exists x t) =
-  do let v = getRename x (f, rs) (id, fs) (fst4, op) (id, tn)
+  do let v = getRename x (f, rs) (id, fs) (id, getTypesNames op) (id, tn)
      tt <- renamedType (f, f', (f' v S.<| rs), (f' x S.<| bs)) fs op tn t
      return $ Exists v tt
 renamedType frbs fs op tn (Fun t1 t2) =
@@ -58,22 +58,22 @@ renamedType frbs fs op tn (Fun t1 t2) =
      tt2 <- renamedType frbs fs op tn t2
      return $ Fun tt1 tt2
 renamedType frbs fs op tn (RenamedType s ts) =
-  getOpType op s ts $ renamedType frbs fs op tn
+  transformType op s ts $ renamedType frbs fs op tn
 
-basicTypeWithoutName :: FTypeContext -> FOperations -> Type1
+basicTypeWithoutName :: FTypeContext -> TypeDefs -> Type1
                      -> Either ProofException DoubleType
 basicTypeWithoutName = typeWithoutName (id, id, S.empty)
 
 -- Obtiene el tipo sin nombre de su 4º arg.
 typeWithoutName :: (a -> TypeVar, TypeVar -> a, S.Seq a) -> FTypeContext
-                -> FOperations -> Type1 -> Either ProofException DoubleType
+                -> TypeDefs -> Type1 -> Either ProofException DoubleType
 typeWithoutName (f, _, bs) fs op (TVar x) =
   case S.findIndexL (\w -> f w == x) bs of
     Just n -> return $ TVar (x, Bound n)
-    Nothing -> case find (\w -> fst4 w == x) op of
-                 Just a -> if getNumArgs a == 0
-                           then return $ RenamedType x []
-                           else throw $ OpE1 x
+    Nothing -> case getTypeData x op of
+                 Just (_,a,_) -> if a == 0
+                                 then return $ RenamedType x []
+                                 else throw $ OpE1 x
                  Nothing -> if elem x fs
                             then return $ TVar (x, Free x)
                             else throw $ TypeE x
@@ -88,28 +88,22 @@ typeWithoutName fbs fs op (Fun t1 t2) =
      tt2 <- typeWithoutName fbs fs op t2
      return $ Fun tt1 tt2
 typeWithoutName fbs fs op (RenamedType s ts) =
-  case find (\(x,_) -> x == s) notFoldeableOps of
-    Just (_, args') ->
-      if args' == args
+  case getTypeData s op of
+    Just (_, args, _) ->
+      if args == length ts
       then do tt <- sequence $ map (typeWithoutName fbs fs op) ts
               return $ RenamedType s tt
       else throw $ OpE1 s
-    Nothing ->
-      do a <- maybeToEither (OpE2 s) $ find (\x -> fst4 x == s) op
-         if getNumArgs a == args
-           then do tt <- sequence $ map (typeWithoutName fbs fs op) ts
-                   return $ RenamedType s tt
-           else throw $ OpE1 s
-  where args = length ts
+    Nothing -> throw $ OpE2 s
 
 
 renamedValidType1 :: Int -> BTypeContext -> FTypeContext
-                  -> FOperations -> Theorems
+                  -> TypeDefs -> LamDefs
                   -> DoubleType -> DoubleType
-renamedValidType1 n bs ftc op te = positiveShiftAndRename n bs bs ftc op (theoremsNames te) 
+renamedValidType1 n bs ftc op te = positiveShiftAndRename n bs bs ftc (getTypesNames op) (getNames te) 
 
 renamedValidType2 :: Int -> BTypeContext -> FTypeContext
-                  -> FOperations -> [String]
+                  -> [String] -> [String]
                   -> DoubleType -> DoubleType
 renamedValidType2 n bs = positiveShiftAndRename n bs bs
   
@@ -121,17 +115,17 @@ renamedValidType2 n bs = positiveShiftAndRename n bs bs
 -- 2. Conjunto de variables de tipo ligadas renombradas.
 -- 3. Conjunto de variables de tipo ligadas no renombradas.
 -- 4. Conjunto de variables de tipos libres.
--- 5. Operaciones.
--- 6. Nombres de teoremas.
+-- 5. Nombres de los tipos definidos.
+-- 6. Nombres de los lambda términos definidos.
 -- 7. Tipo sobre el que se realiza el renombramiento.
 positiveShiftAndRename :: Int -> BTypeContext -> BTypeContext
-                       -> FTypeContext -> FOperations
+                       -> FTypeContext -> [String]
                        -> [String] -> DoubleType -> DoubleType
 positiveShiftAndRename 0 = \_ _ _ _ _ t -> t
-positiveShiftAndRename n = positiveShiftAndRename' 0 n
+positiveShiftAndRename n = positiveShiftAndRename' 0 n 
 
 positiveShiftAndRename' :: Int -> Int -> BTypeContext -> BTypeContext
-                        -> FTypeContext -> FOperations
+                        -> FTypeContext -> [String]
                         -> [String] -> DoubleType -> DoubleType
 positiveShiftAndRename' m n rs bs fs op _ (TVar (a, b@(Bound x)))
   | x < m = case S.findIndexL (\(_,w) -> w == a) bs of
@@ -141,10 +135,10 @@ positiveShiftAndRename' m n rs bs fs op _ (TVar (a, b@(Bound x)))
 positiveShiftAndRename' _ _ _ _ _ _ _ (TVar (a, b@(Free x))) =
   TVar (a, b)
 positiveShiftAndRename' m n rs bs fs op tn (ForAll x t) =
-  let v = getRename x (snd, rs) (id, fs) (fst4, op) (id, tn)
+  let v = getRename x (snd, rs) (id, fs) (id, op) (id, tn)
   in ForAll v $ positiveShiftAndRename' (m+1) n (bTypeVar v S.<| rs) (bTypeVar x S.<| bs) fs op tn t
 positiveShiftAndRename' m n rs bs fs op tn (Exists x t) =
-  let v = getRename x (snd, rs) (id, fs) (fst4, op) (id, tn)
+  let v = getRename x (snd, rs) (id, fs) (id, op) (id, tn)
   in Exists v $ positiveShiftAndRename' (m+1) n (bTypeVar v S.<| rs) (bTypeVar x S.<| bs) fs op tn t
 positiveShiftAndRename' m n rs bs fs op tn (Fun t1 t2) =
   Fun (positiveShiftAndRename' m n rs bs fs op tn t1) (positiveShiftAndRename' m n rs bs fs op tn t2)
@@ -154,10 +148,10 @@ positiveShiftAndRename' m n rs bs fs op tn (RenamedType s ts) =
 ----------------------------------------------------------------------------------------------------------------------
 -- Trasformadores de lambda términos: Se pasa de un lambda término con nombre, a uno renombrado y al equivalente sin nombre.
 
-basicWithoutName :: FOperations -> FTypeContext -> Theorems -> LTerm1
+basicWithoutName :: TypeDefs -> FTypeContext -> LamDefs -> LTerm1
                  -> Either ProofException DoubleLTerm
 basicWithoutName op fs = withoutName op fs (S.empty) (empty, 0)
-  
+
 
 -- Genera el lambda término con renombre de variables de tipo, y el lambda término sin nombre.
 -- Chequea que las variables de tipo sean válidas de acuerdo a los contexto de tipos
@@ -168,12 +162,12 @@ basicWithoutName op fs = withoutName op fs (S.empty) (empty, 0)
 -- El 1º argumento, es la tabla de operaciones "foldeables".
 -- Obs: es util generar el lambda término con nombres renombrados para imprimir mejor los errores.
 -- Se usa en el algoritmo de inferencia, y el comando exact.
-withoutName :: FOperations -> FTypeContext -> BTypeContext -> (IntSet, Int) -> Theorems
+withoutName :: TypeDefs -> FTypeContext -> BTypeContext -> (IntSet, Int) -> LamDefs
             -> LTerm1 -> Either ProofException DoubleLTerm
-withoutName op fs bs cnn te = withoutName' S.empty S.empty bs bs fs op cnn (theoremsNames te)
+withoutName op fs bs cnn te = withoutName' S.empty S.empty bs bs fs op cnn (getNames te)
 
 withoutName' :: S.Seq TermVar -> S.Seq TermVar -> BTypeContext -> BTypeContext -> FTypeContext
-             -> FOperations -> (IntSet, Int) -> [String] -> LTerm1 -> Either ProofException DoubleLTerm
+             -> TypeDefs -> (IntSet, Int) -> [String] -> LTerm1 -> Either ProofException DoubleLTerm
 withoutName' ters tebs _ _ _ _ cnn _ w@(LVar x) =
   case S.elemIndexL x tebs of
     Just m -> return $ LVar (S.index ters m, Bound m)
@@ -188,7 +182,7 @@ withoutName' ters tebs tyrs tybs fs op cnn tn (e1 :@: e2) =
      ee2 <- withoutName' ters tebs tyrs tybs fs op cnn tn e2
      return $ ee1 :@: ee2
 withoutName' ters tebs tyrs tybs fs op cnn tn (BAbs x e) =
-  do let v = getRename x (snd, tyrs) (id, fs) (fst4, op) (id, [])
+  do let v = getRename x (snd, tyrs) (id, fs) (id, getTypesNames op) (id, [])
      ee <- withoutName' ters tebs (bTypeVar v S.<| tyrs) (bTypeVar x S.<| tybs) fs op cnn tn e
      return $ BAbs v ee
 withoutName' ters tebs tyrs tybs fs op cnn tn (e :!: t) =
@@ -202,7 +196,7 @@ withoutName' ters tebs tyrs tybs fs op cnn tn (EPack t e t') =
      return $ EPack tt ee tt
 withoutName' ters tebs tyrs tybs fs op cnn tn (EUnpack x y e1 e2) =
   do ee1 <- withoutName' ters tebs tyrs tybs fs op cnn tn e1
-     let v = getRename x (snd, tyrs) (id, fs) (fst4, op) (id, [])
+     let v = getRename x (snd, tyrs) (id, fs) (id, getTypesNames op) (id, [])
          h = getRename y (id, ters) (id, S.empty) (id, S.empty) (id, [])
      ee2 <- withoutName' (h S.<| ters) (y S.<| tebs) (bTypeVar v S.<| tyrs) (bTypeVar x S.<| tybs) fs op cnn tn e2
      return $ EUnpack h v ee1 ee2
@@ -214,12 +208,12 @@ withoutName' ters tebs tyrs tybs fs op cnn tn (e ::: t) =
 ----------------------------------------------------------------------------------------------------------------------
 -- Transformadores para aplicaciones ambiguas.
 
-basicDisambiguatedTerm :: FTypeContext ->  FOperations -> GenTree String
+basicDisambiguatedTerm :: FTypeContext -> TypeDefs -> GenTree String
                        -> Either ProofException (Either DoubleType DoubleLTerm)
 basicDisambiguatedTerm ftc op = disambiguatedTerm S.empty ftc op (empty, 0)
 
 -- Convierte a una aplicacion ambigua en una aplicación de tipos, o en una aplicación de lambda términos.
-disambiguatedTerm :: BTypeContext -> FTypeContext ->  FOperations -> (IntSet, Int)
+disambiguatedTerm :: BTypeContext -> FTypeContext ->  TypeDefs -> (IntSet, Int)
                   -> GenTree String -> Either ProofException (Either DoubleType DoubleLTerm)
 disambiguatedTerm btc ftc op cnn t =
   case disambiguatedType btc ftc op t of
@@ -228,46 +222,37 @@ disambiguatedTerm btc ftc op cnn t =
     Right ty -> return $ Left ty
 
 
-disambiguatedType :: BTypeContext -> FTypeContext -> FOperations
+disambiguatedType :: BTypeContext -> FTypeContext -> TypeDefs
                   -> GenTree String -> Either ProofException DoubleType
 disambiguatedType bs fs op (Node x []) =
-  getVarType (\w _ _ -> w) (snd, S.empty, bs) fs op x -- NO es necesario rs
+  transfromVarType (\w _ _ -> w) (snd, S.empty, bs) fs op x -- NO es necesario rs
 disambiguatedType bs fs op (Node x xs) =
-  getOpType op x xs $ disambiguatedType bs fs op
+  transformType op x xs $ disambiguatedType bs fs op
 
 
-getVarType :: (TypeVar -> S.Seq a -> Int -> TypeVar)
+transfromVarType :: (TypeVar -> S.Seq a -> Int -> TypeVar)
            -> (a -> TypeVar, S.Seq a, S.Seq a) -> S.Seq String
-           -> FOperations
-           -> String -> Either ProofException DoubleType
-getVarType fvar frbs@(f, rs, bs) fs op x =
+           -> TypeDefs -> String -> Either ProofException DoubleType
+transfromVarType fvar frbs@(f, rs, bs) fs op x =
   case S.findIndexL (\w -> f w == x) bs of
     Just n -> return $ TVar (fvar x rs n, Bound n)
-    Nothing -> case find (\w -> fst4 w == x) op of
-                 Just a -> if getNumArgs a == 0
+    Nothing -> case getNumArgs x op of
+                 Just a -> if a == 0
                            then return $ RenamedType x []
                            else throw $ OpE1 x
                  Nothing -> if elem x fs
                             then return $ TVar (x, Free x)
                             else throw $ TypeE x
 
-getOpType :: FOperations -> String -> [a]
+transformType :: TypeDefs -> String -> [a]
           -> (a -> Either ProofException DoubleType)
           -> Either ProofException DoubleType
-getOpType op s ts f =
-  case find (\(x,_) -> x == s) notFoldeableOps of
-    Just (_, args') ->
-      if args' == args
-      then do tt <- sequence $ map f ts
-              return $ RenamedType s tt
-      else throw $ OpE1 s
-    Nothing ->
-      do a <- maybeToEither (OpE2 s) $ find (\x -> fst4 x == s) op
-         if getNumArgs a == args
-           then do tt <- sequence $ map f ts
-                   return $ RenamedType s tt
-           else throw $ OpE1 s
-  where args = length ts
+transformType op s ts f =
+  do a <- maybeToEither (OpE2 s) $ getNumArgs s op
+     if a == length ts
+       then do tt <- sequence $ map f ts
+               return $ RenamedType s tt
+       else throw $ OpE1 s
 
 -- Convierte una aplicacion en una aplicación de lambda términos, si es posible.
 disambiguatedLTerm :: (IntSet, Int) -> GenTree String -> DoubleLTerm

@@ -22,12 +22,13 @@ type CommandLineCommand = Either ProofException (EPosition, CLICommand)
 emptyPos :: EPosition
 emptyPos = ("", 1)
 
+
 reservedWords = ["Propositions", "Types", "Theorem", "Print", "Check", "forall", "exists",
-                 "let", "in", "as", "False", "assumption", "intro", "intros", "split",
+                 "let", "in", "as","assumption", "intro", "intros", "split",
                  "left", "right", "apply", "elim", "absurd", "cut", "unfold", "exact",
                  ":load", ":reset", ":quit", ":help", ":l", ":r", ":q", ":h"]
 
-reservedSymbols = ["=", "~"]
+reservedSymbols = ["=", "->"] --, and_id, or_id, iff_id, not_id]
 
 sc :: Parser ()
 sc = L.space space1 lineCmnt empty
@@ -81,10 +82,11 @@ identifier = (lexeme . try) (p >>= check)
 symbolIdent :: Parser String
 symbolIdent = (lexeme . try) (p >>= check)
   where
-    p       = (:) <$> symbolChar <*> many symbolChar
+    p       = (:) <$> sym <*> many sym
     check x = if x `elem` reservedSymbols
                 then fail $ "keyword " ++ show x ++ " cannot be an symbolic identifier"
                 else return x
+    sym = symbolChar <|> char '/' <|> char '\\' <|> char '-'
 
 
 commandsFromFiles :: [String] -> IO ProofCommands
@@ -97,9 +99,15 @@ commandsFromFiles files =
            Left e -> return $ Left $ SyntaxE  e
        Left e -> return $ Left $ FileE e
 
-
+-- CHEQUEAR
 commands :: Parser [(EPosition, Command)]
-commands = many ((\x y -> (x,y)) <$> (getLinePos <$> getPosition) <*> command)
+commands = many ((\x y -> (x,y)) <$> (getLinePos <$> getPosition) <*> command) <* eof
+-- commands = do xs <- many p
+--               (do x <- p
+--                   return (xs++[x])
+--                <|> do eof
+--                       return xs)
+--   where p = (\x y -> (x,y)) <$> (getLinePos <$> getPosition) <*> command
 
 getLinePos :: SourcePos -> EPosition
 getLinePos (SourcePos n l c) = (n, unPos l)
@@ -140,8 +148,8 @@ command = do rword "Theorem"
                 ps <- sepByCommaSeq identifier
                 dot
                 return $ Types ps
-         <|> do tac <- tactic
-                return $ Tac tac
+         <|> try (do tac <- tactic
+                     return $ Tac tac)
          <|> do (name, def) <- definition
                 return $ Definition name def
 

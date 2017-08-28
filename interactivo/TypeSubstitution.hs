@@ -17,10 +17,10 @@ import RenamedVariables
 -- dos var. de tipo ligadas con el mismo nombre, una más anidada que la otra.
 -- Argumentos:
 -- 1. Cantidad de sustituciones a realizar.
--- 2. Conjunto de variables de tipo de libres.
--- 3. Conjunto de variables de tipo ligadas (con nombres), del contexto.
--- 4. Operaciones foldeables.
--- 5. Teoremas.
+-- 2. Conjunto de variables de tipo ligadas (con nombres), del contexto.
+-- 3. Conjunto de variables de tipo de libres.
+-- 4. Tipos definidos.
+-- 5. Lambda términos definidos.
 -- 6. Tipo (con nombres y sin nombres), sobre el que se realiza la sust.
 -- 7. Tipos T1,..,Tn.
 typeSubs :: Int -> BTypeContext -> FTypeContext -> TypeDefs -> LamDefs

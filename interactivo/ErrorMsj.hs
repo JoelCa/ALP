@@ -1,19 +1,20 @@
 module ErrorMsj where
 
 import Common
+import TypeDefinition (TypeDefs)
 import Text.PrettyPrint
 import PrettyPrinter (printType, printLTerm)
 import Hypothesis (printHypothesis)
 import Text.Megaparsec (parseErrorPretty)
 
-printError :: FOperations -> ExceptionPos -> Doc
+printError :: TypeDefs -> ExceptionPos -> Doc
 printError op (_, e@(SyntaxE _)) =
   errorMessage op e
 printError op ((file,pos), e) =  
   filePos file pos $$
   errorMessage op e 
 
-printErrorNoPos :: FOperations -> ExceptionPos -> Doc
+printErrorNoPos :: TypeDefs -> ExceptionPos -> Doc
 printErrorNoPos op (_, e) = errorMessage op e 
 
 filePos :: String -> Int -> Doc
@@ -24,7 +25,7 @@ filePos file line =
   colon
 
 -- Mensajes de error.
-errorMessage :: FOperations -> ProofException -> Doc
+errorMessage :: TypeDefs -> ProofException -> Doc
 errorMessage _ (SyntaxE e) = sep $
                              text "error de sintaxis." :
                              [text $ parseErrorPretty e]
@@ -114,7 +115,7 @@ errorMessage _ (HypoE i) =
   text "no existe."
 
   
-errorInfer :: FOperations -> InferException -> Doc
+errorInfer :: TypeDefs -> InferException -> Doc
 errorInfer _ (InferE1 x) =
   text "La variable de término" <+>
   quotes (text x) <+>
@@ -128,7 +129,7 @@ errorInfer op (InferE4 te) =
   quotes (printLTerm op te) <>
   char '.'
 
-errorInfer' :: FOperations -> DoubleLTerm -> Doc -> Doc
+errorInfer' :: TypeDefs -> DoubleLTerm -> Doc -> Doc
 errorInfer' op te s =
   sep $
   text "Se esperaba el tipo" <+>

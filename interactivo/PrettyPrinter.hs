@@ -2,7 +2,7 @@ module PrettyPrinter where
 
 import Common
 import Proof
-import DefaultOperators
+import TypeDefinition (TypeDefs, getTypeData)
 import Text.PrettyPrint
 import Data.List
 import qualified Data.Sequence as S
@@ -83,10 +83,10 @@ pEUnpack :: Int
 pEUnpack = 2
 
 -- Pretty-printer de lambda término con nombre, y tipos con nombres.
-printLTerm :: FOperations -> DoubleLTerm -> Doc
+printLTerm :: TypeDefs -> DoubleLTerm -> Doc
 printLTerm op = printLTerm' op (1, False)
 
-printLTerm' :: FOperations -> (Int, Bool) -> DoubleLTerm -> Doc
+printLTerm' :: TypeDefs -> (Int, Bool) -> DoubleLTerm -> Doc
 printLTerm' _ _ (LVar (x,_)) =
   text x
 printLTerm' op (i,j) (Abs x t e) =
@@ -153,10 +153,10 @@ printLTerm' op (i, j) (t ::: ty) =
 
 
 -- Pretty-printer de lambda término sin nombre, y tipos con nombres.
-printLTermNoName :: FOperations -> LTerm2 -> Doc 
+printLTermNoName :: TypeDefs -> LTerm2 -> Doc 
 printLTermNoName op t = printLTermNoName' op (1, False) [] (vars \\ (Set.toList $ varsInTerm t))  t
 
-printLTermNoName' :: FOperations -> (Int, Bool) -> [String] -> [String] -> LTerm2 -> Doc
+printLTermNoName' :: TypeDefs -> (Int, Bool) -> [String] -> [String] -> LTerm2 -> Doc
 printLTermNoName' _ _ bs _  (LVar (Bound x)) =
   text $ bs !! x
 printLTermNoName' _ _ _  _  (LVar (Free n)) =
@@ -231,7 +231,7 @@ printLTermNoName' _ _ _ [] (Abs _ _ _) =
 -- Además, que las operaciones unaria solo se imprimen de forma prefija.
 -- Obs: Basta con que la primera componente de la tripleta, que se pasa como argumento a
 -- printType', sea mayor o igual a 7, para asegurar que no aparescan paréntesis "externos".
-printType :: FOperations -> DoubleType -> Doc
+printType :: TypeDefs -> DoubleType -> Doc
 printType = printType' (7,False)
 
 -- Argumentos:
@@ -241,7 +241,7 @@ printType = printType' (7,False)
 -- componente izquierda de "op".
 -- 2. Operaciones foldeables.
 -- 3. Tipo.
-printType' :: (Int, Bool) -> FOperations -> DoubleType -> Doc
+printType' :: (Int, Bool) -> TypeDefs -> DoubleType -> Doc
 printType' _ _ (TVar (v, _)) =
   text v
 printType' prec op (Fun t1 t2) =
@@ -264,12 +264,12 @@ printType' prec@(p,left) op (RenamedType s [t1, t2])
   | s == and_id = printBinInfix (\x t -> printType' x op t) s prec 3 t1 t2
   | s == or_id = printBinInfix (\x t -> printType' x op t) s prec 4 t1 t2
   | s == iff_id = printBinInfix (\x t -> printType' x op t) s prec 6 t1 t2
-  | otherwise = case find (\(x,_,_,_) -> x == s) op of
-          Just (_,_,_,False) ->
-            printPrefix (\x t -> printType' x op t) s prec [t1,t2]
-          Just (_,_,_,True) ->
-            printBinInfix (\x t -> printType' x op t) s prec 2 t1 t2
-          _ -> error "error: printType' no debería pasar."
+  | otherwise = case getTypeData s op of
+                  Just (_,_,False) ->
+                    printPrefix (\x t -> printType' x op t) s prec [t1,t2]
+                  Just (_,_,True) ->
+                    printBinInfix (\x t -> printType' x op t) s prec 2 t1 t2
+                  _ -> error "error: printType' no debería pasar."
 printType' prec op (RenamedType s ts) =
   printPrefix (\x t -> printType' x op t) s prec ts
 
@@ -303,7 +303,7 @@ printPrefix f s (p, left) ts =
   
 --------------------------------------------------------------------------------------------  
 -- Pretty-printer de la prueba.
-printProof :: Int -> IS.IntSet -> FOperations -> FTypeContext -> [SubProof] -> Doc
+printProof :: Int -> IS.IntSet -> TypeDefs -> FTypeContext -> [SubProof] -> Doc
 printProof tp cn op ftc sb =
   (text $ "Hay " ++ show tp ++ " sub pruebas.\n") $$
   printContext cn op (ftc, bTypeContext s) (termContext s) $$
@@ -311,17 +311,17 @@ printProof tp cn op ftc sb =
   where s = head sb
 
 -- Imprime el tipo objetivo de cada subprueba.
-printGoals :: Int -> FOperations -> [SubProof] -> Doc
+printGoals :: Int -> TypeDefs -> [SubProof] -> Doc
 printGoals = printGoals' 1
 
-printGoals' :: Int -> Int -> FOperations -> [SubProof] -> Doc
+printGoals' :: Int -> Int -> TypeDefs -> [SubProof] -> Doc
 printGoals' _ _ _ [] = empty
 printGoals' i tp op (s:sb) =
   printLevelGoals i tp op (ty s) $$
   printGoals' (i+(lsubp s)) tp op sb
 
 -- Imprime los tipos objetivos de cada nivel.
-printLevelGoals :: Int -> Int -> FOperations -> [Maybe DoubleType] -> Doc
+printLevelGoals :: Int -> Int -> TypeDefs -> [Maybe DoubleType] -> Doc
 printLevelGoals _ _ _ [] =
   empty
 printLevelGoals i tp op (t:ts) =
@@ -329,11 +329,11 @@ printLevelGoals i tp op (t:ts) =
   printGoal op t $$
   printLevelGoals (i+1) tp op ts
 
-printGoal :: FOperations -> Maybe DoubleType -> Doc
+printGoal :: TypeDefs -> Maybe DoubleType -> Doc
 printGoal op (Just ty) = printType op ty
 printGoal op Nothing = text "*"
 
-printContext :: IS.IntSet -> FOperations -> (FTypeContext, BTypeContext) -> TermContext -> Doc
+printContext :: IS.IntSet -> TypeDefs -> (FTypeContext, BTypeContext) -> TermContext -> Doc
 printContext cn op (ftc,btc) c =
   printFTypeContext ftc $$
   printRestContext cn (IS.size cn + S.length c - 1) op btc c
@@ -344,7 +344,7 @@ printFTypeContext = foldr (\x r -> printFTypeVar x $$ r) empty
 printFTypeVar :: FTypeVar -> Doc
 printFTypeVar x = text x
 
-printRestContext :: IS.IntSet -> Int -> FOperations -> BTypeContext -> TermContext -> Doc
+printRestContext :: IS.IntSet -> Int -> TypeDefs -> BTypeContext -> TermContext -> Doc
 printRestContext cn n op btc c
   | S.null btc = printRestTermC cn n op c
   | S.null c = printRestBTypeC btc
@@ -370,7 +370,7 @@ getValidName cn n = let (cn', isMember, _) = IS.splitMember n cn
                         n' = if isMember then n-1 else n
                     in (n', cn')
 
-printRestTermC :: IS.IntSet -> Int -> FOperations -> TermContext -> Doc
+printRestTermC :: IS.IntSet -> Int -> TypeDefs -> TermContext -> Doc
 printRestTermC cn n op c
   | S.null c = empty
   | otherwise = printRestTermC cn' (n'-1) op (S.drop 1 c) $$
@@ -383,7 +383,7 @@ printRestBTypeC btc
   | otherwise = printRestBTypeC (S.drop 1 btc) $$
                 printBTypeVar (S.index btc 0)
 
-printTermVar :: Int -> FOperations -> TermVarWithType -> Doc
+printTermVar :: Int -> TypeDefs -> TermVarWithType -> Doc
 printTermVar n op (_,_,t) =
   text (printHypothesis n) <+>
   text ":" <+>

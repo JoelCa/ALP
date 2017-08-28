@@ -2,6 +2,7 @@ module Tactics where
 
 import Common
 import LambdaTermDefinition (LamDefs)
+import TypeDefinition (TypeDefs, getTypeData)
 import Proof
 import TermsWithHoles
 import RenamedVariables
@@ -86,25 +87,25 @@ habitar Split =
 habitar (Exact (LamT te)) =
   do x <- getType
      tt <- maybeToProof EmptyType x
-     op <- getUsrOpers
+     op <- getTypeDefinitions
      n <- getTTermVars
      cn <- getConflictNames
      btc <- getBTypeContext
      ftc <- getFTypeContext
      ld <- getLamDefinitions
-     te' <- eitherToProof $ withoutName op ftc btc (cn,n) teo te
+     te' <- eitherToProof $ withoutName op ftc btc (cn,n) ld te
      exactTerm te' tt  
 habitar (Exact (T ty)) =
   do x <- getType
      when (isJust x) $ throw $ ExactE2 $ fromJust x
-     op <- getUsrOpers
+     op <- getTypeDefinitions
      btc <- getBTypeContext
      ftc <- getFTypeContext
      ld <- getLamDefinitions
-     ty' <- eitherToProof $ renamedType2 btc ftc op teo ty
+     ty' <- eitherToProof $ renamedType2 btc ftc op ld ty
      exactType ty'     
 habitar (Exact (Appl aps)) =
-  do op <- getUsrOpers
+  do op <- getTypeDefinitions
      btc <- getBTypeContext
      ftc <- getFTypeContext
      n <- getTTermVars
@@ -121,15 +122,15 @@ habitar (Exact (Appl aps)) =
 habitar (Unfold s Nothing) =
   do x <- getType
      t <- maybeToProof EmptyType x
-     op <- getUsrOpers
-     (s', tt, _, _) <- maybeToProof (UnfoldE1 s) $ find (\(x,_,_,_) -> x == s) op
+     op <- getTypeDefinitions
+     (tt, _, _) <- maybeToProof (UnfoldE1 s) $ getTypeData s op
      btc <- getBTypeContext
      ftc <- getFTypeContext
      ld <- getLamDefinitions
-     replaceType $ unfoldComm btc ftc op teo s' t tt
+     replaceType $ unfoldComm btc ftc op ld s t tt
 habitar (Unfold s (Just h)) =
-  do op <- getUsrOpers
-     (s', tt, _, _) <- maybeToProof (UnfoldE1 s) $ find (\(x,_,_,_) -> x == s) op
+  do op <- getTypeDefinitions
+     (tt, _, _) <- maybeToProof (UnfoldE1 s) $ getTypeData s op
      n <- getTTermVars
      cn <- getConflictNames
      i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
@@ -138,18 +139,18 @@ habitar (Unfold s (Just h)) =
      btc <- getBTypeContext
      ftc <- getFTypeContext
      ld <- getLamDefinitions
-     let r = unfoldComm btc ftc op teo s' t tt
+     let r = unfoldComm btc ftc op ld s t tt
      updateTermContext i (x,y,r)
 habitar (Absurd ty) =
   do x <- getType
      case x of
        Just (RenamedType s []) ->
          if s == bottom_id
-         then do op <- getUsrOpers
+         then do op <- getTypeDefinitions
                  btc <- getBTypeContext
                  ftc <- getFTypeContext
                  ld <- getLamDefinitions
-                 tty <- eitherToProof $ renamedType2 btc ftc op teo ty
+                 tty <- eitherToProof $ renamedType2 btc ftc op ld ty
                  newSubProofs 2 [ Just tty
                                 , Just (RenamedType not_id [tty]) ]
                  modifyTerm $ addDHT (\x y -> ((LVar $ Free "intro_bottom")
@@ -161,22 +162,22 @@ habitar (CExists ty) =
   do x <- getType
      case x of
        Just tt@(Exists v t) ->
-         do op <- getUsrOpers
+         do op <- getTypeDefinitions
             btc <- getBTypeContext
             ftc <- getFTypeContext
             ld <- getLamDefinitions
-            ty' <- eitherToProof $ renamedType2 btc ftc op teo ty
-            replaceType $ typeSubs 1 btc ftc op teo t [ty']
+            ty' <- eitherToProof $ renamedType2 btc ftc op ld ty
+            replaceType $ typeSubs 1 btc ftc op ld t [ty']
             modifyTerm $ addHT (\x -> EPack ty' x tt)
        _ -> throw CommandInvalid
 habitar (Cut ty) =
   do x <- getType
      t <- maybeToProof EmptyType x
-     op <- getUsrOpers
+     op <- getTypeDefinitions
      btc <- getBTypeContext
      ftc <- getFTypeContext
      ld <- getLamDefinitions
-     tty <- eitherToProof $ renamedType2 btc ftc op teo ty
+     tty <- eitherToProof $ renamedType2 btc ftc op ld ty
      newSubProofs 2 [ Just (Fun tty t)
                     , Just tty ]
      modifyTerm $ addDHT (\x y -> x :@: y)
@@ -223,9 +224,9 @@ elimComm i t (Exists v tt) =
      addTermContext (tv, q, tt)
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     op <- getUsrOpers
+     op <- getTypeDefinitions
      ld <- getLamDefinitions
-     replaceType $ renamedValidType1 1 (bTypeVar v S.<| btc) ftc op te t
+     replaceType $ renamedValidType1 1 (bTypeVar v S.<| btc) ftc op ld t
      modifyTerm $ addHT (\x -> EUnpack v () (LVar $ Bound i) x)
 elimComm i t (RenamedType s [t1,t2])
   | s == and_id =
@@ -359,8 +360,8 @@ exactTerm te tt =
   do c <- getTermContext
      ld <- getLamDefinitions
      q <- getTBTypeVars
-     op <- getUsrOpers
-     t <- eitherToProof $ typeInference q c teo op te
+     op <- getTypeDefinitions
+     t <- eitherToProof $ typeInference q c ld op te
      unless (t == tt) $ throw $ ExactE1 tt
      endSubProof
      modifyTerm $ simplify $ toNoName te
@@ -376,7 +377,7 @@ exactTerm te tt =
 -- 5. Nombre de la operación a "unfoldear".
 -- 6. Tipo sobre el que se aplica el unfold.
 -- 7. Tipo que define al operador foldeado (sin los para todos).
-unfoldComm :: BTypeContext -> FTypeContext -> FOperations -> LamDefs
+unfoldComm :: BTypeContext -> FTypeContext -> TypeDefs -> LamDefs
            -> String -> DoubleType -> DoubleType -> DoubleType
 unfoldComm _ _ _ _ _ t@(TVar _) _ = t
 unfoldComm btc ftc op te oper (RenamedType s ts) body

@@ -44,7 +44,7 @@ typeInference' n c te op (Abs _ t e) =
      return $ Fun t tt
 typeInference' n c te op (e1 :@: e2) =
   do tt1 <- typeInference' n c te op e1
-     case tt1 of
+     case basicType tt1 op of
        Fun t1 t2 ->
          do tt2 <- typeInference' n c te op e2
             if fullEqualTypes op tt2 t1
@@ -56,8 +56,8 @@ typeInference' n c te op (BAbs v e) =
      return $ ForAll v t
 typeInference' n c te op (e :!: t) =
   do tt <- typeInference' n c te op e
-     case tt of
-       (ForAll _ t1) ->
+     case basicType tt op of
+       ForAll _ t1 ->
          return $ basicTypeSubs t1 t
        _ -> throw $ InferE3 e "forall *"
 typeInference' n c te op (EPack t1 e t@(Exists _ t2)) =
@@ -68,8 +68,8 @@ typeInference' n c te op (EPack t1 e t@(Exists _ t2)) =
        else throw $ InferE2 e tt2
 typeInference' n c te op (EUnpack _ _ e1 e2) =
   do t1 <- typeInference' n c te op e1
-     case t1 of
-       (Exists _ tt1) -> 
+     case basicType t1 op of
+       Exists _ tt1 -> 
          do t2 <- typeInference' (n+1) ((0,n+1,tt1) S.<| c) te op e2
             case negativeShift 1 t2 of
               Just t2' -> return t2'
@@ -105,3 +105,12 @@ fullEqualTypes op t (RenamedType s ys) =
     Just (tt,args,_)-> fullEqualTypes op t (typeSubsNoRename args tt ys)
     Nothing -> error "error: fullEqualTypes, no debería pasar."    
 fullEqualTypes _ t1 t2 = t1 == t2
+
+
+-- Obtiene el tipo básico.
+basicType :: DoubleType -> TypeDefs -> DoubleType
+basicType t@(RenamedType s xs) op =
+  case getTypeData s op of
+    Just (tt,args,_) -> basicType (typeSubsNoRename args tt xs) op
+    Nothing -> error "error: basicType, no debería pasar."
+basicType t _ = t

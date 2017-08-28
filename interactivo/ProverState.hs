@@ -70,4 +70,3 @@ setProofC _ _ = error "error: setProofC, no debería pasar."
 theoremName :: ProverState -> String
 theoremName (PSt {proof = Just pr}) = name pr
 theoremName _ = error "error: theoremName, no debería pasar."
-

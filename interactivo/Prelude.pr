@@ -1,0 +1,23 @@
+p /\ q = forall a, (p -> q -> a) -> a.
+
+p \/ q = forall a, (p -> a) -> (q -> a) -> a.
+
+False = forall a, a.
+
+~ p = p -> False.
+
+p <-> q = (p -> q) /\ (q -> p).
+
+intro_and = (\p.\q.\x:p.\y:q.\a.\z:p->q->a.z x y) as forall p, forall q, p -> q -> p /\ q.
+
+elim_and = (\p.\q.\r.\x:p/\q.\y:p->q->r.x [r] y) as forall p, forall q, forall r, p /\ q -> (p -> q -> r) -> r.
+
+intro_or1 = (\p.\q.\x:p.\a.\y:p->a.\z:q->a.y x) as forall p, forall q, p -> p \/ q.
+
+intro_or2 = (\p.\q.\x:q.\a.\y:p->a.\z:q->a.z x) as forall p, forall q, q -> p \/ q.
+
+elim_or = (\p.\q.\r.\x:p\/q.\y:p->r.\z:q->r.x [r] y z) as forall p, forall q, forall r, p \/ q -> (p -> r) -> (q -> r) -> r.
+
+intro_bottom = (\p.\x:False.x [p]) as forall p, False -> p.
+
+elim_bottom = (\p.\x:p.\y:~p.y x) as forall p, p -> ~p -> False.

@@ -71,6 +71,10 @@ nat = fromInteger <$> lexeme L.decimal
 rword :: String -> Parser ()
 rword w = try $ string w *> notFollowedBy alphaNumChar *> sc
 
+rsym :: String -> Parser ()
+rsym w = try $ string w *> notFollowedBy symbolChar *> sc
+
+
 identifier :: Parser String
 identifier = (lexeme . try) (p >>= check)
   where
@@ -260,7 +264,7 @@ infixOps = do x <- unit4
 
 
 unit4 :: Parser Type1
-unit4 = do symbol not_id
+unit4 = do rsym not_id
            u <- unit4
            return $ RenamedType not_id [u]
         <|> try prefixOps

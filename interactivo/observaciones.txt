@@ -169,13 +169,18 @@ Donde, la variable de tipo ligada "x", coincide con la variable de término "x".
 
 - No es posible comentar la primera línea de un archivo.
 
+- Consideramos que en las operaciones de not anidadas deben ir espacios.
+Por ejemplo: "~ ~ p", NO se puede escribir como "~~ p". Pues, "~~" puede ser un operador
+definido por el usuario. COQ si lo permite. 
+
 
 HACER:
-- Revisar el parser para ver si 'rword "False"' está bien, cuando False ya no es una palabra reservada.
 - Ver si en la definición de un lambda término es necesario anexarle su tipo inferido mediante "as",
 cuando se puede guardar el tipo en la tabla de lambda términos.
 - Chequear casos en el inferidor de tipos donde podría haberme olvidado usar "basicType".
 
+HECHO:
+- Revisar el parser para ver si 'rword "False"' está bien, cuando False ya no es una palabra reservada.
 
 
 FALTA:

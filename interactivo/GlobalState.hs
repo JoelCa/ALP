@@ -18,11 +18,14 @@ data GlobalState = Global { fTypeContext :: FTypeContext
                           }
 
 
-addLamDefinition :: String -> LTerm2 -> DoubleType -> GlobalState -> GlobalState
-addLamDefinition name lt t g = g {lamDef = LTD.insert name lt t $ lamDef g}
+addEmptyLamTerm :: String -> DoubleType -> GlobalState -> GlobalState
+addEmptyLamTerm name t g = g {lamDef = LTD.insertWithoutLamTerm name t $ lamDef g}
 
-addTypeDefinition :: String -> TypeDefNoName -> GlobalState -> GlobalState
-addTypeDefinition s d g = g {typeDef = TD.insert s d $ typeDef g}
+addLamTerm :: String -> LTerm2 -> DoubleType -> GlobalState -> GlobalState
+addLamTerm name lt t g = g {lamDef = LTD.insertWithLamTerm name lt t $ lamDef g}
+
+addType :: String -> TypeDefNoName -> GlobalState -> GlobalState
+addType s d g = g {typeDef = TD.insert s d $ typeDef g}
 
 checkConflictName :: String -> GlobalState -> GlobalState
 checkConflictName s g = g {conflict = addConflictName s $ conflict g}
@@ -56,5 +59,10 @@ invalidName name g =  isLamDef name g
 addFreeVars :: S.Seq TypeVar -> GlobalState -> GlobalState
 addFreeVars vars g = g {fTypeContext = vars S.>< fTypeContext g}
 
-getLamTerm :: String -> GlobalState -> (Maybe LTerm2, DoubleType)
-getLamTerm name (Global {lamDef = te}) = te LTD.! name
+getLamTerm :: String -> GlobalState -> Maybe LTerm2
+getLamTerm name (Global {lamDef = te}) = LTD.getLamTerm te name
+
+getLamTermType :: String -> GlobalState -> DoubleType
+getLamTermType name (Global {lamDef = te}) = LTD.getType te name
+
+ 

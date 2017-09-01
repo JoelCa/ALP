@@ -429,3 +429,21 @@ helpMessage = [("Propositions/Types <var>, <var>, ...",
 help :: String
 help =
   concat $ map (\(x,y) -> x ++ replicate ((40 - length x) `max` 2) ' ' ++ y) helpMessage  
+
+--------------------------------------------------------------------------------------------  
+-- Comando print
+
+printPrintCommand :: TypeDefs -> String -> Maybe LTerm2 -> DoubleType -> Doc
+printPrintCommand tyd name (Just te) ty =
+  sep $
+  text name <+>
+  text "=" :
+  printLTermNoName tyd te <+>
+  text ":" :
+  [printType tyd ty]
+printPrintCommand tyd name Nothing ty =
+  sep $
+  text name <+>
+  text ":" :
+  [printType tyd ty]
+  

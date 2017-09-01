@@ -7,7 +7,7 @@ import qualified Data.Sequence as S
 import Tactics (habitar)
 import Parser (isLoadCommand, emptyPos, commandsFromFiles, reservedWords, getCommand)
 import Text.PrettyPrint (render)
-import PrettyPrinter (help, printLTermNoName, printProof, printType)
+import PrettyPrinter (help, printLTermNoName, printProof, printType, printPrintCommand)
 import Transformers
 import ErrorMsj (printError, printErrorNoPos)
 import TypeInference (basicTypeInference)
@@ -154,7 +154,6 @@ otherTacticsCommand pos ta =
        else return ()
      return (typeDef $ global s, getTypeProof s, pc')
 
--- TERMINAR (cuando se imprime un axioma)
 printCommand :: EPosition -> String -> ProverInputState ()
 printCommand pos x =
   do s <- lift get
@@ -168,12 +167,11 @@ inferCommand pos x =
      te <- returnInput pos $ basicWithoutName (typeDef g) (fTypeContext g) (lamDef g) x
      returnInput pos $ basicTypeInference (lamDef g) (typeDef g) te
 
--- TERMINAR
 printCommandPrinting :: String -> ProverInputState ()
 printCommandPrinting x =
   do s <- lift get
      let g = global s
-     outputStrLn $ renderNoNameLTerm (typeDef g) $ fromJust $ fst $ getLamTerm x g
+     outputStrLn $ render $ printPrintCommand (typeDef g) x (getLamTerm x g) (getLamTermType x g)
 
 inferCommandPrinting :: DoubleType -> ProverInputState ()
 inferCommandPrinting ty =
@@ -246,7 +244,7 @@ defCommand pos name (Ambiguous ap) =
 -- Función auxiliar de defCommand
 typeDefinition :: String -> DoubleType -> Int -> Bool -> ProverInputState ()
 typeDefinition name t n isInfix =
-  lift $ modify $ modifyGlobal $ addTypeDefinition name (t, n, isInfix)
+  lift $ modify $ modifyGlobal $ addType name (t, n, isInfix)
 
 -- Función auxiliar de defCommand
 lamTermDefinition :: EPosition -> String -> DoubleLTerm -> ProverInputState ()
@@ -254,7 +252,7 @@ lamTermDefinition pos name te =
   do s <- lift get
      let glo = global s
      ty <- returnInput pos $ basicTypeInference (lamDef glo) (typeDef glo) te
-     lift $ modify $ newLamDefinition name (toNoName te ::: ty) ty
+     lift $ modify $ newLamDefinition name (toNoName te) ty
 
 -- Función auxiliar del comando "Props/Types".
 typeRepeated :: S.Seq TypeVar -> (String -> Bool) -> (Maybe String, Maybe String)

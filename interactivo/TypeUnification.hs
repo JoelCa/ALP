@@ -6,7 +6,7 @@ import qualified Data.Map.Strict as M (Map, lookup, insert, empty, size)
 
 -- Algoritmo de unificación para el comando APPLY.
 unification :: Bool -> Int -> DoubleType -> DoubleType
-            -> Either ProofException (M.Map Int DoubleType)
+            -> Either SemanticException (M.Map Int DoubleType)
 unification True _ = \_ _ -> return M.empty
 unification False n = unif 0 n M.empty
 
@@ -20,7 +20,7 @@ unification False n = unif 0 n M.empty
 -- 5. El tipo con el debe unificar el tipo dado en el 4º arg.
 unif :: Int -> Int -> M.Map Int DoubleType
      -> DoubleType -> DoubleType
-     -> Either ProofException (M.Map Int DoubleType)
+     -> Either SemanticException (M.Map Int DoubleType)
 unif pos n sust t@(TVar (_, Bound i)) tt
   | (pos <= i) && (i < n) =
     let k = n - 1 - i

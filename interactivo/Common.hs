@@ -97,10 +97,10 @@ type FTypeContext = Seq FTypeVar
 
   --Comandos del lenguaje.
 data Command = Theorem String Type1
+             | Axiom String Type1
              | Tac Tactic
              | Types (Seq TypeVar)
              | Definition String BodyDef
-             | Axiom String Type1
              deriving (Show)
 
   -- Comandos de la línea de comandos
@@ -114,6 +114,7 @@ data ECommand = Exit
               deriving (Show)
 
 data BodyDef = LTerm LTerm1
+             | EmptyLTerm Type1
              | Type TypeDefWithName
              | Ambiguous (GenTree String)
              deriving (Show)
@@ -132,7 +133,7 @@ type TypeDefNoName = TypeDef DoubleType
 
   -- Tácticas.
 data Tactic = Assumption | Apply Int | Intro | Intros | Split
-            | Elim Int | CLeft | CRight | Print String 
+            | Elim Int | CLeft | CRight | Print String | PrintAll 
             | CExists Type1 | Cut Type1 | Exact ExactB
             | Infer LTerm1 | Unfold String (Maybe Int)
             | Absurd Type1
@@ -144,26 +145,34 @@ data ExactB = LamT LTerm1
             deriving (Show)
 
   -- Excepciones.
-data ProofException = PNotFinished | PNotStarted | ExistE String
-                    | NotExistE String | SyntaxE (ParseError Char Void) | AssuE
-                    | IntroE1 | ApplyE1 DoubleType DoubleType | HypoE Int
-                    | Unif1 | Unif2 | Unif3 | Unif4
-                    | ElimE1 | CommandInvalid | TypeRepeated String
-                    | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 DoubleType
-                    | ExactE2 DoubleType | ExactE3 | PSE | EmptyType | TypeE String
-                    | InferE DoubleLTerm InferException | UnfoldE1 String
-                    | FileE IOError
-                    deriving (Show, Typeable)
+data SemanticException = PNotFinished | PNotStarted | ExistE String
+                       | NotExistE String | AssuE
+                       | IntroE1 | ApplyE1 DoubleType DoubleType | HypoE Int
+                       | Unif1 | Unif2 | Unif3 | Unif4
+                       | ElimE1 | CommandInvalid | TypeRepeated String
+                       | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 DoubleType
+                       | ExactE2 DoubleType | ExactE3 | PSE | EmptyType | TypeE String
+                       | InferE DoubleLTerm InferException | UnfoldE1 String
+                       deriving (Show, Typeable)
+
+data PException a = SemanticE a
+                  | SyntaxE (ParseError Char Void)
+                  | FileE IOError
+                  deriving (Show, Typeable)
+
+type ProverExceptionPos = PException (EPosition, SemanticException)
+
+type ProverException = PException SemanticException
 
 type EPosition = (String, Int)
 
-type ExceptionPos = (EPosition, ProofException)
+--type ExceptionPos = (EPosition, ProofException)
 
 data InferException = InferE1 String | InferE2 DoubleLTerm DoubleType
                     | InferE3 DoubleLTerm String | InferE4 DoubleLTerm
                      deriving (Show, Typeable)
                               
-instance Exception ExceptionPos --ProofExceptions
+instance Exception ProverExceptionPos
 
   -- Arbol general.
 data GenTree a = Nil | Node a [GenTree a]

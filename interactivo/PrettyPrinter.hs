@@ -446,4 +446,3 @@ printPrintCommand tyd name Nothing ty =
   text name <+>
   text ":" :
   [printType tyd ty]
-  

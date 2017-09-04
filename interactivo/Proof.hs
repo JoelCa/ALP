@@ -8,7 +8,7 @@ import TermsWithHoles
 import Control.Monad.State.Lazy (get, modify)
 import qualified Data.Sequence as S
 
-type Proof = StateExceptions ProofConstruction ProofException
+type Proof = StateExceptions ProofConstruction SemanticException
 
 
   -- Construcción de la prueba.
@@ -41,7 +41,7 @@ getAttribute :: (SubProof -> a) -> Proof a
 getAttribute f = do ps <- get
                     let x = subps ps
                     if null x
-                      then throw PSE
+                      then throw $ PSE
                       else return $ f $ head x
 
 getType :: Proof (Maybe DoubleType)

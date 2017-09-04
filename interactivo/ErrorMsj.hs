@@ -7,15 +7,19 @@ import PrettyPrinter (printType, printLTerm)
 import Hypothesis (printHypothesis)
 import Text.Megaparsec (parseErrorPretty)
 
-printError :: TypeDefs -> ExceptionPos -> Doc
-printError op (_, e@(SyntaxE _)) =
-  errorMessage op e
-printError op ((file,pos), e) =  
+printError :: TypeDefs -> ProverExceptionPos -> Doc
+printError op (SemanticE ((file,pos), e)) =  
   filePos file pos $$
   errorMessage op e 
+printError op (SyntaxE e) =
+  sep $
+  text "error de sintaxis." :
+  [text $ parseErrorPretty e]
+printError _ (FileE e) =
+  text $ show $ e
 
-printErrorNoPos :: TypeDefs -> ExceptionPos -> Doc
-printErrorNoPos op (_, e) = errorMessage op e 
+--printErrorNoPos :: TypeDefs -> ExceptionPos -> Doc
+--printErrorNoPos op (_, e) = errorMessage op e 
 
 filePos :: String -> Int -> Doc
 filePos file line =
@@ -24,12 +28,8 @@ filePos file line =
   int line <>
   colon
 
--- Mensajes de error.
-errorMessage :: TypeDefs -> ProofException -> Doc
-errorMessage _ (SyntaxE e) = sep $
-                             text "error de sintaxis." :
-                             [text $ parseErrorPretty e]
-errorMessage _ (FileE e) = text $ show $ e
+-- Mensajes de errores semánticos.
+errorMessage :: TypeDefs -> SemanticException -> Doc
 errorMessage _ PNotFinished =
   text "error: prueba no terminada."
 errorMessage _ PNotStarted =

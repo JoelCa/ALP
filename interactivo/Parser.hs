@@ -14,9 +14,9 @@ import Data.Char (isSpace)
 
 type Parser = Parsec Void String
 
-type ProofCommands = Either ProofException [(EPosition, Command)]
+type ProofCommands = Either ProverException [(EPosition, Command)]
 
-type CommandLineCommand = Either ProofException (EPosition, CLICommand)
+type CommandLineCommand = Either ProverException (EPosition, CLICommand)
 
 
 emptyPos :: EPosition
@@ -28,7 +28,7 @@ reservedWords = ["Propositions", "Types", "Theorem", "Print", "Check", "forall",
                  "left", "right", "apply", "elim", "absurd", "cut", "unfold", "exact",
                  ":load", ":reset", ":quit", ":help", ":l", ":r", ":q", ":h"]
 
-reservedSymbols = ["=", "->"] --, and_id, or_id, iff_id, not_id]
+reservedSymbols = ["=", "->", ":"] --, and_id, or_id, iff_id, not_id]
 
 sc :: Parser ()
 sc = L.space space1 lineCmnt empty
@@ -358,6 +358,7 @@ tactic = assumptionP
          <|> splitP
          <|> leftP
          <|> rightP
+         <|> printAllP  -- DEBE ir antes que printP.
          <|> printP
          <|> exactP
          <|> existsP
@@ -404,6 +405,12 @@ cutP = tacticType1Arg "cut" Cut
 
 existsP :: Parser Tactic
 existsP = tacticType1Arg "exists" CExists
+
+printAllP :: Parser Tactic
+printAllP = do rword "Print"
+               symbol "_"
+               dot
+               return PrintAll
 
 unfoldP :: Parser Tactic
 unfoldP = do rword "unfold"
@@ -471,6 +478,10 @@ definition = do x <- identifier
                         t <- typeTerm
                         dot
                         return (y, Type ((t, S.fromList [z, x]), 2, True)))
+                 <|> do colon
+                        t <- typeTerm
+                        dot
+                        return (x, EmptyLTerm t)
              <|> do name <- symbolIdent
                     (n, xs) <- seqReverseOrd1 identifier
                     equal
@@ -480,6 +491,7 @@ definition = do x <- identifier
 
 --------------------------------------------------------------------------------------
 -- Parser de aplicaciones "ambiguas".                            
+
 ambiguousApp :: Parser (GenTree String)
 ambiguousApp = applications ambiguousArgs identifier (\x -> Node x []) appendApp
 

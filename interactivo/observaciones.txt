@@ -175,7 +175,7 @@ definido por el usuario. COQ si lo permite.
 
 
 HACER:
-- Agregar axiomas.
+- Terminar de agregar "PrintAll"
 - Ver "TermsWithHoles", si es posible NO usar LTerm2.
 - Chequear casos en el inferidor de tipos donde podría haberme olvidado usar "basicType".
 
@@ -183,6 +183,7 @@ HECHO:
 - Revisar el parser para ver si 'rword "False"' está bien, cuando False ya no es una palabra reservada.
 - Ver si en la definición de un lambda término es necesario anexarle su tipo inferido mediante "as",
 cuando se puede guardar el tipo en la tabla de lambda términos.
+- Agregar axiomas.
 
 FALTA:
 - Chequear el parser de las hipotesis.

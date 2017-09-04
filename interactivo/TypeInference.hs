@@ -11,7 +11,7 @@ import qualified Data.Sequence as S
 -- Algoritmo de inferencia de tipos de un lambda término.
 
 basicTypeInference :: LamDefs -> TypeDefs -> DoubleLTerm
-                   -> Either ProofException DoubleType
+                   -> Either SemanticException DoubleType
 basicTypeInference = typeInference 0 S.empty
 
 -- Infiere el tipo de un lambda término.
@@ -25,7 +25,7 @@ basicTypeInference = typeInference 0 S.empty
 -- 4. Tipos definidos.
 -- 5. Lambda término con y sin nombre, al que se le quiere inferir su tipo.
 typeInference :: Int -> TermContext -> LamDefs -> TypeDefs
-              -> DoubleLTerm -> Either ProofException DoubleType
+              -> DoubleLTerm -> Either SemanticException DoubleType
 typeInference n c te op t = case typeInference' n c te op t of
                               Right r -> return r
                               Left e -> throw $ InferE t e

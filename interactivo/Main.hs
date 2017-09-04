@@ -9,7 +9,7 @@ import Parser (isLoadCommand, emptyPos, commandsFromFiles, reservedWords, getCom
 import Text.PrettyPrint (render)
 import PrettyPrinter (help, printLTermNoName, printProof, printType, printPrintCommand)
 import Transformers
-import ErrorMsj (printError, printErrorNoPos)
+import ErrorMsj (printError)
 import TypeInference (basicTypeInference)
 import ProverState
 import GlobalState
@@ -17,7 +17,7 @@ import Proof (ProofConstruction, getLTermFromProof, isFinalTerm, cglobal, tsubp,
 import Data.List (isSuffixOf)
 import TypeDefinition (TypeDefs, showTypeTable) -- SACAR SHOW
 import LambdaTermDefinition (showLamTable) -- QUITAR
-  
+
 type ProverInputState a = InputT (StateT ProverState IO) a
 
 
@@ -64,16 +64,16 @@ proverFromCLI =
        Nothing -> return ()
        Just "" -> proverFromCLI
        Just x ->
-         catch (do command <- returnInput emptyPos $ getCommand x
+         catch (do command <- returnInputFromParser $ getCommand x
                    checkCliCommand command)
-         (\e -> outputStrLn (render $ printErrorNoPos (typeDef $ global s) e)
+         (\e -> outputStrLn (render $ printError (typeDef $ global s) e)
                 >> proverFromCLI)
 
 proverFromFiles :: [String] -> ProverInputState ()
 proverFromFiles files =
   do s <- lift get
      r <- lift $ lift $ commandsFromFiles files
-     catch (do commands <- returnInput emptyPos r
+     catch (do commands <- returnInputFromParser r
                checkCommand commands)
        (\e -> outputStrLn (render $ printError (typeDef $ global s) e)
               >> proverFromCLI)
@@ -95,27 +95,34 @@ checkCliCommand (pos, Lang c) =
 theoremCommand :: EPosition -> String -> Type1 -> ProverInputState ()
 theoremCommand pos name ty =
   do s <- lift get
-     when (proofStarted s) $ throwIO (pos, PNotFinished)
+     when (proofStarted s) $ throwSemanError pos PNotFinished
      let g = global s
-     when (invalidName name g) $ throwIO (pos, ExistE name)
+     when (invalidName name g) $ throwSemanError pos $ ExistE name
      tyr <- returnInput pos $ renamedType1 (fTypeContext g) (typeDef g) (lamDef g) ty
      ty' <- returnInput pos $ basicTypeWithoutName (fTypeContext g) (typeDef g) ty
      lift $ modify $ newProof name ty' tyr
 
+axiomCommand :: EPosition -> String -> Type1 -> ProverInputState ()
+axiomCommand pos name ty =
+  do s <- lift get
+     let g = global s
+     when (invalidName name g) $ throwSemanError pos $ ExistE name
+     emptyLTermDefinition pos name ty
+     
 typesVarCommand :: EPosition -> S.Seq TypeVar -> ProverInputState ()
 typesVarCommand pos ps =
   do s <- lift get
-     when (proofStarted s) $ throwIO (pos, PNotFinished)
+     when (proofStarted s) $ throwSemanError pos PNotFinished
      let (tr1, tr2) = typeRepeated ps (\t -> invalidName t $ global s)
-     when (isJust tr1) $ throwIO (pos, TypeRepeated $ fromJust tr1)
-     when (isJust tr2) $ throwIO (pos, ExistE $ fromJust tr2)
+     when (isJust tr1) $ throwSemanError pos $ TypeRepeated $ fromJust tr1
+     when (isJust tr2) $ throwSemanError pos $ ExistE $ fromJust tr2
      lift $ modify $ modifyGlobal $ addFreeVars ps
 
 definitionCommand :: EPosition -> String -> BodyDef -> ProverInputState ()
 definitionCommand pos name body = 
   do s <- lift get
-     when (proofStarted s) $ throwIO (pos, PNotFinished)
-     when (invalidName name $ global s) $ throwIO (pos, ExistE name)
+     when (proofStarted s) $ throwSemanError pos $ PNotFinished
+     when (invalidName name $ global s) $ throwSemanError pos $ ExistE name
      defCommand pos name body
 
 tacticCommand :: Bool -> EPosition -> Tactic -> ProverInputState () 
@@ -144,7 +151,7 @@ otherTacticsCommand _ (Infer _) =
   error "error: otherTacticsCommand, no debería pasar."
 otherTacticsCommand pos ta =
   do s <- lift get
-     when (not $ proofStarted s) $ throwIO (pos, PNotStarted)
+     when (not $ proofStarted s) $ throwSemanError pos PNotStarted
      let pc = getProofC s
          typ = getTypeProof s
      (_ , pc') <- returnInput pos $ runStateExceptions (habitar ta) pc
@@ -158,7 +165,7 @@ printCommand :: EPosition -> String -> ProverInputState ()
 printCommand pos x =
   do s <- lift get
      let g = global s
-     when (not $ isLamDef x g) $ throwIO (pos, NotExistE x)
+     when (not $ isLamDef x g) $ throwSemanError pos $ NotExistE x
 
 inferCommand :: EPosition -> LTerm1 -> ProverInputState DoubleType
 inferCommand pos x =
@@ -197,12 +204,15 @@ checkCommand [(pos, Theorem name ty)] =
   do theoremCommand pos name ty
      s <- lift get
      outputStrLn $ renderProof $ getProofC s
-     proverFromCLI
+     proverFromCLI     
 checkCommand [(pos, Tac ta)] =
   do tacticCommand True pos ta
      proverFromCLI
 checkCommand ((pos, Theorem name ty):cs) =
   do theoremCommand pos name ty
+     checkCommand cs
+checkCommand ((pos, Axiom name ty):cs) =
+  do axiomCommand pos name ty
      checkCommand cs
 checkCommand ((pos, Types ps):cs) =
   do typesVarCommand pos ps
@@ -229,6 +239,8 @@ defCommand pos name (LTerm body) =
      te  <- returnInput pos $ basicWithoutName (typeDef glo) (fTypeContext glo) (lamDef glo) body
      --outputStrLn $ "Renombramiento: " ++ (renderLTerm (typeDef glo) $ fst te)
      lamTermDefinition pos name te
+defCommand pos name (EmptyLTerm ty) =
+  emptyLTermDefinition pos name ty
 defCommand pos name (Ambiguous ap) =
   do s <- lift get
      let glo = global s
@@ -253,6 +265,13 @@ lamTermDefinition pos name te =
      let glo = global s
      ty <- returnInput pos $ basicTypeInference (lamDef glo) (typeDef glo) te
      lift $ modify $ newLamDefinition name (toNoName te) ty
+
+emptyLTermDefinition :: EPosition -> String -> Type1 -> ProverInputState ()
+emptyLTermDefinition pos name ty =
+  do s <- lift get
+     let g = global s
+     ty' <- returnInput pos $ basicTypeWithoutName (fTypeContext g) (typeDef g) ty
+     lift $ modify $ newEmptyLamDefinition name ty'
 
 -- Función auxiliar del comando "Props/Types".
 typeRepeated :: S.Seq TypeVar -> (String -> Bool) -> (Maybe String, Maybe String)
@@ -284,6 +303,15 @@ renderProof :: ProofConstruction -> String
 renderProof p = render $ printProof (tsubp p) (conflict $ cglobal p) (typeDef $ cglobal p) (fTypeContext $ cglobal p) (subps p)
 
 
-returnInput :: EPosition -> Either ProofException a -> ProverInputState a
-returnInput pos (Left exception) = throwIO (pos, exception)
+returnInput :: EPosition -> Either SemanticException a -> ProverInputState a
+returnInput pos (Left exception) = throwIO $ SemanticE (pos, exception)
 returnInput pos (Right x) = return x
+
+returnInputFromParser :: Either ProverException a -> ProverInputState a
+returnInputFromParser (Left (SemanticE e)) = error "error: returnInputFromParser, no debería suceder."
+returnInputFromParser (Left (SyntaxE e)) = throwIO (SyntaxE e :: ProverExceptionPos)
+returnInputFromParser (Left (FileE e)) = throwIO (FileE e :: ProverExceptionPos)
+returnInputFromParser (Right x) = return x
+
+throwSemanError :: EPosition -> SemanticException -> ProverInputState ()
+throwSemanError pos e = throwIO $ SemanticE (pos, e)

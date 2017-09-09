@@ -2,6 +2,7 @@ module TermsWithHoles where
 
 import Common
 
+
   -- Lamda término con aujeros de términos y tipos.
 data LTermHoles = Hole (LTerm2 -> LTerm2) | DoubleHole (LTerm2 -> LTerm2 -> LTerm2)
                 | LamTe LTerm2 | TypeHo TypeHole

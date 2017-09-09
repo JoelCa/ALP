@@ -173,11 +173,13 @@ Donde, la variable de tipo ligada "x", coincide con la variable de término "x".
 Por ejemplo: "~ ~ p", NO se puede escribir como "~~ p". Pues, "~~" puede ser un operador
 definido por el usuario. COQ si lo permite. 
 
+- El parser de archivos acepta varios comandos en la misma línea. 
+Por ejemplo: "comando1. comando2."
+El parser interactivo, solo acepta de a un comando por vez. 
+
 
 HACER:
-- Chequear parser cuando hay algo asi: "algo1.  algo2."
 - Ver "TermsWithHoles", si es posible NO usar LTerm2.
-- Chequear casos en el inferidor de tipos donde podría haberme olvidado usar "basicType".
 
 HECHO:
 - Revisar el parser para ver si 'rword "False"' está bien, cuando False ya no es una palabra reservada.
@@ -187,6 +189,8 @@ cuando se puede guardar el tipo en la tabla de lambda términos.
 - Se imprime mal el término dado en Inferencia OK, caso 1.
 - Hacer que <interactive> tenga una posición, para mostrar los errores.
 - Terminar de agregar "PrintAll".
+- Chequear parser cuando hay algo asi: "algo1.  algo2."
+- Chequear casos en el inferidor de tipos donde podría haberme olvidado usar "basicType".
 
 FALTA:
 - Chequear el parser de las hipotesis.

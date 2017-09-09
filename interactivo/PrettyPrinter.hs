@@ -434,6 +434,7 @@ help =
 
 --------------------------------------------------------------------------------------------  
 -- Comando Print
+
 printPrintComm :: TypeDefs -> String -> Maybe LTerm2 -> DoubleType -> Doc
 printPrintComm = printComm True
 

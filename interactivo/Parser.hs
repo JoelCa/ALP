@@ -23,8 +23,8 @@ interactive :: String
 interactive = "<interactive>"
 
 
-reservedWords = ["Propositions", "Types", "Theorem", "Print", "Check", "forall", "exists",
-                 "let", "in", "as","assumption", "intro", "intros", "split",
+reservedWords = ["Propositions", "Types", "Theorem", "Axiom", "Print", "Check", "forall"
+                , "exists",  "let", "in", "as","assumption", "intro", "intros", "split",
                  "left", "right", "apply", "elim", "absurd", "cut", "unfold", "exact",
                  ":load", ":reset", ":quit", ":help", ":l", ":r", ":q", ":h"]
 

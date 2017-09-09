@@ -175,8 +175,7 @@ definido por el usuario. COQ si lo permite.
 
 
 HACER:
-- Añadir un historial de comandos, mediante haskeline.
-- Terminar de agregar "PrintAll"
+- Chequear parser cuando hay algo asi: "algo1.  algo2."
 - Ver "TermsWithHoles", si es posible NO usar LTerm2.
 - Chequear casos en el inferidor de tipos donde podría haberme olvidado usar "basicType".
 
@@ -187,6 +186,7 @@ cuando se puede guardar el tipo en la tabla de lambda términos.
 - Agregar axiomas.
 - Se imprime mal el término dado en Inferencia OK, caso 1.
 - Hacer que <interactive> tenga una posición, para mostrar los errores.
+- Terminar de agregar "PrintAll".
 
 FALTA:
 - Chequear el parser de las hipotesis.
@@ -199,3 +199,6 @@ distintas a las variables de tipo libre y nombres de operadores.
 - Explicar en el informe el renombre de lambda términos (tanto de var. de tipos, como de términos).
 - Mejorar Print (Print All, Print de tipos)
 - Crea una estructura de tipos de términos, con y sin nombre.
+
+NO SE HACE:
+- Añadir un historial de comandos, mediante haskeline.

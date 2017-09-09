@@ -3,6 +3,7 @@ module PrettyPrinter where
 import Common
 import Proof
 import TypeDefinition (TypeDefs, getTypeData)
+import LambdaTermDefinition (LamDefs, getLamTable)
 import Text.PrettyPrint
 import Data.List
 import qualified Data.Sequence as S
@@ -10,6 +11,7 @@ import Hypothesis (printHypothesis)
 import qualified Data.IntSet as IS
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Maybe (isJust)
 
 -----------------------
 --- pretty printer
@@ -431,18 +433,37 @@ help =
   concat $ map (\(x,y) -> x ++ replicate ((40 - length x) `max` 2) ' ' ++ y) helpMessage  
 
 --------------------------------------------------------------------------------------------  
--- Comando print
+-- Comando Print
+printPrintComm :: TypeDefs -> String -> Maybe LTerm2 -> DoubleType -> Doc
+printPrintComm = printComm True
 
-printPrintCommand :: TypeDefs -> String -> Maybe LTerm2 -> DoubleType -> Doc
-printPrintCommand tyd name (Just te) ty =
+printComm :: Bool -> TypeDefs -> String -> Maybe LTerm2 -> DoubleType -> Doc
+printComm withTerm tyd name (Just te) ty =
   sep $
   text name <+>
+  printComm' withTerm tyd te <+>
+  text ":" :
+  [printType tyd ty]
+printComm _ tyd name Nothing ty =
+  sep $
+  text name <+>
+  text ":" :
+  [printType tyd ty]
+
+printComm' :: Bool -> TypeDefs -> LTerm2 -> Doc
+printComm' True tyd te =
+  sep $
   text "=" :
-  printLTermNoName tyd te <+>
-  text ":" :
-  [printType tyd ty]
-printPrintCommand tyd name Nothing ty =
-  sep $
-  text name <+>
-  text ":" :
-  [printType tyd ty]
+  [printLTermNoName tyd te]
+printComm' False _ _ =
+  empty
+
+printPrintAllComm :: LamDefs -> TypeDefs -> Doc
+printPrintAllComm ted tyd =
+  foldr (\(name, (mte, ty)) r -> printPrintAllComm' tyd name mte ty $$ r)
+  empty $ getLamTable ted
+
+printPrintAllComm' :: TypeDefs -> String -> Maybe LTerm2 -> DoubleType -> Doc
+printPrintAllComm' tyd name mte ty =
+  (if isJust mte then text "-" else text "*") <+>
+  printComm False tyd name mte ty

@@ -7,7 +7,7 @@ import qualified Data.Sequence as S
 import Tactics (habitar)
 import Parser (isLoadCommand, commandsFromFiles, reservedWords, getCommand)
 import Text.PrettyPrint (render)
-import PrettyPrinter (help, printLTermNoName, printProof, printType, printPrintCommand)
+import PrettyPrinter (help, printLTermNoName, printProof, printType, printPrintComm, printPrintAllComm)
 import Transformers
 import ErrorMsj (printError)
 import TypeInference (basicTypeInference)
@@ -132,6 +132,10 @@ tacticCommand printing pos (Print x) =
     if printing
       then printCommandPrinting x
       else return ()
+tacticCommand printing pos PrintAll =
+ if printing
+ then printCommandPrintingAll
+ else return ()
 tacticCommand printing pos (Infer x) =
   do ty <- inferCommand pos x
      if printing
@@ -179,7 +183,13 @@ printCommandPrinting :: String -> ProverInputState ()
 printCommandPrinting x =
   do s <- lift get
      let g = global s
-     outputStrLn $ render $ printPrintCommand (typeDef g) x (getLamTerm x g) (getLamTermType x g)
+     outputStrLn $ render $ printPrintComm (typeDef g) x (getLamTerm x g) (getLamTermType x g)
+
+printCommandPrintingAll :: ProverInputState ()
+printCommandPrintingAll =
+  do s <- lift get
+     let g = global s
+     outputStrLn $ render $ printPrintAllComm (lamDef g) (typeDef g)
 
 inferCommandPrinting :: DoubleType -> ProverInputState ()
 inferCommandPrinting ty =

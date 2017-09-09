@@ -13,8 +13,8 @@ printError op (SemanticE ((file,pos), e)) =
   errorMessage op e 
 printError op (SyntaxE e) =
   sep $
-  text "error de sintaxis." :
-  [text $ parseErrorPretty e]
+  (text $ parseErrorPretty e) :
+  [text "error de sintaxis."]
 printError _ (FileE e) =
   text $ show $ e
 
@@ -26,8 +26,10 @@ filePos file line =
   text file <>
   colon <>
   int line <>
+  colon <>
+  int 1 <>
   colon
-
+  
 -- Mensajes de errores semánticos.
 errorMessage :: TypeDefs -> SemanticException -> Doc
 errorMessage _ PNotFinished =

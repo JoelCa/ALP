@@ -5,7 +5,7 @@ import Data.Maybe
 import Data.List (isPrefixOf)
 import qualified Data.Sequence as S
 import Tactics (habitar)
-import Parser (isLoadCommand, emptyPos, commandsFromFiles, reservedWords, getCommand)
+import Parser (isLoadCommand, commandsFromFiles, reservedWords, getCommand)
 import Text.PrettyPrint (render)
 import PrettyPrinter (help, printLTermNoName, printProof, printType, printPrintCommand)
 import Transformers
@@ -58,13 +58,14 @@ startProver = proverFromFiles ["Prelude.pr"]
 
 proverFromCLI :: ProverInputState ()
 proverFromCLI =
-  do s <- lift get
+  do lift $ modify addCount
+     s <- lift get
      minput <- getInputLine $ prompt s
      case minput of
        Nothing -> return ()
        Just "" -> proverFromCLI
        Just x ->
-         catch (do command <- returnInputFromParser $ getCommand x
+         catch (do command <- returnInputFromParser $ getCommand x (getCounter s)
                    checkCliCommand command)
          (\e -> outputStrLn (render $ printError (typeDef $ global s) e)
                 >> proverFromCLI)
@@ -237,7 +238,7 @@ defCommand pos name (LTerm body) =
   do s <- lift get
      let glo = global s
      te  <- returnInput pos $ basicWithoutName (typeDef glo) (fTypeContext glo) (lamDef glo) body
-     --outputStrLn $ "Renombramiento: " ++ (renderLTerm (typeDef glo) $ fst te)
+     --outputStrLn $ "Renombramiento: " ++ show te ++ "\n" --(renderLTerm (typeDef glo) $ fst te)
      lamTermDefinition pos name te
 defCommand pos name (EmptyLTerm ty) =
   emptyLTermDefinition pos name ty
@@ -263,7 +264,9 @@ lamTermDefinition :: EPosition -> String -> DoubleLTerm -> ProverInputState ()
 lamTermDefinition pos name te =
   do s <- lift get
      let glo = global s
+     --outputStrLn $ show te ++ "\n"
      ty <- returnInput pos $ basicTypeInference (lamDef glo) (typeDef glo) te
+     --outputStrLn $ (show $ toNoName te) ++ "\n"
      lift $ modify $ newLamDefinition name (toNoName te) ty
 
 emptyLTermDefinition :: EPosition -> String -> Type1 -> ProverInputState ()

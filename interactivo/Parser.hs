@@ -19,8 +19,8 @@ type ProofCommands = Either ProverException [(EPosition, Command)]
 type CommandLineCommand = Either ProverException (EPosition, CLICommand)
 
 
-emptyPos :: EPosition
-emptyPos = ("", 1)
+interactive :: String
+interactive = "<interactive>"
 
 
 reservedWords = ["Propositions", "Types", "Theorem", "Print", "Check", "forall", "exists",
@@ -115,12 +115,20 @@ commands = many ((\x y -> (x,y)) <$> (getLinePos <$> getPosition) <*> command) <
 
 getLinePos :: SourcePos -> EPosition
 getLinePos (SourcePos n l c) = (n, unPos l)
-    
 
-getCommand :: String -> CommandLineCommand
-getCommand s = case parse (space *> ((\x -> (emptyPos, x)) <$> cliCommand) <* eof) "" s  of
-                 Right x -> Right x
-                 Left e -> Left $ SyntaxE  e
+newPosition :: String -> Int -> SourcePos
+newPosition name line = SourcePos name (mkPos line) pos1
+
+getCommand :: String -> Int -> CommandLineCommand
+getCommand s line =
+  case parse (cliWithPosition line) interactive s  of
+    Right x -> Right x
+    Left e -> Left $ SyntaxE  e
+
+cliWithPosition :: Int -> Parser (EPosition, CLICommand)
+cliWithPosition line =
+  do setPosition (newPosition interactive line)
+     space *> ((\x -> ((interactive, line), x)) <$> cliCommand) <* eof
 
 cliCommand :: Parser CLICommand
 cliCommand = do c <- command
@@ -358,7 +366,7 @@ tactic = assumptionP
          <|> splitP
          <|> leftP
          <|> rightP
-         <|> printAllP  -- DEBE ir antes que printP.
+         <|> try printAllP
          <|> printP
          <|> exactP
          <|> existsP

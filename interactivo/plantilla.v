@@ -263,6 +263,10 @@ Definition ttt := p.
 
 Print t23.
 
+Definition All := p.
+
+Print All.
+
 (*Variables xx:Prop.
 
 Print xx.*)

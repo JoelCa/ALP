@@ -9,6 +9,7 @@ import Data.Sequence (Seq)
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState
                        , global :: GlobalState
+                       , cc :: Int                    -- Contador del número de entradas dadas por el usuario.
                        }
 
 
@@ -62,6 +63,7 @@ proofStarted p = isJust $ proof p
 initialProver :: ProverState
 initialProver = PSt { global = initialGlobal
                     , proof = Nothing
+                    , cc = 0
                     }
 
 modifyGlobal :: (GlobalState -> GlobalState) -> ProverState -> ProverState
@@ -74,3 +76,9 @@ setProofC _ _ = error "error: setProofC, no debería pasar."
 theoremName :: ProverState -> String
 theoremName (PSt {proof = Just pr}) = name pr
 theoremName _ = error "error: theoremName, no debería pasar."
+
+addCount :: ProverState -> ProverState
+addCount p = p {cc = cc p + 1}
+
+getCounter :: ProverState -> Int
+getCounter (PSt {cc = n}) = n

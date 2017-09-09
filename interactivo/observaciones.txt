@@ -175,6 +175,7 @@ definido por el usuario. COQ si lo permite.
 
 
 HACER:
+- Añadir un historial de comandos, mediante haskeline.
 - Terminar de agregar "PrintAll"
 - Ver "TermsWithHoles", si es posible NO usar LTerm2.
 - Chequear casos en el inferidor de tipos donde podría haberme olvidado usar "basicType".
@@ -184,6 +185,8 @@ HECHO:
 - Ver si en la definición de un lambda término es necesario anexarle su tipo inferido mediante "as",
 cuando se puede guardar el tipo en la tabla de lambda términos.
 - Agregar axiomas.
+- Se imprime mal el término dado en Inferencia OK, caso 1.
+- Hacer que <interactive> tenga una posición, para mostrar los errores.
 
 FALTA:
 - Chequear el parser de las hipotesis.

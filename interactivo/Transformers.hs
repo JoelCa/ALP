@@ -193,13 +193,13 @@ withoutName' ters tebs tyrs tybs fs op cnn tn (EPack t e t') =
   do tt <- renamedType (snd, \x -> (0, x), tyrs, tybs) fs op tn t
      ee <- withoutName' ters tebs tyrs tybs fs op cnn tn e
      tt' <- renamedType (snd, \x -> (0, x), tyrs, tybs) fs op tn t'
-     return $ EPack tt ee tt
+     return $ EPack tt ee tt'
 withoutName' ters tebs tyrs tybs fs op cnn tn (EUnpack x y e1 e2) =
   do ee1 <- withoutName' ters tebs tyrs tybs fs op cnn tn e1
      let v = getRename x (snd, tyrs) (id, fs) (id, getTypesNames op) (id, [])
          h = getRename y (id, ters) (id, S.empty) (id, S.empty) (id, [])
      ee2 <- withoutName' (h S.<| ters) (y S.<| tebs) (bTypeVar v S.<| tyrs) (bTypeVar x S.<| tybs) fs op cnn tn e2
-     return $ EUnpack h v ee1 ee2
+     return $ EUnpack v h ee1 ee2
 withoutName' ters tebs tyrs tybs fs op cnn tn (e ::: t) =
   do ee <- withoutName' ters tebs tyrs tybs fs op cnn tn e
      t' <- typeWithoutName (snd, \x -> (0, x), tybs) fs op t
@@ -329,6 +329,6 @@ toNoName (Abs _ t e) = Abs () t (toNoName e)
 toNoName (BAbs t e) = BAbs t (toNoName e)
 toNoName (x :@: y) = toNoName x :@: toNoName y
 toNoName (e :!: t) = toNoName e :!: t
-toNoName (EPack t1 e t2) = EPack t1 (toNoName e) t1
+toNoName (EPack t1 e t2) = EPack t1 (toNoName e) t2
 toNoName (EUnpack v _ e1 e2) = EUnpack v () (toNoName e1) (toNoName e2)
 toNoName (e ::: t) = toNoName e ::: t

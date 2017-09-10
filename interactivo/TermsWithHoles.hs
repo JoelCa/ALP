@@ -13,9 +13,9 @@ type T2Holes a b = Term2Holes a (TermHoles b a)
 
 type THoles a b = [T2Holes a b]
 
-type LTerm2Holes = T2Holes LTerm2 DoubleType
+type LTerm2Holes = T2Holes DoubleLTerm DoubleType
 
-type LTermHoles = THoles LTerm2 DoubleType
+type LTermHoles = THoles DoubleLTerm DoubleType
 
 -- Funciones que operan sobre los lambda términos con aujeros.
 
@@ -44,13 +44,13 @@ addT2H (Term2 x) ts = Term2 x : ts
 simplifyType :: DoubleType -> LTermHoles -> LTermHoles
 simplifyType = simplify2
 
-simplifyLTerm :: LTerm2 -> LTermHoles -> LTermHoles
+simplifyLTerm :: DoubleLTerm -> LTermHoles -> LTermHoles
 simplifyLTerm = simplify1
 
-addHT :: (LTerm2 -> LTerm2) -> LTermHoles -> LTermHoles
+addHT :: (DoubleLTerm -> DoubleLTerm) -> LTermHoles -> LTermHoles
 addHT = addHole1
 
-addDHT :: (LTerm2 -> LTerm2 -> LTerm2) -> LTermHoles -> LTermHoles
+addDHT :: (DoubleLTerm -> DoubleLTerm -> DoubleLTerm) -> LTermHoles -> LTermHoles
 addDHT = addHole2
 
 addTypeHoleInTerm :: LTerm2Holes -> LTermHoles -> LTermHoles
@@ -100,5 +100,5 @@ emptyLTerm = empty
 withoutHoles :: LTermHoles -> Bool
 withoutHoles = noHolesTerm1
 
-getLTermNoHoles :: LTermHoles -> Maybe LTerm2
+getLTermNoHoles :: LTermHoles -> Maybe DoubleLTerm
 getLTermNoHoles = getTerm1

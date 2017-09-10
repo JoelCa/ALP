@@ -26,8 +26,11 @@ habitar Assumption =
      c <- getTermContext
      q <- getTBTypeVars
      i <- maybeToProof AssuE $ S.findIndexL (\(_,p,t') -> positiveShift (q - p) t' == t) c
+     to <- getTTermVars
+     -- (i,v) <- maybeToProof AssuE $
+     --          S.foldrWithIndex (\index (_,p,t') r -> if positiveShift (q - p) t' == t then return (index,p) else r) Nothing c
      endSubProof
-     modifyTerm $ simplifyLTerm $ LVar $ Bound i
+     modifyTerm $ simplifyLTerm $ LVar (hypothesis (to - i - 1), Bound i)
 habitar Intro =
   do x <- getType
      introComm x
@@ -41,7 +44,7 @@ habitar (Apply h) =
      i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
      c <- getTermContext
      q <- getTBTypeVars
-     applyComm i t (getTypeVar q $ S.index c i)
+     applyComm (hypothesis h) i t (getTypeVar q $ S.index c i)
 habitar (Elim h) =
   do x <- getType
      t <- maybeToProof EmptyType x
@@ -50,14 +53,14 @@ habitar (Elim h) =
      i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
      c <- getTermContext
      q <- getTBTypeVars
-     elimComm i t (getTypeVar q $ S.index c i)
+     elimComm (hypothesis h) i t (getTypeVar q $ S.index c i)
 habitar CLeft =
   do x <- getType
      case x of
        Just (RenamedType s [t1,t2]) ->
          if s == or_id
          then do replaceType t1
-                 modifyTerm $ addHT (\x -> ((LVar $ Free "intro_or1")
+                 modifyTerm $ addHT (\x -> ((LVar ("intro_or1", Free "intro_or1"))
                                              :!: t1 :!: t2)
                                            :@: x)
          else throw CommandInvalid
@@ -68,7 +71,7 @@ habitar CRight =
        Just (RenamedType s [t1,t2]) ->
          if s == or_id
          then do replaceType t2
-                 modifyTerm $ addHT (\x -> ((LVar $ Free "intro_or2")
+                 modifyTerm $ addHT (\x -> ((LVar ("intro_or2", Free "intro_or2"))
                                              :!: t1 :!: t2)
                                            :@: x)
          else throw CommandInvalid
@@ -79,7 +82,7 @@ habitar Split =
        Just (RenamedType s [t1,t2]) ->
          if s == and_id
          then do newSubProofs 2 [Just t1, Just t2]
-                 modifyTerm $ addDHT (\x y -> ((LVar $ Free "intro_and")
+                 modifyTerm $ addDHT (\x y -> ((LVar ("intro_and", Free "intro_and"))
                                                 :!: t1 :!: t2)
                                               :@: x :@: y)
          else throw CommandInvalid
@@ -153,7 +156,7 @@ habitar (Absurd ty) =
                  tty <- eitherToProof $ renamedType2 btc ftc op ld ty
                  newSubProofs 2 [ Just tty
                                 , Just (RenamedType not_id [tty]) ]
-                 modifyTerm $ addDHT (\x y -> ((LVar $ Free "intro_bottom")
+                 modifyTerm $ addDHT (\x y -> ((LVar ("intro_bottom", Free "intro_bottom"))
                                                 :!: tty)
                                               :@: x :@: y)
          else throw CommandInvalid
@@ -192,7 +195,8 @@ introComm (Just (Fun t1 t2)) =
      tv <- getTVars
      addTermContext (tv, q, t1)
      replaceType t2
-     modifyTerm $ addHT (\x -> Abs () t1 x)
+     to <- getTTermVars
+     modifyTerm $ addHT (\x -> Abs (hypothesis (to - 1)) t1 x)
 introComm (Just (ForAll v t)) =
   do modifyTVars (+1)
      tv <- getTVars
@@ -212,9 +216,8 @@ introsComm = catch (do habitar Intro
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando ELIM
 
--- Asumimos que las tuplas del 2º arg. , tienen la forma correcta.
-elimComm :: Int -> DoubleType -> DoubleType -> Proof ()
-elimComm i t (Exists v tt) =
+elimComm :: TermVar -> Int -> DoubleType -> DoubleType -> Proof ()
+elimComm h i t (Exists v tt) =
   do modifyTVars (+1)
      tv <- getTVars
      addBTypeContext (tv, v)
@@ -226,48 +229,49 @@ elimComm i t (Exists v tt) =
      ftc <- getFTypeContext
      op <- getTypeDefinitions
      ld <- getLamDefinitions
+     to <- getTTermVars
      replaceType $ renamedValidType1 1 (bTypeVar v S.<| btc) ftc op ld t
-     modifyTerm $ addHT (\x -> EUnpack v () (LVar $ Bound i) x)
-elimComm i t (RenamedType s [t1,t2])
+     modifyTerm $ addHT (\x -> EUnpack v (hypothesis $ to - i) (LVar (h, Bound i)) x)
+elimComm h i t (RenamedType s [t1,t2])
   | s == and_id =
       do replaceType (Fun t1 (Fun t2 t))
-         modifyTerm $ addHT (\x -> ((LVar $ Free "elim_and")
+         modifyTerm $ addHT (\x -> ((LVar ("elim_and", Free "elim_and"))
                                      :!: t1 :!: t2 :!: t)
-                                   :@: (LVar $ Bound i) :@: x)
+                                   :@: (LVar (h, Bound i)) :@: x)
   | s == or_id =
       do newSubProofs 2 [ Just (Fun t1 t)
                         , Just (Fun t2 t) ]
-         modifyTerm $ addDHT (\x y -> ((LVar $ Free "elim_or")
+         modifyTerm $ addDHT (\x y -> ((LVar ("elim_and", Free "elim_or"))
                                         :!: t1 :!: t2 :!: t)
-                                      :@: (LVar $ Bound i) :@: x :@: y)
+                                      :@: (LVar (h, Bound i)) :@: x :@: y)
   | otherwise =
       throw ElimE1
-elimComm i t (RenamedType s [])
+elimComm h i t (RenamedType s [])
   | s == bottom_id =
       do endSubProof
-         modifyTerm $ simplifyLTerm $ (LVar $ Free "elim_bottom") :!: t :@: (LVar $ Bound i)
+         modifyTerm $ simplifyLTerm $ (LVar ("elim_bottom", Free "elim_bottom")) :!: t :@: (LVar (h, Bound i))
   | otherwise =
       throw ElimE1
-elimComm _ _ _ = throw ElimE1
+elimComm _ _ _ _ = throw ElimE1
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando APPLY
 
-applyComm :: Int -> DoubleType -> DoubleType -> Proof ()
-applyComm i x ht@(Fun _ _) = 
+applyComm :: TermVar -> Int -> DoubleType -> DoubleType -> Proof ()
+applyComm h i x ht@(Fun _ _) = 
   do n <- compareTypes ht x
      evaluateSubProof n $ getTypesFun n ht
-     modifyTerm $ getApplyTermFun n i
-applyComm i x ht@(ForAll _ _) =
+     modifyTerm $ getApplyTermFun n h i
+applyComm h i x ht@(ForAll _ _) =
   do let equal = ht == x
          (ft, n) = getNestedTypeForAll equal ht
      r <- eitherToProof $ unification equal n ft x
      let m = n - M.size r
      evaluateSubProof m $ getTypesForAll m
-     modifyTerm $ getApplyTermForAll n r (LVar $ Bound i)
-applyComm i x t
+     modifyTerm $ getApplyTermForAll n r (LVar (h, Bound i))
+applyComm h i x t
   | t == x = do evaluateSubProof 0 []
-                modifyTerm $ simplifyLTerm (LVar $ Bound i)
+                modifyTerm $ simplifyLTerm (LVar (h, Bound i))
   | otherwise = throw $ ApplyE1 t x
   
 
@@ -304,11 +308,11 @@ getNestedTypeForAll' (ForAll _ x) = let (f, n) = getNestedTypeForAll' x
                                     in (f, n+1)
 getNestedTypeForAll' x = (x,0)
 
-getApplyTermFun :: Int -> Int -> LTermHoles -> LTermHoles
-getApplyTermFun 0 i ts = simplifyLTerm (LVar $ Bound i) ts
-getApplyTermFun 1 i ts = addHT (\x -> (LVar $ Bound i) :@: x) ts
-getApplyTermFun 2 i ts = addDHT (\x y -> ((LVar $ Bound i) :@: x) :@: y) ts
-getApplyTermFun n i ts = getApplyTermFun (n-1) i $ addDHT (\x y -> x :@: y) ts
+getApplyTermFun :: Int -> TermVar -> Int -> LTermHoles -> LTermHoles
+getApplyTermFun 0 h i ts = simplifyLTerm (LVar (h, Bound i)) ts
+getApplyTermFun 1 h i ts = addHT (\x -> (LVar (h, Bound i)) :@: x) ts
+getApplyTermFun 2 h i ts = addDHT (\x y -> ((LVar (h, Bound i)) :@: x) :@: y) ts
+getApplyTermFun n h i ts = getApplyTermFun (n-1) h i $ addDHT (\x y -> x :@: y) ts
 
 
 repeatElem :: Int -> a -> [a]
@@ -320,11 +324,11 @@ repeatElem n x
 getTypesForAll :: Int -> [Maybe DoubleType]
 getTypesForAll m = repeatElem m Nothing
 
-getApplyTermForAll :: Int -> M.Map Int DoubleType -> LTerm2 -> LTermHoles -> LTermHoles
+getApplyTermForAll :: Int -> M.Map Int DoubleType -> DoubleLTerm -> LTermHoles -> LTermHoles
 getApplyTermForAll n sust t =
   addTypeHoleInTerm $ termForAll n t sust
 
-termForAll :: Int -> LTerm2 -> M.Map Int DoubleType -> LTerm2Holes
+termForAll :: Int -> DoubleLTerm -> M.Map Int DoubleType -> LTerm2Holes
 termForAll n t sust
   | n == 0 = Term1 t
   | n > 0 = termForAll' 0 (n-1) (Term1 t) sust
@@ -361,7 +365,7 @@ exactTerm te tt =
      t <- eitherToProof $ typeInference q c ld op te
      unless (t == tt) $ throw $ ExactE1 tt
      endSubProof
-     modifyTerm $ simplifyLTerm $ toNoName te
+     modifyTerm $ simplifyLTerm te
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando UNFOLD

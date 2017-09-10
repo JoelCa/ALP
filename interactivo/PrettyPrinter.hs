@@ -7,7 +7,7 @@ import LambdaTermDefinition (LamDefs, getLamTable)
 import Text.PrettyPrint
 import Data.List
 import qualified Data.Sequence as S
-import Hypothesis (printHypothesis)
+import Hypothesis (hypothesis)
 import qualified Data.IntSet as IS
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -387,7 +387,7 @@ printRestBTypeC btc
 
 printTermVar :: Int -> TypeDefs -> TermVarWithType -> Doc
 printTermVar n op (_,_,t) =
-  text (printHypothesis n) <+>
+  text (hypothesis n) <+>
   text ":" <+>
   printType op t
 
@@ -435,10 +435,10 @@ help =
 --------------------------------------------------------------------------------------------  
 -- Comando Print
 
-printPrintComm :: TypeDefs -> String -> Maybe LTerm2 -> DoubleType -> Doc
+printPrintComm :: TypeDefs -> String -> Maybe DoubleLTerm -> DoubleType -> Doc
 printPrintComm = printComm True
 
-printComm :: Bool -> TypeDefs -> String -> Maybe LTerm2 -> DoubleType -> Doc
+printComm :: Bool -> TypeDefs -> String -> Maybe DoubleLTerm -> DoubleType -> Doc
 printComm withTerm tyd name (Just te) ty =
   sep $
   text name <+>
@@ -451,11 +451,11 @@ printComm _ tyd name Nothing ty =
   text ":" :
   [printType tyd ty]
 
-printComm' :: Bool -> TypeDefs -> LTerm2 -> Doc
+printComm' :: Bool -> TypeDefs -> DoubleLTerm -> Doc
 printComm' True tyd te =
   sep $
   text "=" :
-  [printLTermNoName tyd te]
+  [printLTerm tyd te]
 printComm' False _ _ =
   empty
 
@@ -464,7 +464,7 @@ printPrintAllComm ted tyd =
   foldr (\(name, (mte, ty)) r -> printPrintAllComm' tyd name mte ty $$ r)
   empty $ getLamTable ted
 
-printPrintAllComm' :: TypeDefs -> String -> Maybe LTerm2 -> DoubleType -> Doc
+printPrintAllComm' :: TypeDefs -> String -> Maybe DoubleLTerm -> DoubleType -> Doc
 printPrintAllComm' tyd name mte ty =
   (if isJust mte then text "-" else text "*") <+>
   printComm False tyd name mte ty

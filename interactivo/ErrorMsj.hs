@@ -4,7 +4,7 @@ import Common
 import TypeDefinition (TypeDefs)
 import Text.PrettyPrint
 import PrettyPrinter (printType, printLTerm)
-import Hypothesis (printHypothesis)
+import Hypothesis (hypothesis)
 import Text.Megaparsec (parseErrorPretty)
 
 printError :: TypeDefs -> ProverExceptionPos -> Doc
@@ -113,7 +113,7 @@ errorMessage _ (UnfoldE1 s) =
   text "no es un operador foldeable."
 errorMessage _ (HypoE i) =
   text "error: la hipótesis" <+>
-  quotes (text $ printHypothesis i) <+>
+  quotes (text $ hypothesis i) <+>
   text "no existe."
 
   

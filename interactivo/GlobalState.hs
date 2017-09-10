@@ -21,7 +21,7 @@ data GlobalState = Global { fTypeContext :: FTypeContext
 addEmptyLamTerm :: String -> DoubleType -> GlobalState -> GlobalState
 addEmptyLamTerm name t g = g {lamDef = LTD.insertWithoutLamTerm name t $ lamDef g}
 
-addLamTerm :: String -> LTerm2 -> DoubleType -> GlobalState -> GlobalState
+addLamTerm :: String -> DoubleLTerm -> DoubleType -> GlobalState -> GlobalState
 addLamTerm name lt t g = g {lamDef = LTD.insertWithLamTerm name lt t $ lamDef g}
 
 addType :: String -> TypeDefNoName -> GlobalState -> GlobalState
@@ -59,7 +59,7 @@ invalidName name g =  isLamDef name g
 addFreeVars :: S.Seq TypeVar -> GlobalState -> GlobalState
 addFreeVars vars g = g {fTypeContext = vars S.>< fTypeContext g}
 
-getLamTerm :: String -> GlobalState -> Maybe LTerm2
+getLamTerm :: String -> GlobalState -> Maybe DoubleLTerm
 getLamTerm name (Global {lamDef = te}) = LTD.getLamTerm te name
 
 getLamTermType :: String -> GlobalState -> DoubleType

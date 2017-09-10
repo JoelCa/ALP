@@ -179,7 +179,7 @@ El parser interactivo, solo acepta de a un comando por vez.
 
 
 HACER:
-- Ver "TermsWithHoles", si es posible NO usar LTerm2.
+- Chequear los lambda terminos al aplicar la eliminación de exists.
 
 HECHO:
 - Revisar el parser para ver si 'rword "False"' está bien, cuando False ya no es una palabra reservada.
@@ -191,6 +191,7 @@ cuando se puede guardar el tipo en la tabla de lambda términos.
 - Terminar de agregar "PrintAll".
 - Chequear parser cuando hay algo asi: "algo1.  algo2."
 - Chequear casos en el inferidor de tipos donde podría haberme olvidado usar "basicType".
+- Ver "TermsWithHoles", si es posible NO usar LTerm2. Usamos DoubleLTerm.
 
 FALTA:
 - Chequear el parser de las hipotesis.
@@ -199,10 +200,8 @@ FALTA:
 de teoremas probados.
 - En el pretty printer de un lambda término sin nombre, hacer que las variables de términos ligadas sean
 distintas a las variables de tipo libre y nombres de operadores.
-- Ver constantes.
 - Explicar en el informe el renombre de lambda términos (tanto de var. de tipos, como de términos).
 - Mejorar Print (Print All, Print de tipos)
-- Crea una estructura de tipos de términos, con y sin nombre.
 
 NO SE HACE:
 - Añadir un historial de comandos, mediante haskeline.

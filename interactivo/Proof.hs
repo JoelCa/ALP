@@ -211,7 +211,7 @@ newProofC g ty = PConstruction { tsubp = 1
                                }
 
 -- Obtiene el lambda término final de la prueba construida.
-getLTermFromProof :: ProofConstruction -> DoubleType -> LTerm2
+getLTermFromProof :: ProofConstruction -> DoubleType -> DoubleLTerm
 getLTermFromProof (PConstruction {term=t}) ty =
   case getLTermNoHoles t of
     Just x -> x ::: ty

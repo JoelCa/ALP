@@ -1,5 +1,6 @@
 module Hypothesis where
 
+import Common (TermVar)
 import qualified Data.IntSet as IS
 
 
@@ -15,5 +16,5 @@ getHypoPosition c n h
   | (h >= 0) && (h < n + IS.size c) = return $ n - 1 - h + IS.foldr (\k x -> if k < h then succ x else x) 0 c
   | otherwise = Nothing
 
-printHypothesis :: Int -> String
-printHypothesis n = "H" ++ show n
+hypothesis :: Int -> TermVar
+hypothesis n = "H" ++ show n

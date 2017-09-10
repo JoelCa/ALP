@@ -48,7 +48,7 @@ newLamDefFromProof :: ProverState -> ProverState
 newLamDefFromProof p@(PSt {proof = Just pr}) =
   newLamDefinition (name pr) (getLTermFromProof (constr pr) (types pr)) (types pr) p
 
-newLamDefinition :: String -> LTerm2 -> DoubleType -> ProverState -> ProverState
+newLamDefinition :: String -> DoubleLTerm -> DoubleType -> ProverState -> ProverState
 newLamDefinition name te ty  = modifyGlobal (checkConflictName name . addLamTerm name te ty)
 
 newEmptyLamDefinition :: String -> DoubleType -> ProverState -> ProverState

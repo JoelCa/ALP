@@ -7,7 +7,7 @@ import qualified Data.Sequence as S
 import Tactics (habitar)
 import Parser (isLoadCommand, commandsFromFiles, reservedWords, getCommand)
 import Text.PrettyPrint (render)
-import PrettyPrinter (help, printLTermNoName, printProof, printType, printPrintComm, printPrintAllComm)
+import PrettyPrinter (help, printLTerm, printProof, printType, printPrintComm, printPrintAllComm)
 import Transformers
 import ErrorMsj (printError)
 import TypeInference (basicTypeInference)
@@ -200,7 +200,7 @@ otherTacticsCPrinting :: TypeDefs ->  DoubleType ->  ProofConstruction
                       -> ProverInputState ()
 otherTacticsCPrinting op ty pc
   | isFinalTerm pc = outputStrLn $ "Prueba completa.\n" ++
-                     renderNoNameLTerm op (getLTermFromProof pc ty)
+                     renderLTerm op (getLTermFromProof pc ty)
   | otherwise = outputStrLn $ renderProof pc
   
 
@@ -277,7 +277,7 @@ lamTermDefinition pos name te =
      --outputStrLn $ show te ++ "\n"
      ty <- returnInput pos $ basicTypeInference (lamDef glo) (typeDef glo) te
      --outputStrLn $ (show $ toNoName te) ++ "\n"
-     lift $ modify $ newLamDefinition name (toNoName te) ty
+     lift $ modify $ newLamDefinition name te ty
 
 emptyLTermDefinition :: EPosition -> String -> Type1 -> ProverInputState ()
 emptyLTermDefinition pos name ty =
@@ -300,12 +300,12 @@ typeRepeated ps f
                             
 
 -- Impresión de lambda término sin nombre, y tipos con nombres.
-renderNoNameLTerm :: TypeDefs -> LTerm2 -> String
-renderNoNameLTerm op = render . printLTermNoName op
+-- renderLTermNoName :: TypeDefs -> LTerm2 -> String
+-- renderLTermNoName op = render . printLTermNoName op
 
 -- Impresión de lambda término con nombre, y tipos con nombres.
--- renderLTerm :: TypeDefs -> LamTerm -> String
--- renderLTerm op  = render . printLamTerm op
+renderLTerm :: TypeDefs -> DoubleLTerm -> String
+renderLTerm op  = render . printLTerm op
 
 -- Impresión de tipo con nombre.
 renderType :: TypeDefs -> DoubleType -> String

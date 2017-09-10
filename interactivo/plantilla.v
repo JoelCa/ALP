@@ -246,19 +246,13 @@ Check x.
 
 Theorem tt22 : forall w, (x w) (w -> w).
 
-Theorem t22: forall c:Prop, c -> c.
-Proof.
-  intros.
-  assumption.
-Qed.
+Theorem t22: forall c:Prop, c -> c.  Proof.  intros.  assumption.  Qed.
 
 Definition tt22 := fun (c : Prop) (H : c) => H.
 
 Print t22.
 
-Definition t23 := tt22 p.
-
-Definition ttt := p.
+Definition t23 := tt22 p.  Definition ttt := p.
 
 
 Print t23.

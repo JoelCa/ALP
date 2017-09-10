@@ -15,7 +15,7 @@ type Proof = StateExceptions ProofConstruction SemanticException
 data ProofConstruction = PConstruction { tsubp :: Int              -- Cantidad total de subpruebas activas.
                                        , subps :: [SubProof]       -- Datos de las subpruebas, ordenas por nivel.
                                        , cglobal :: GlobalState    -- Copia de los datos globales.
-                                       , term :: [LTermHoles]      -- Lambda termino.
+                                       , term :: LTermHoles        -- Lambda termino con aujeros.
                                        }
 
   -- Conjunto de subpruebas.
@@ -141,7 +141,7 @@ replaceType t = modifyType (\_ -> [Just t])
 removeFirstType :: Proof ()
 removeFirstType = modifyType tail
 
-modifyTerm :: ([LTermHoles] -> [LTermHoles]) -> Proof ()
+modifyTerm :: (LTermHoles -> LTermHoles) -> Proof ()
 modifyTerm f = modify (\ps -> ps {term = f $ term ps})
 
 modifySubps :: ([SubProof] -> [SubProof]) -> Proof ()
@@ -207,16 +207,18 @@ newProofC :: GlobalState -> DoubleType -> ProofConstruction
 newProofC g ty = PConstruction { tsubp = 1
                                , subps = [newSubProof (length $ fTypeContext $ g) ty]
                                , cglobal = g
-                               , term = [Hole id]
+                               , term = emptyLTerm
                                }
 
 -- Obtiene el lambda término final de la prueba construida.
 getLTermFromProof :: ProofConstruction -> DoubleType -> LTerm2
-getLTermFromProof (PConstruction {term=[LamTe t]}) ty = t ::: ty
-getLTermFromProof _ _ = error "getTermFromProof: no debería pasar."
+getLTermFromProof (PConstruction {term=t}) ty =
+  case getLTermNoHoles t of
+    Just x -> x ::: ty
+    Nothing -> error "getTermFromProof: no debería pasar."
 
 -- Funciones auxiliares.
 -- Chequea si la prueba a terminado.
 isFinalTerm :: ProofConstruction -> Bool
-isFinalTerm (PConstruction {term=[LamTe _]}) = True
-isFinalTerm _ = False
+isFinalTerm (PConstruction {term=t}) = withoutHoles t
+

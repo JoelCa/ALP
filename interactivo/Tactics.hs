@@ -260,7 +260,7 @@ applyComm i x ht@(Fun _ _) =
      modifyTerm $ getApplyTermFun n i
 applyComm i x ht@(ForAll _ _) =
   do let equal = ht == x
-     let (ft, n) = getNestedTypeForAll equal ht
+         (ft, n) = getNestedTypeForAll equal ht
      r <- eitherToProof $ unification equal n ft x
      let m = n - M.size r
      evaluateSubProof m $ getTypesForAll m
@@ -304,7 +304,7 @@ getNestedTypeForAll' (ForAll _ x) = let (f, n) = getNestedTypeForAll' x
                                     in (f, n+1)
 getNestedTypeForAll' x = (x,0)
 
-getApplyTermFun :: Int -> Int -> [LTermHoles] -> [LTermHoles]
+getApplyTermFun :: Int -> Int -> LTermHoles -> LTermHoles
 getApplyTermFun 0 i ts = simplify (LVar $ Bound i) ts
 getApplyTermFun 1 i ts = addHT (\x -> (LVar $ Bound i) :@: x) ts
 getApplyTermFun 2 i ts = addDHT (\x y -> ((LVar $ Bound i) :@: x) :@: y) ts
@@ -320,29 +320,26 @@ repeatElem n x
 getTypesForAll :: Int -> [Maybe DoubleType]
 getTypesForAll m = repeatElem m Nothing
 
-getApplyTermForAll :: Int -> M.Map Int DoubleType -> LTerm2 -> [LTermHoles] -> [LTermHoles]
-getApplyTermForAll n sust t ts = case termForAll n t sust of
-                                   LamTe x -> simplify x ts
-                                   TypeHo x -> TypeHo x : ts
-                                   _ -> error "error: getApplyTermForAll, no debería pasar"
+getApplyTermForAll :: Int -> M.Map Int DoubleType -> LTerm2 -> LTermHoles -> LTermHoles
+getApplyTermForAll n sust t =
+  addTypeHoleInTerm $ termForAll n t sust
 
-
-termForAll :: Int -> LTerm2 -> M.Map Int DoubleType -> LTermHoles
+termForAll :: Int -> LTerm2 -> M.Map Int DoubleType -> LTerm2Holes
 termForAll n t sust
-  | n == 0 = LamTe t
-  | n > 0 = termForAll' 0 (n-1) (LamTe t) sust
+  | n == 0 = Term1 t
+  | n > 0 = termForAll' 0 (n-1) (Term1 t) sust
   | otherwise = error "error: termForAll, no deberia pasar."
 
-termForAll' :: Int -> Int -> LTermHoles -> M.Map Int DoubleType  -> LTermHoles
+termForAll' :: Int -> Int -> LTerm2Holes -> M.Map Int DoubleType  -> LTerm2Holes
 termForAll' n m t sust
   | n < 0 = error "error: termForAll', no deberia pasar."
   | otherwise =
     case M.lookup n sust of
-      Nothing ->let tt = TypeHo $ addTypeHole t
+      Nothing ->let tt = addTypeHole t
                 in if n == m
                    then tt
                    else termForAll' (n+1) m tt sust
-      Just x -> let tt = addTypeTermST t x
+      Just x -> let tt = addTypeTerm t x
                 in if n == m
                    then tt
                    else termForAll' (n+1) m tt sust

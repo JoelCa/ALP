@@ -9,66 +9,96 @@ data Term2Holes a b = Hole (a -> a) | DoubleHole (a -> a -> a)
   -- Término con aujeros de tipo "a" sobre un tipo "b".
 data TermHoles a b = OneHole (a -> b) | Holes (a -> TermHoles a b)
 
-type TypeHoles = TermHoles DoubleType LTerm2
+type T2Holes a b = Term2Holes a (TermHoles b a)
 
-type LTerm2Holes = Term2Holes LTerm2 TypeHoles 
+type THoles a b = [T2Holes a b]
 
-type LTermHoles = [LTerm2Holes] 
+type LTerm2Holes = T2Holes LTerm2 DoubleType
 
--- instance Show (LTermHoles) where
---   show (Term1 t) = show t
---   show _ = "término con aujeros"
+type LTermHoles = THoles LTerm2 DoubleType
 
 -- Funciones que operan sobre los lambda términos con aujeros.
 
-simplifyTypeInTerm :: DoubleType -> LTermHoles -> LTermHoles
-simplifyTypeInTerm ty (Term2 (OneHole h) : ts) = simplify (h ty) ts
-simplifyTypeInTerm ty (Term2 (Holes h) : ts) = (Term2 $ h ty) : ts
+simplify1 :: a -> THoles a b -> THoles a b
+simplify1 t [Hole et] = [Term1 $ et t]
+simplify1 t ((DoubleHole et):ts) = (Hole $ et t):ts
+simplify1 t ((Hole et):(DoubleHole et'):ts) = (Hole $ (et' . et) t):ts
 
-simplify :: LTerm2 -> LTermHoles -> LTermHoles
-simplify t [Hole et] = [Term1 $ et t]
-simplify t ((DoubleHole et):ts) = (Hole $ et t):ts
-simplify t ((Hole et):(DoubleHole et'):ts) = (Hole $ (et' . et) t):ts
+simplify2 :: b -> THoles a b -> THoles a b
+simplify2 ty (Term2 (OneHole h) : ts) = simplify1 (h ty) ts
+simplify2 ty (Term2 (Holes h) : ts) = (Term2 $ h ty) : ts
+
+addHole1 :: (a -> a) -> THoles a b -> THoles a b
+addHole1 et ((Hole et'):ts) = (Hole $ et' . et):ts
+addHole1 et ((DoubleHole et'):ts) = (DoubleHole $ et' . et):ts
+
+addHole2 :: (a -> a -> a) -> THoles a b -> THoles a b
+addHole2 et ((Hole et'):ts) = (DoubleHole $ (\f -> et' . f) . et):ts
+addHole2 et ((DoubleHole et'):ts) = (DoubleHole et):(DoubleHole et'):ts
+
+addT2H :: T2Holes a b -> THoles a b -> THoles a b
+addT2H (Term1 x) ts = simplify1 x ts
+addT2H (Term2 x) ts = Term2 x : ts
+
+
+simplifyType :: DoubleType -> LTermHoles -> LTermHoles
+simplifyType = simplify2
+
+simplifyLTerm :: LTerm2 -> LTermHoles -> LTermHoles
+simplifyLTerm = simplify1
 
 addHT :: (LTerm2 -> LTerm2) -> LTermHoles -> LTermHoles
-addHT et ((Hole et'):ts) = (Hole $ et' . et):ts
-addHT et ((DoubleHole et'):ts) = (DoubleHole $ et' . et):ts
+addHT = addHole1
 
 addDHT :: (LTerm2 -> LTerm2 -> LTerm2) -> LTermHoles -> LTermHoles
-addDHT et ((Hole et'):ts) = (DoubleHole $ (\f -> et' . f) . et):ts
-addDHT et ((DoubleHole et'):ts) = (DoubleHole et):(DoubleHole et'):ts
+addDHT = addHole2
 
 addTypeHoleInTerm :: LTerm2Holes -> LTermHoles -> LTermHoles
-addTypeHoleInTerm (Term1 x) ts = simplify x ts
-addTypeHoleInTerm (Term2 x) ts = Term2 x : ts
+addTypeHoleInTerm = addT2H
 
+---------------------------------------------------------------------
+
+addHole3 :: (a -> b -> a) -> T2Holes a b -> T2Holes a b
+addHole3 f (Term1 te) = Term2 $ OneHole $ \y -> f te y
+addHole3 f (Term2 hte) = Term2 $ Holes $ \y -> addTerm2 f y hte
+addHole3 _ _ = error "error: addHole3, no debería pasar."
+
+addTerm1 :: (a -> b -> a) -> b -> T2Holes a b -> T2Holes a b
+addTerm1 f x (Term1 te) = Term1 $ f te x
+addTerm1 f x (Term2 hte) = Term2 $ addTerm2 f x hte
+addTerm1 _ _ _ = error "error: addTerm, no debería pasar."
+
+addTerm2 :: (a -> b -> a) -> b -> TermHoles b a -> TermHoles b a
+addTerm2 f x (OneHole h) = OneHole $ \y -> f (h y) x
+addTerm2 f x (Holes h) = Holes $ \y -> addTerm2 f x (h y)
 
 -- addTypeHole añade al lambda término (1° arg.), un aujero de tipo;
 -- es decir una instancia de tipo "vacia".
 addTypeHole :: LTerm2Holes -> LTerm2Holes
-addTypeHole (Term1 te) = Term2 $ OneHole $ \y -> te :!: y
-addTypeHole (Term2 hte) = Term2 $ Holes $ \y -> addType hte y
-addTypeHole _ = error "error: addTypeHole, no debería pasar."
+addTypeHole = addHole3 (:!:)
 
 -- addTypeTerm añade al lambda término (1° arg.), el tipo dado por su 2° arg.
-addTypeTerm :: LTerm2Holes -> DoubleType -> LTerm2Holes
-addTypeTerm (Term1 te) x = Term1 $ te :!: x
-addTypeTerm (Term2 hte) x = Term2 $ addType hte x
-addTypeTerm _ _ = error "error: addTypeTermST, no debería pasar."
+addTypeTerm :: DoubleType -> LTerm2Holes -> LTerm2Holes
+addTypeTerm = addTerm1 (:!:)
 
--- addType añade al lambda término con aujeros de tipos (1° arg.),
--- el tipo dado por su 2° arg.
-addType :: TypeHoles -> DoubleType -> TypeHoles
-addType (OneHole h) x = OneHole $ \y -> h y :!: x
-addType (Holes h) x = Holes $ \y -> addType (h y) x
+---------------------------------------------------------------------
 
-withoutHoles :: LTermHoles -> Bool
-withoutHoles [Term1 _] = True
-withoutHoles _ = False
+empty :: THoles a b
+empty = [Hole id]
 
-getLTermNoHoles :: LTermHoles -> Maybe LTerm2
-getLTermNoHoles [Term1 t] = Just t
-getLTermNoHoles _ = Nothing
+noHolesTerm1 :: THoles a b -> Bool
+noHolesTerm1 [Term1 _] = True
+noHolesTerm1 _ = False
+
+getTerm1 :: THoles a b -> Maybe a
+getTerm1 [Term1 t] = Just t
+getTerm1 _ = Nothing
 
 emptyLTerm :: LTermHoles
-emptyLTerm = [Hole id]
+emptyLTerm = empty
+  
+withoutHoles :: LTermHoles -> Bool
+withoutHoles = noHolesTerm1
+
+getLTermNoHoles :: LTermHoles -> Maybe LTerm2
+getLTermNoHoles = getTerm1

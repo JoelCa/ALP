@@ -27,7 +27,7 @@ habitar Assumption =
      q <- getTBTypeVars
      i <- maybeToProof AssuE $ S.findIndexL (\(_,p,t') -> positiveShift (q - p) t' == t) c
      endSubProof
-     modifyTerm $ simplify $ LVar $ Bound i
+     modifyTerm $ simplifyLTerm $ LVar $ Bound i
 habitar Intro =
   do x <- getType
      introComm x
@@ -245,7 +245,7 @@ elimComm i t (RenamedType s [t1,t2])
 elimComm i t (RenamedType s [])
   | s == bottom_id =
       do endSubProof
-         modifyTerm $ simplify $ (LVar $ Free "elim_bottom") :!: t :@: (LVar $ Bound i)
+         modifyTerm $ simplifyLTerm $ (LVar $ Free "elim_bottom") :!: t :@: (LVar $ Bound i)
   | otherwise =
       throw ElimE1
 elimComm _ _ _ = throw ElimE1
@@ -267,7 +267,7 @@ applyComm i x ht@(ForAll _ _) =
      modifyTerm $ getApplyTermForAll n r (LVar $ Bound i)
 applyComm i x t
   | t == x = do evaluateSubProof 0 []
-                modifyTerm $ simplify (LVar $ Bound i)
+                modifyTerm $ simplifyLTerm (LVar $ Bound i)
   | otherwise = throw $ ApplyE1 t x
   
 
@@ -305,7 +305,7 @@ getNestedTypeForAll' (ForAll _ x) = let (f, n) = getNestedTypeForAll' x
 getNestedTypeForAll' x = (x,0)
 
 getApplyTermFun :: Int -> Int -> LTermHoles -> LTermHoles
-getApplyTermFun 0 i ts = simplify (LVar $ Bound i) ts
+getApplyTermFun 0 i ts = simplifyLTerm (LVar $ Bound i) ts
 getApplyTermFun 1 i ts = addHT (\x -> (LVar $ Bound i) :@: x) ts
 getApplyTermFun 2 i ts = addDHT (\x y -> ((LVar $ Bound i) :@: x) :@: y) ts
 getApplyTermFun n i ts = getApplyTermFun (n-1) i $ addDHT (\x y -> x :@: y) ts
@@ -339,7 +339,7 @@ termForAll' n m t sust
                 in if n == m
                    then tt
                    else termForAll' (n+1) m tt sust
-      Just x -> let tt = addTypeTerm t x
+      Just x -> let tt = addTypeTerm x t
                 in if n == m
                    then tt
                    else termForAll' (n+1) m tt sust
@@ -350,7 +350,7 @@ termForAll' n m t sust
 exactType :: DoubleType -> Proof ()
 exactType ty =
   endSubProof >>
-  (modifyTerm $ simplifyTypeInTerm ty)
+  (modifyTerm $ simplifyType ty)
 
 exactTerm :: DoubleLTerm -> DoubleType -> Proof ()
 exactTerm te tt =
@@ -361,7 +361,7 @@ exactTerm te tt =
      t <- eitherToProof $ typeInference q c ld op te
      unless (t == tt) $ throw $ ExactE1 tt
      endSubProof
-     modifyTerm $ simplify $ toNoName te
+     modifyTerm $ simplifyLTerm $ toNoName te
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando UNFOLD

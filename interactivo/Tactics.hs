@@ -231,7 +231,7 @@ elimComm h i t (Exists v tt) =
      ld <- getLamDefinitions
      to <- getTTermVars
      replaceType $ renamedValidType1 1 (bTypeVar v S.<| btc) ftc op ld t
-     modifyTerm $ addHT (\x -> EUnpack v (hypothesis $ to - i) (LVar (h, Bound i)) x)
+     modifyTerm $ addHT (\x -> EUnpack v (hypothesis $ to - i - 1) (LVar (h, Bound i)) x)
 elimComm h i t (RenamedType s [t1,t2])
   | s == and_id =
       do replaceType (Fun t1 (Fun t2 t))

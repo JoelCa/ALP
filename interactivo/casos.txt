@@ -8,9 +8,9 @@ Para chequear que el para todo unifica con el existe.
 - Theorem t2: p -> (exists x, p -> x) -> (exists y, y).
 Para chequear eliminación de existe, y el inferidor.
 - Theorem t3: (exists y, forall x, x -> y) -> (forall x, exists y, x -> y).
-Para chequear eliminación de existe. NO chequee el lambda termino.
+Para chequear eliminación de existe.
 - Theorem t44: (forall x, exists y, y /\ x \/ exists k, x) -> forall t, exists q, q /\ (t -> q) \/ exists m, (t -> m).
-Para chequear la unificación cuando hay exists.
+Este ejemplo NO es válido.
 
 
 Casos sin existenciales:

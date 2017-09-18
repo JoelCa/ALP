@@ -179,7 +179,7 @@ El parser interactivo, solo acepta de a un comando por vez.
 
 
 HACER:
-- Chequear los lambda terminos al aplicar la eliminación de exists.
+- Chequear los ejemplos del archivo "casos.txt"
 
 HECHO:
 - Revisar el parser para ver si 'rword "False"' está bien, cuando False ya no es una palabra reservada.
@@ -192,6 +192,7 @@ cuando se puede guardar el tipo en la tabla de lambda términos.
 - Chequear parser cuando hay algo asi: "algo1.  algo2."
 - Chequear casos en el inferidor de tipos donde podría haberme olvidado usar "basicType".
 - Ver "TermsWithHoles", si es posible NO usar LTerm2. Usamos DoubleLTerm.
+- Chequeo de los lambda terminos al aplicar la eliminación de exists en los 4 primeros casos de "casos.txt".
 
 FALTA:
 - Chequear el parser de las hipotesis.

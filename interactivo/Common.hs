@@ -108,8 +108,9 @@ data CLICommand = Escaped ECommand
                 | Lang Command
 
 data ECommand = Exit
-              | Reset
+              | Abort
               | Load [String]
+              | Save String
               | Help
               deriving (Show)
 

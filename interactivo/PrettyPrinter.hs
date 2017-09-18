@@ -410,17 +410,23 @@ helpMessage = [("Propositions/Types <var>, <var>, ...",
                "Declaración de un operador lógico binario infijo.\n"),
                ("<name> = <lambda term>",
                "Declaración de un lambda término.\n"),
+               ("<name> : <logic term>",
+               "Declaración de un lambda término vacio.\n"),
                ("Theorem <name> : <logic term>",
                "Inicia la prueba de un teorema.\n"),
                ("<tactic>",
                "Táctica de una prueba.\n"),
+               ("Axiom <name> : <logic term>",
+               "Se asume un axioma.\n"),
+               ("Print <name>",
+               "Imprime el lambda término asociado.\n"),
+               ("Check <lambda term>",
+               "Infiere el tipo del lambda término.\n"),
                (":load <files>",
                "Carga de archivos.\n"),
-               (":print <name>",
-               "Imprime el lambda término asociado.\n"),
-               (":infer <lambda term>",
-               "Infiere el tipo del lambda término.\n"),
-               (":reset",
+               (":save <file>",
+                "Guarda el historial de comandos exitosos.\n"),
+               (":abort",
                "Cancela la prueba de un teorema.\n"),
                (":quit",
                "Salir.\n"),
@@ -468,3 +474,18 @@ printPrintAllComm' :: TypeDefs -> String -> Maybe DoubleLTerm -> DoubleType -> D
 printPrintAllComm' tyd name mte ty =
   (if isJust mte then text "-" else text "*") <+>
   printComm False tyd name mte ty
+
+--------------------------------------------------------------------------------------------  
+-- Impresión de la prueba de un teorema.
+
+printTheorem :: TypeDefs -> String -> DoubleType -> [String] -> Doc
+printTheorem td name t xs =
+  text "Theorem" <+>
+  text name <+>
+  text ":" <+>
+  printType td t <>
+  text "." $$
+  nest 2 (printTactics xs)
+  
+printTactics :: [String] -> Doc
+printTactics xs = foldl (\r x -> text x $$ r) empty xs

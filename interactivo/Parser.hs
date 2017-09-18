@@ -26,7 +26,7 @@ interactive = "<interactive>"
 reservedWords = ["Propositions", "Types", "Theorem", "Axiom", "Print", "Check", "forall"
                 , "exists",  "let", "in", "as","assumption", "intro", "intros", "split",
                  "left", "right", "apply", "elim", "absurd", "cut", "unfold", "exact",
-                 ":load", ":reset", ":quit", ":help", ":l", ":r", ":q", ":h"]
+                 ":load", ":abort", ":quit", ":help", ":save", ":l", ":a", ":q", ":h", ":s"]
 
 reservedSymbols = ["=", "->", ":"] --, and_id, or_id, iff_id, not_id]
 
@@ -169,20 +169,28 @@ escapedCommand :: Parser ECommand
 escapedCommand =
   do rword ":quit" <|> rword ":q"
      return Exit
-  <|> do rword ":reset" <|> rword ":r"
-         return Reset
+  <|> do rword ":abort" <|> rword ":a"
+         return Abort
   <|> do rword ":load" <|> rword ":l"
-         names <- many (fileName <* space)
+         names <- many (proofFileName <* space)
          return $ Load names
+  <|> do rword ":save" <|> rword ":s"
+         name <- fileName
+         space
+         return $ Save name
   <|> do rword ":help" <|> rword ":h"
          return Help
 
 
 fileName :: Parser String
-fileName = do name <- many $ satisfy (not . isSpace)
-              if isSuffixOf ".pr" name
-                then return name
-                else empty
+fileName = many $ satisfy (not . isSpace)
+
+proofFileName :: Parser String
+proofFileName =
+  do name <- fileName
+     if isSuffixOf ".pr" name
+       then return name
+       else empty
               
 
 --------------------------------------------------------------------------------------
@@ -533,8 +541,9 @@ getInt s = parseMaybe nat2 s
 
 --------------------------------------------------------------------------------------
 -- Parser para identificar el comando escapado "load".
-isLoadCommand :: String -> Bool
-isLoadCommand s = case parse (space *> rword2 ":load" <|> rword2 ":l") "" s of
+isLoadOrSaveCommand :: String -> Bool
+isLoadOrSaveCommand s = case parse (space *> rword2 ":load" <|> rword2 ":l"
+                                     <|> rword2 ":save" <|> rword2 ":s") "" s of
                     Left _ -> False
                     Right _ -> True 
 

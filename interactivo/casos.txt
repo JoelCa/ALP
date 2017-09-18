@@ -63,12 +63,12 @@ Para chequear el renombre de variables de tipo ligadas en el unfold.
 - Theorem t23: forall o, forall t, (forall w,  forall r, o /\ w) -> (o /\ t).
 Para chequear la unificación (este caso no unificaba y lo arregle).
 - Theorem t24: p -> q -> (((p /\ q) /\ (p /\ p)) /\ q) /\ p.
-Para chequear el pretty printer de la prueba, y el Checkidor sobre el lambda término de la prueba.
+Para chequear el pretty printer de la prueba, y el Check sobre el lambda término de la prueba.
 - Definition x x y := forall w, forall v, x /\ y.
   Theorem t25 : forall w, forall y, x w y -> x w y.
 Para probar el parseo (antes no se parseaba bien).
 - Theorem t26: forall w, forall y,  w /\ y -> w \/ y.
-Para probar que puede Checkirse el tipo del lambda término asociado
+Para probar que puede inferirse el tipo del lambda término asociado
 - Theorem t27: p -> p <-> p -> p.
 Para probar el pretty printer (precedencias).
 - Definition fun1 w := forall x, w -> x -> w.

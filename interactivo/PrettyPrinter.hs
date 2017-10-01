@@ -305,10 +305,10 @@ printPrefix f s (p, left) ts =
   
 --------------------------------------------------------------------------------------------  
 -- Pretty-printer de la prueba.
-printProof :: Int -> IS.IntSet -> TypeDefs -> FTypeContext -> [SubProof] -> Doc
-printProof tp cn op ftc sb =
+printProof :: Int -> TypeDefs -> FTypeContext -> [SubProof] -> Doc
+printProof tp op ftc sb =
   (text $ "Hay " ++ show tp ++ " sub pruebas.\n") $$
-  printContext cn op (ftc, bTypeContext s) (termContext s) $$
+  printContext op (ftc, bTypeContext s) (termContext s) $$
   printGoals tp op sb
   where s = head sb
 
@@ -335,10 +335,10 @@ printGoal :: TypeDefs -> Maybe DoubleType -> Doc
 printGoal op (Just ty) = printType op ty
 printGoal op Nothing = text "*"
 
-printContext :: IS.IntSet -> TypeDefs -> (FTypeContext, BTypeContext) -> TermContext -> Doc
-printContext cn op (ftc,btc) c =
+printContext :: TypeDefs -> (FTypeContext, BTypeContext) -> TermContext -> Doc
+printContext op (ftc,btc) c =
   printFTypeContext ftc $$
-  printRestContext cn (IS.size cn + S.length c - 1) op btc c
+  printRestContext op btc c
 
 printFTypeContext :: FTypeContext -> Doc
 printFTypeContext = foldr (\x r -> printFTypeVar x $$ r) empty
@@ -346,18 +346,17 @@ printFTypeContext = foldr (\x r -> printFTypeVar x $$ r) empty
 printFTypeVar :: FTypeVar -> Doc
 printFTypeVar x = text x
 
-printRestContext :: IS.IntSet -> Int -> TypeDefs -> BTypeContext -> TermContext -> Doc
-printRestContext cn n op btc c
-  | S.null btc = printRestTermC cn n op c
+printRestContext :: TypeDefs -> BTypeContext -> TermContext -> Doc
+printRestContext op btc c
+  | S.null btc = printRestTermC op c
   | S.null c = printRestBTypeC btc
   | otherwise = let x = S.index btc 0
                     y = S.index c 0
-                in if fst x > fst3 y
-                   then printRestContext cn n op (S.drop 1 btc) c $$
+                in if fst x > (\(_,w,_,_) -> w) y
+                   then printRestContext op (S.drop 1 btc) c $$
                         printBTypeVar x
-                   else printRestContext cn' (n'-1) op btc (S.drop 1 c) $$
-                        printTermVar n' op y
-                        where (n', cn') = getValidName cn n
+                   else printRestContext op btc (S.drop 1 c) $$
+                        printTermVar op y
 
 -- Obtiene el nombre una hipótesis.
 -- Argumentos:
@@ -367,17 +366,16 @@ printRestContext cn n op btc c
 -- Tupla donde la 1º componente es el nombre para una hipótesis,
 -- y la 2º componente es el 1º argumento, al que le extrajeron los
 -- nombres conflictivos "visitados".
-getValidName :: IS.IntSet -> Int -> (Int, IS.IntSet)
-getValidName cn n = let (cn', isMember, _) = IS.splitMember n cn
-                        n' = if isMember then n-1 else n
-                    in (n', cn')
+-- getValidName :: IS.IntSet -> Int -> (Int, IS.IntSet)
+-- getValidName cn n = let (cn', isMember, _) = IS.splitMember n cn
+--                         n' = if isMember then error $ show (n,n-1) else n
+--                     in (n', cn')
 
-printRestTermC :: IS.IntSet -> Int -> TypeDefs -> TermContext -> Doc
-printRestTermC cn n op c
+printRestTermC :: TypeDefs -> TermContext -> Doc
+printRestTermC op c
   | S.null c = empty
-  | otherwise = printRestTermC cn' (n'-1) op (S.drop 1 c) $$
-                printTermVar n' op (S.index c 0)
-                where (n', cn') = getValidName cn n
+  | otherwise = printRestTermC op (S.drop 1 c) $$
+                printTermVar op (S.index c 0)
 
 printRestBTypeC :: BTypeContext -> Doc
 printRestBTypeC btc
@@ -385,17 +383,14 @@ printRestBTypeC btc
   | otherwise = printRestBTypeC (S.drop 1 btc) $$
                 printBTypeVar (S.index btc 0)
 
-printTermVar :: Int -> TypeDefs -> TermVarWithType -> Doc
-printTermVar n op (_,_,t) =
-  text (hypothesis n) <+>
+printTermVar :: TypeDefs -> TermVarWithType -> Doc
+printTermVar op (h,_,_,t) =
+  text h <+>
   text ":" <+>
   printType op t
 
 printBTypeVar :: BTypeVar -> Doc
 printBTypeVar (_,x) = text x
-
-fst3 :: (a, b, c) -> a
-fst3 (x, _, _) = x
 
 --------------------------------------------------------------------------------------------  
 -- Help

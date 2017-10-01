@@ -72,11 +72,12 @@ data LamTerm a b c = LVar b
                    deriving (Show, Eq)
 
   -- Para cada variable de término, tenemos (por posición en la 4-tupla):
-  -- 1. Su posición en el contexto, a la hora de imprimirlo.
-  -- 2. La profundidad con la que se añadio al contexto,
+  -- 1. Nombre.
+  -- 2. Su posición en el contexto, a la hora de imprimirlo.
+  -- 3. La profundidad con la que se añadio al contexto,
   -- (la profundidad se refiere a la cantidad de cuantificadores construidos).
-  -- 3. Su tipo con y sin nombre.
-type TermVarWithType = (Int, Int, DoubleType)
+  -- 4. Su tipo con y sin nombre.
+type TermVarWithType = (String, Int, Int, DoubleType)
 
   -- Secuencia de variables de términos. 
 type TermContext = Seq TermVarWithType

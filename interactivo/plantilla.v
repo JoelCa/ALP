@@ -252,6 +252,10 @@ Definition tt22 := fun (c : Prop) (H : c) => H.
 
 Print t22.
 
+Definition tt222 := fun (c : forall q:Prop, q -> q) (c0 : Prop) => c c0.
+
+Print tt222.
+
 Definition t23 := tt22 p.  Definition ttt := p.
 
 
@@ -264,6 +268,7 @@ Print All.
 (*Variables xx:Prop.
 
 Print xx.*)
+
 
 Theorem xx: forall ttt:Prop, ttt -> ttt.
 Proof.
@@ -312,6 +317,16 @@ Proof.
 Qed.
 
 Print H0.
+
+Theorem t2555: (forall a:Prop, a) -> (forall a:Prop, a) -> (forall H1:Prop, H1 -> H1).
+Proof.
+intro.
+intro.
+intro.
+auto.
+Qed.
+
+Print t2555.
 
 Theorem t26: forall w:Prop, w -> w -> w.
 Proof.

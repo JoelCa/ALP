@@ -101,10 +101,14 @@ checkCliCommand (_, Escaped Exit) =
      outputStrLn "Saliendo."
 checkCliCommand (_, Escaped Abort) =
   abortProof >> proverFromCLI
-checkCliCommand (_, Escaped (Load files)) =
-  proverFromFiles files
-checkCliCommand (_, Escaped (Save file)) =
-  withHistory file >> proverFromCLI
+checkCliCommand (pos, Escaped (Load files)) =
+  do s <- lift get
+     when (proofStarted s) $ throwSemanError pos PNotFinished
+     proverFromFiles files
+checkCliCommand (pos, Escaped (Save file)) =
+  do s <- lift get
+     when (proofStarted s) $ throwSemanError pos PNotFinished
+     withHistory file >> proverFromCLI
 checkCliCommand (_, Escaped Help) =
   outputStrLn help >> proverFromCLI
 checkCliCommand (pos, Lang c) =
@@ -192,6 +196,7 @@ inferCommand pos x =
   do s <- lift get
      let g = global s
      te <- returnInput pos $ basicWithoutName (typeDef g) (fTypeContext g) (lamDef g) x
+     outputStrLn $ show te ++ "\n"
      returnInput pos $ basicTypeInference (lamDef g) (typeDef g) te
 
 printCommandPrinting :: String -> ProverInputState ()
@@ -214,8 +219,9 @@ inferCommandPrinting ty =
 otherTacticsCPrinting :: TypeDefs ->  DoubleType ->  ProofConstruction
                       -> ProverInputState ()
 otherTacticsCPrinting op ty pc
-  | isFinalTerm pc = outputStrLn $ "Prueba completa.\n" ++
-                     renderLTerm op (getLTermFromProof pc ty)
+  | isFinalTerm pc = do outputStrLn $ "Prueba completa.\n" ++
+                          renderLTerm op (getLTermFromProof pc ty)
+                        outputStrLn $ show (getLTermFromProof pc ty) ++ "\n"
   | otherwise = outputStrLn $ renderProof pc
   
 
@@ -344,7 +350,7 @@ renderType op = render . printType op
 
 -- Impresión de la prueba en construcción
 renderProof :: ProofConstruction -> String
-renderProof p = render $ printProof (tsubp p) (conflict $ cglobal p) (typeDef $ cglobal p) (fTypeContext $ cglobal p) (subps p)
+renderProof p = render $ printProof (tsubp p) (typeDef $ cglobal p) (fTypeContext $ cglobal p) (subps p)
 
 
 returnInput :: EPosition -> Either SemanticException a -> ProverInputState a

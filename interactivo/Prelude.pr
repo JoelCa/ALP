@@ -18,6 +18,6 @@ intro_or2 = (\p.\q.\x:q.\a.\y:p->a.\z:q->a.z x) as forall p, forall q, q -> p \/
 
 elim_or = (\p.\q.\r.\x:p\/q.\y:p->r.\z:q->r.x [r] y z) as forall p, forall q, forall r, p \/ q -> (p -> r) -> (q -> r) -> r.
 
-intro_bottom = (\p.\x:False.x [p]) as forall p, False -> p.
+elim_bottom = (\p.\x:False.x [p]) as forall p, False -> p.
 
-elim_bottom = (\p.\x:p.\y:~p.y x) as forall p, p -> ~p -> False.
+intro_bottom = (\p.\x:p.\y:~p.y x) as forall p, p -> ~p -> False.

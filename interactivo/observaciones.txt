@@ -179,7 +179,16 @@ El parser interactivo, solo acepta de a un comando por vez.
 
 
 HACER:
+- Arreglar renombramientos. Ver como funciona el mecanismo por el cual las variables de términos
+ligadas "saltean" los nombres conflictivos, en la construcción de una prueba.
+Ej. 
+H5 = \a.\x:a.x.
+Theorem hh2: forall q, q -> q /\ q -> q -> q -> q -> forall t, q /\ q.
+intros.
 - Chequear los ejemplos del archivo "casos.txt"
+- Comentar la primera línea de un archivo.
+- Hacer que el comando save guarde todos los comandos exitosos dados hasta el momento por el usuario.
+- Mostrar estado de la prueba, si se carga de un archivo una prueba incompleta.
 
 HECHO:
 - Revisar el parser para ver si 'rword "False"' está bien, cuando False ya no es una palabra reservada.
@@ -193,6 +202,10 @@ cuando se puede guardar el tipo en la tabla de lambda términos.
 - Chequear casos en el inferidor de tipos donde podría haberme olvidado usar "basicType".
 - Ver "TermsWithHoles", si es posible NO usar LTerm2. Usamos DoubleLTerm.
 - Chequeo de los lambda terminos al aplicar la eliminación de exists en los 4 primeros casos de "casos.txt".
+- Añadir el comando "save".
+- Hacer un renombre de modo tal que las var. de tipo ligadas de la forma
+"Hnro" se renombren a "H_nro". Para que no coincidan con el espacio de
+nombre de las hipotesis (var. de términos ligadas).
 
 FALTA:
 - Chequear el parser de las hipotesis.
@@ -203,6 +216,3 @@ de teoremas probados.
 distintas a las variables de tipo libre y nombres de operadores.
 - Explicar en el informe el renombre de lambda términos (tanto de var. de tipos, como de términos).
 - Mejorar Print (Print All, Print de tipos)
-
-NO SE HACE:
-- Añadir un historial de comandos, mediante haskeline.

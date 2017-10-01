@@ -37,10 +37,10 @@ typeInference' n _ te _ (LVar (_, Free x)) =
     Just (_, t) -> return t
     Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean teoremas.
 typeInference' n c te _ (LVar (_, Bound x)) =
-  let (_,m,t) = S.index c x
+  let (_,_,m,t) = S.index c x
   in return $ positiveShift (n-m) t
 typeInference' n c te op (Abs _ t e) =
-  do tt <- typeInference' n ((0,n,t) S.<| c) te op e
+  do tt <- typeInference' n (("",0,n,t) S.<| c) te op e
      return $ Fun t tt
 typeInference' n c te op (e1 :@: e2) =
   do tt1 <- typeInference' n c te op e1
@@ -70,7 +70,7 @@ typeInference' n c te op (EUnpack _ _ e1 e2) =
   do t1 <- typeInference' n c te op e1
      case basicType t1 op of
        Exists _ tt1 -> 
-         do t2 <- typeInference' (n+1) ((0,n+1,tt1) S.<| c) te op e2
+         do t2 <- typeInference' (n+1) (("",0,n+1,tt1) S.<| c) te op e2
             case negativeShift 1 t2 of
               Just t2' -> return t2'
               Nothing -> throw $ InferE4 e2

@@ -85,34 +85,34 @@ Para probar el pretty printer (precedencias).
 - Theorem t32: (p -- q ^ q -- p) ^ (q ++ q) ^ p.
 Para probar el pretty printer (precedencias).
 - Theorem t33: ~p \/ fun1 p.
-Para probar el pretty printer (precedencias), y el Checkidor de tipos.
+Para probar el pretty printer (precedencias), y el inferidor de tipos.
 - Theorem t34: forall x, x -> x /\ (x <-> x).
-Para probar el Checkidor de tipos.
+Para probar el inferidor de tipos.
 - Theorem t35: False -> ~p.
 Para probar la táctica de eliminación del bottom.
 - Definition fun3 w y := forall x, w -> x -> y -> w.
   Theorem t36: fun3 p q -> fun2 q.
 Para probar el pretty printer (precedencias).
-- Theorem k37: fun1 p /\ (p -> p).
+- Theorem t37: fun1 p /\ (p -> p).
 Para probar el pretty printer (precedencias).
-- Theorem k38: forall bb, forall aa, aa -> (forall aa0, aa0 -> aa).
+- Theorem t38: forall bb, forall aa, aa -> (forall aa0, aa0 -> aa).
 Probar con "intro" y "exact (\aa.\x:aa.\aa.\y:aa.x) as forall bb, bb -> (forall cc, cc -> bb)".
 Para chequear el renombramiento de var. de tipo en el lambda término final.
-- Theorem k39: forall x, forall y, (x -> ~y) -> y -> x -> ~x.
+- Theorem t39: forall x, forall y, (x -> ~y) -> y -> x -> ~x.
 Para probar "cut" y "absurd".
-- Theorem k40: forall x, forall y, x -> y -> (forall x, forall y, x /\ y -> x \/ y) -> x \/ y.
+- Theorem t40: forall x, forall y, x -> y -> (forall x, forall y, x /\ y -> x \/ y) -> x \/ y.
 Para probar "cut x /\ y".
 - Definition fun3 x := ~x /\ (forall x, x).
-  Theorem k41: forall x, fun3 x -> x -> x \/ ~x.
+  Theorem t41: forall x, fun3 x -> x -> x \/ ~x.
 Para probar "cut False", o "unfold fun3 in H0".
 - Definition op x := forall y, y -> x.
-  Theorem k42: False -> op (forall y, y) -> forall y0, y0 -> False.
+  Theorem t42: False -> op (forall y, y) -> forall y0, y0 -> False.
 Para probar el parser (Antes NO funcionaba).
 - Definition x $ y := forall w, (w /\ x) /\ y -> w.
   Theorem t43: forall w, forall p, w -> forall p, p $ w -- forall w, forall p, w /\ p.
-Para probar el parser, con "para todo" sin paréntesis (NO se probó su veracidad).
+Para probar el parser, con "para todo" sin paréntesis.
 - Theorem t45: forall t, forall g, (forall x, forall y, exists z, z /\ x \/ ~exists k, k -> y) -> exists q, q /\ (t -> g) \/ ~exists m, m -> g -> t.
-Para probar el parser, y el Checkidor.
+Para probar el parser, y el inferidor.
 - Theorem t46: (forall w, forall d, forall a, a -> d)-> forall b, forall c, b -> c.
 Para probar la unificación, donde hay que ingregar un tipo mediante exact.
 - Theorem t47: forall p, forall q, p -> q -> ((forall x, x -> x) /\ (forall w, w -> w)) /\ forall k, p /\ q.
@@ -123,8 +123,8 @@ Hice: intros; split; split; exact (\a. \x:a. x) as forall ww, ww -> ww; exact (\
 Para probar el parser, y chequear que se efectue correctamente la transformación del tipo con nombre a uno sin nombre.
 - x x x = forall w, forall v, x /\ v.
   jojo x x = forall w, forall v, x /\ v.
-  Theorem t49: forall m, jojo m (~m) -> False.
-NO se probo. Para chequear definición de operadores. 
+  Theorem t49: forall m, jojo m (~m) -> False -> ~False.
+Para chequear definición de operadores. 
 - op = forall w, w -> w.
   Theorem t50: op -> forall op, op -> op.
 Para chequear el renombre de variables ligadas.
@@ -132,29 +132,29 @@ Para chequear el renombre de variables ligadas.
 Lo resuelvo con: intro; exact (\h.\x:h.x).
 Para probar el exact, y el Chequeador.
 - (Props p, q.)
-  op x = forall q, x -> q.
+  op x = forall q, q -> x -> q.
   Theorem t52: forall q, op q.
 Para chequear el renombramiento cuando se hace "unfold op".
 - cc = forall qq, qq -> qq.
- Theorem t52: forall qq, qq -> cc.
+ Theorem t53: forall qq, qq -> cc.
 Para chequear el renombramiento con "unfold cc".
 - qq = forall t, t -> t /\ t.
-  Theorem t53: qq -> cc.
+  Theorem t54: qq -> cc.
 Para chequear el renombramiento con "unfold cc".
 - H = \a.\x:a.x.
   H0 = \a.\x:a.x.
-  Theorem t54: forall p, forall q, p -> p.
+  Theorem t55: forall p, forall q, p -> p.
 Chequemos que los nombres de los hipótesis NO coincidan con los nombres de los teoremas.
 - qqq = \t.\x:t.intro_and [t] [t] x x.
-  Theorem t55: forall w, w -> (w /\ w) /\ (w -> w).
+  Theorem t56: forall w, w -> (w /\ w) /\ (w -> w).
 Para chequear el exact sobre una definición de término.
 La prueba es: intros; exact (intro_and [w /\ w] [w -> w] (qqq [w] H0) (\f:w.f)).
 - algo w = forall x, w -> w.
   Theorem x: forall q, q -> q.
-  Theorem t56: forall a, a -> algo a.
+  Theorem t57: forall a, a -> algo a.
 Para probar el renombre del unfold. 
 - Theorem x: forall w, w -> w.
-  Theorem t57: forall x, forall y, y -> y.
+  Theorem t58: forall x, forall y, y -> y.
 Para chequear el renombre.
 
 
@@ -208,4 +208,38 @@ Ver caso de CBool y CBool2, en test.f
 
 VER:
 
-Error en el archivo "../prueba.pr"
+- Error en el archivo "../prueba.pr"
+
+- Theorem t55_2: forall p, p -> forall q, q -> q.
+
+- Casos de var. de término ligada y var. de tipo libre.
+Propositions H0.
+Theorem kk: forall a, (forall q, a) -> a.
+intro.
+intro.
+exact (H0 [H0]).
+
+Check (\H0:forall q, q. H0 [H0]).
+
+- Caso de var. de término ligada y var. de tipo ligada.
+Check (\H1.\H1:forall t, t. H1 [H1]).
+
+- Caso de var. término ligada y teorema.
+H0 = forall q, q -> q.
+Check (\H0:forall t, t. H0).
+
+- Caso de var. de tipo ligada y var. de término ligada.
+Check (\H1:forall q, q.\H1. H1 [H1]).
+
+- H0 = \a.\x:a.x.
+Theorem hh: forall q, q -> q /\ q -> forall t, q /\ q.
+intro.
+intro.
+intro.
+exact (\a.H2).
+
+En el contexto de las variables se saltea H0.
+El lambda término con nombre generado esta mal (el lambda término
+sin nombre esta bien).
+
+- Theorem tt : (forall a, a) -> forall H0, H0.

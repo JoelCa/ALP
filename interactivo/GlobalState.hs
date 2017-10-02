@@ -1,9 +1,9 @@
 module GlobalState where
 
 import Common
-import Data.IntSet as IS
-import LambdaTermDefinition as LTD
-import TypeDefinition as TD
+import qualified Data.IntSet as IS
+import qualified LambdaTermDefinition as LTD
+import qualified TypeDefinition as TD
 import qualified Data.Sequence as S
 import Parser (getHypothesisValue)
 
@@ -13,7 +13,7 @@ type ConflictNames = IS.IntSet
 data GlobalState = Global { fTypeContext :: FTypeContext
                           , lamDef :: LTD.LamDefs           -- Lambda términos definidos.
                           , typeDef :: TD.TypeDefs          -- Tipos definidos.
-                          , conflict :: ConflictNames       -- Nombres de teoremas conflictivos
+                          , conflict :: ConflictNames       -- Nombres de expresiones conflictivas
                                                             -- con los nombres de hipótesis.
                           }
 
@@ -27,13 +27,17 @@ addLamTerm name lt t g = g {lamDef = LTD.insertWithLamTerm name lt t $ lamDef g}
 addType :: String -> TypeDefNoName -> GlobalState -> GlobalState
 addType s d g = g {typeDef = TD.insert s d $ typeDef g}
 
-checkConflictName :: String -> GlobalState -> GlobalState
-checkConflictName s g = g {conflict = addConflictName s $ conflict g}
+-- Añade un nombre conflicto, si lo es.
+addConflictName :: String -> GlobalState -> GlobalState
+addConflictName s g = g {conflict = addConflictName' s $ conflict g}
+  where addConflictName' s c =
+          case getHypothesisValue s of
+            Just n -> IS.insert n c
+            Nothing -> c
 
-addConflictName :: String -> ConflictNames -> ConflictNames
-addConflictName s c = case getHypothesisValue s of
-                        Just n -> IS.insert n c
-                        Nothing -> c
+addConflictNames :: [String] -> GlobalState -> GlobalState
+addConflictNames xs g = foldr addConflictName g xs
+
 
 initialGlobal :: GlobalState
 initialGlobal = Global { fTypeContext = S.empty
@@ -64,5 +68,3 @@ getLamTerm name (Global {lamDef = te}) = LTD.getLamTerm te name
 
 getLamTermType :: String -> GlobalState -> DoubleType
 getLamTermType name (Global {lamDef = te}) = LTD.getType te name
-
- 

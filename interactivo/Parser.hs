@@ -529,12 +529,16 @@ sc2 = L.space space1 empty empty
 
 lexeme2 :: SParser a -> SParser a
 lexeme2 = L.lexeme sc2
-
+  
 nat2 :: SParser Int
 nat2 = fromInteger <$> lexeme2 L.decimal
 
+-- ARREGLAR
+-- NO debe tomar cosas de la forma H0024
 getHypothesisValue :: String -> Maybe Int
-getHypothesisValue = parseMaybe $ char 'H' >> nat2
+getHypothesisValue = parseMaybe $
+                     char 'H' >> nat2
+
 
 getInt :: String -> Maybe Int
 getInt s = parseMaybe nat2 s

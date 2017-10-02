@@ -202,6 +202,7 @@ introComm (Just (ForAll v t)) =
   do modifyTVars (+1)
      tv <- getTVars
      addBTypeContext (tv, v)
+     addConflicNameInProof v
      replaceType t
      modifyTerm $ addHT (\x -> BAbs v x)
 introComm Nothing = throw EmptyType

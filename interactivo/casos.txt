@@ -212,7 +212,9 @@ VER:
 
 - Theorem t55_2: forall p, p -> forall q, q -> q.
 
-- Casos de var. de término ligada y var. de tipo libre.
+Más casos:
+
+1. Casos de var. de término ligada y var. de tipo libre.
 Propositions H0.
 Theorem kk: forall a, (forall q, a) -> a.
 intro.
@@ -221,17 +223,17 @@ exact (H0 [H0]).
 
 Check (\H0:forall q, q. H0 [H0]).
 
-- Caso de var. de término ligada y var. de tipo ligada.
+2. Caso de var. de término ligada y var. de tipo ligada.
 Check (\H1.\H1:forall t, t. H1 [H1]).
 
-- Caso de var. término ligada y teorema.
+3. Caso de var. término ligada y teorema.
 H0 = forall q, q -> q.
 Check (\H0:forall t, t. H0).
 
-- Caso de var. de tipo ligada y var. de término ligada.
+4. Caso de var. de tipo ligada y var. de término ligada.
 Check (\H1:forall q, q.\H1. H1 [H1]).
 
-- H0 = \a.\x:a.x.
+5. H0 = \a.\x:a.x.
 Theorem hh: forall q, q -> q /\ q -> forall t, q /\ q.
 intro.
 intro.
@@ -242,4 +244,7 @@ En el contexto de las variables se saltea H0.
 El lambda término con nombre generado esta mal (el lambda término
 sin nombre esta bien).
 
-- Theorem tt : (forall a, a) -> forall H0, H0.
+6. Theorem tt : (forall a, a) -> forall H0, H0.
+
+7. Theorem ll: forall H0, H0 -> H0.
+Caso Arreglado.

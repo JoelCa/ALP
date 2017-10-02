@@ -6,6 +6,7 @@ import Data.List (isPrefixOf)
 import qualified Data.Sequence as S
 import Tactics (habitar)
 import Parser (isLoadOrSaveCommand, commandsFromFiles, reservedWords, getCommand)
+import Hypothesis (isHypothesis)
 import Text.PrettyPrint (render)
 import PrettyPrinter (help, printLTerm, printProof, printType, printPrintComm, printPrintAllComm, printTheorem)
 import Transformers
@@ -142,10 +143,10 @@ typesVarCommand :: EPosition -> S.Seq TypeVar -> ProverInputState ()
 typesVarCommand pos ps =
   do s <- lift get
      when (proofStarted s) $ throwSemanError pos PNotFinished
-     let (tr1, tr2) = typeRepeated ps (\t -> invalidName t $ global s)
+     let (tr1, tr2, conflicts) = typeCheckNames ps s
      when (isJust tr1) $ throwSemanError pos $ TypeRepeated $ fromJust tr1
      when (isJust tr2) $ throwSemanError pos $ ExistE $ fromJust tr2
-     lift $ modify $ modifyGlobal $ addFreeVars ps
+     lift $ modify $ modifyGlobal $ addConflictNames conflicts . addFreeVars ps
 
 definitionCommand :: EPosition -> String -> BodyDef -> ProverInputState ()
 definitionCommand pos name body = 
@@ -304,7 +305,7 @@ defCommand pos name (Ambiguous ap) =
 -- Función auxiliar de defCommand
 typeDefinition :: String -> DoubleType -> Int -> Bool -> ProverInputState ()
 typeDefinition name t n isInfix =
-  lift $ modify $ modifyGlobal $ addType name (t, n, isInfix)
+  lift $ modify $ modifyGlobal $ addConflictName name . addType name (t, n, isInfix)
 
 -- Función auxiliar de defCommand
 lamTermDefinition :: EPosition -> String -> DoubleLTerm -> ProverInputState ()
@@ -324,17 +325,26 @@ emptyLTermDefinition pos name ty =
      lift $ modify $ newEmptyLamDefinition name ty'
 
 -- Función auxiliar del comando "Props/Types".
-typeRepeated :: S.Seq TypeVar -> (String -> Bool) -> (Maybe String, Maybe String)
-typeRepeated ps f
-  | S.null ps = (Nothing, Nothing)
+-- Determinar si hay nombres de proposiones con nombres conflictivos.
+typeCheckNames :: S.Seq TypeVar -> ProverState -> (Maybe String, Maybe String, [String])
+typeCheckNames ps s = checkSeq ps elem (\t -> invalidName t $ global s) isHypothesis
+
+checkSeq :: S.Seq a -> (a -> S.Seq a -> Bool)
+          -> (a -> Bool) -> (a -> Bool)
+          -> (Maybe a, Maybe a, [a])
+checkSeq ps f g h
+  | S.null ps = (Nothing, Nothing, [])
   | otherwise = let p = S.index ps 0
                     ps' = S.drop 1 ps
-                in if elem p ps'
-                   then (return p, Nothing)
-                   else if f p
-                        then (Nothing, return p)
-                        else typeRepeated ps' f
-                            
+                in if f p ps'
+                   then (return p, Nothing, [])
+                   else if g p
+                        then (Nothing, return p, [])
+                        else let (x,y,z) = checkSeq ps' f g h
+                             in if h p
+                                then (x,y,p:z)
+                                else (x,y,z)
+                                
 
 -- Impresión de lambda término sin nombre, y tipos con nombres.
 -- renderLTermNoName :: TypeDefs -> LTerm2 -> String

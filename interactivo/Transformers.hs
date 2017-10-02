@@ -152,6 +152,7 @@ basicWithoutName :: TypeDefs -> FTypeContext -> LamDefs -> LTerm1
                  -> Either SemanticException DoubleLTerm
 basicWithoutName op fs = withoutName op fs (S.empty) (empty, 0)
 
+-- ARREGLAR
 
 -- Genera el lambda término con renombre de variables de tipo, y el lambda término sin nombre.
 -- Chequea que las variables de tipo sean válidas de acuerdo a los contexto de tipos

@@ -3,16 +3,19 @@ module Hypothesis where
 import Common (TermVar)
 import qualified Data.IntSet as IS
 import Control.Monad (unless, when)
+import Parser (getHypothesisValue)
 
 -- Se obtiene la posición que ocupa la hipótesis dada por el 2º arg,
 -- en el contexto de términos.
 -- Argumentos:
 -- 1. Conjunto de nombres conflictivos.
 -- 2. Cantidad de hipótesis del contexto de términos.
--- 3. Número de la hipótesis.
+-- 3. Número de la hipótesis (positivo).
 getHypoPosition :: IS.IntSet -> Int -> Int -> Maybe Int
 getHypoPosition h n i
-  | IS.null h = return $ n - i - 1
+  | IS.null h = if n > i
+                then return $ n - i - 1
+                else Nothing
   | otherwise = do let (pre, p , _) = IS.splitMember i h
                    when p Nothing
                    let r = n - 1 - i + IS.size pre
@@ -34,3 +37,8 @@ count :: Int -> IS.IntSet -> (Int, IS.IntSet)
 count i h = (if p then n + 1 else n, post)
   where (pre,p,post) = IS.splitMember i h
         n = IS.size pre
+
+isHypothesis :: String -> Bool
+isHypothesis s = case getHypothesisValue s of
+                   Just _ -> True
+                   Nothing -> False

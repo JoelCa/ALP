@@ -54,10 +54,10 @@ newLamDefFromProof p@(PSt {proof = Just pr}) =
   newLamDefinition (name pr) (getLTermFromProof (constr pr) (types pr)) (types pr) p
 
 newLamDefinition :: String -> DoubleLTerm -> DoubleType -> ProverState -> ProverState
-newLamDefinition name te ty  = modifyGlobal (checkConflictName name . addLamTerm name te ty)
+newLamDefinition name te ty  = modifyGlobal (addConflictName name . addLamTerm name te ty)
 
 newEmptyLamDefinition :: String -> DoubleType -> ProverState -> ProverState
-newEmptyLamDefinition name ty  = modifyGlobal (checkConflictName name . addEmptyLamTerm name ty)
+newEmptyLamDefinition name ty  = modifyGlobal (addConflictName name . addEmptyLamTerm name ty)
 
 
 -- Indica si se inicio una prueba.

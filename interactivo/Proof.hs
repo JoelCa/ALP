@@ -14,7 +14,7 @@ type Proof = StateExceptions ProofConstruction SemanticException
   -- Construcción de la prueba.
 data ProofConstruction = PConstruction { tsubp :: Int              -- Cantidad total de subpruebas activas.
                                        , subps :: [SubProof]       -- Datos de las subpruebas, ordenas por nivel.
-                                       , cglobal :: GlobalState    -- Copia de los datos globales.
+                                       , cglobal :: GlobalState    -- Inicialmente es una copia de los datos globales.
                                        , term :: LTermHoles        -- Lambda termino con aujeros.
                                        }
 
@@ -31,6 +31,13 @@ data SubProof = SP { termContext :: TermContext    -- Vars. de término.
 
 -- Operaciones que modifican el estado de la monada Proof.
 -- Es decir que, estas operaciones cambian la prueba.
+
+addConflicNameInProof :: String -> Proof ()
+addConflicNameInProof = modify . addConflicNameInProof'
+
+addConflicNameInProof' :: String -> ProofConstruction -> ProofConstruction
+addConflicNameInProof' name ps@(PConstruction {cglobal = cg}) =
+  ps {cglobal = addConflictName name cg}
 
 getGlobalAttr :: (GlobalState -> a) -> Proof a
 getGlobalAttr f = do ps <- get

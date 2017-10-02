@@ -179,6 +179,7 @@ El parser interactivo, solo acepta de a un comando por vez.
 
 
 HACER:
+- Arreglar ejemplo 6 de casos.txt.
 - Arreglar renombramientos. Ver como funciona el mecanismo por el cual las variables de términos
 ligadas "saltean" los nombres conflictivos, en la construcción de una prueba.
 Ej. 

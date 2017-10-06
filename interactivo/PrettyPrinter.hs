@@ -352,7 +352,7 @@ printRestContext op btc c
   | S.null c = printRestBTypeC btc
   | otherwise = let x = S.index btc 0
                     y = S.index c 0
-                in if fst x > (\(_,w,_,_) -> w) y
+                in if snd x > (\(_,w,_,_) -> w) y
                    then printRestContext op (S.drop 1 btc) c $$
                         printBTypeVar x
                    else printRestContext op btc (S.drop 1 c) $$

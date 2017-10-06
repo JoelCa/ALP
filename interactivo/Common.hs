@@ -77,15 +77,15 @@ data LamTerm a b c = LVar b
   -- 3. La profundidad con la que se añadio al contexto,
   -- (la profundidad se refiere a la cantidad de cuantificadores construidos).
   -- 4. Su tipo con y sin nombre.
-type TermVarWithType = (String, Int, Int, DoubleType)
+type TermVarWithType = (TermVar, Int, Int, Maybe DoubleType)
 
   -- Secuencia de variables de términos. 
 type TermContext = Seq TermVarWithType
 
   -- Para cada variable de tipo ligada, tenemos (por posición en la tupla):
-  -- 1. Su posición en el contexto. Útil a la hora de imprimirlo.
-  -- 2. El nombre.
-type BTypeVar = (Int, TypeVar)
+  -- 1. El nombre.
+  -- 2. Su posición en el contexto. Útil a la hora de imprimirlo.
+type BTypeVar = (TypeVar, Int)
 
   -- Secuencia de variables de tipo ligadas.
 type BTypeContext = Seq BTypeVar
@@ -155,6 +155,7 @@ data SemanticException = PNotFinished | PNotStarted | ExistE String
                        | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 DoubleType
                        | ExactE2 DoubleType | ExactE3 | PSE | EmptyType | TypeE String
                        | InferE DoubleLTerm InferException | UnfoldE1 String
+                       | TermVarE String | TypeVarE String
                        deriving (Show, Typeable)
 
 data PException a = SemanticE a

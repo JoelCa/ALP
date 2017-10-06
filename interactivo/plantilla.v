@@ -252,6 +252,10 @@ Definition tt22 := fun (c : Prop) (H : c) => H.
 
 Print t22.
 
+Definition tt2220 := fun (c : forall q:Prop, q -> q) (y : forall q:Prop, q -> q) => c.
+
+Print tt2220.
+
 Definition tt222 := fun (c : forall q:Prop, q -> q) (c0 : Prop) => c c0.
 
 Print tt222.

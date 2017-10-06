@@ -84,6 +84,14 @@ errorMessage _ (OpE2 s) =
   text "error: la operación" <+>
   quotes (text s) <+>
   text "no existe."
+errorMessage _ (TermVarE s) =
+  text "error: se esperaba una variable de lambda término." <+>  --VER: Esta bien decir: variable de lambda término? 
+  quotes (text s) <+>
+  text "es una variable tipo."  
+errorMessage _ (TypeVarE s) =
+  text "error: se esperaba una variable de tipo." <+>
+  quotes (text s) <+>
+  text "es una variable de lambda término."  --VER: Esta bien decir: variable de lambda término? 
 errorMessage op (ExactE1 ty) =
   text "error: el término ingresado no tiene el tipo" <+>
   printType op ty <>

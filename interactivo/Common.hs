@@ -240,3 +240,6 @@ maybeToEither _ (Just normalval) = return normalval
 
 fst4 :: (a, b, c, d) -> a
 fst4 (x, _, _, _) = x
+
+lambTermVar :: String -> DoubleLTerm
+lambTermVar s = LVar (s, Free s)

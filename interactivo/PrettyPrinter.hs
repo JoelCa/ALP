@@ -384,13 +384,13 @@ printRestBTypeC btc
                 printBTypeVar (S.index btc 0)
 
 printTermVar :: TypeDefs -> TermVarWithType -> Doc
-printTermVar op (h,_,_,t) =
+printTermVar op (h,_,_,Just t) =
   text h <+>
   text ":" <+>
   printType op t
 
 printBTypeVar :: BTypeVar -> Doc
-printBTypeVar (_,x) = text x
+printBTypeVar (x, _) = text x
 
 --------------------------------------------------------------------------------------------  
 -- Help
@@ -436,39 +436,35 @@ help =
 --------------------------------------------------------------------------------------------  
 -- Comando Print
 
-printPrintComm :: TypeDefs -> String -> Maybe DoubleLTerm -> DoubleType -> Doc
-printPrintComm = printComm True
+printPrintComm :: TypeDefs -> DoubleLTerm -> Maybe DoubleLTerm -> DoubleType -> Doc
+printPrintComm = printComm
 
-printComm :: Bool -> TypeDefs -> String -> Maybe DoubleLTerm -> DoubleType -> Doc
-printComm withTerm tyd name (Just te) ty =
+printComm :: TypeDefs -> DoubleLTerm -> Maybe DoubleLTerm -> DoubleType -> Doc
+printComm tyd var (Just te) ty =
   sep $
-  text name <+>
-  printComm' withTerm tyd te <+>
-  text ":" :
-  [printType tyd ty]
-printComm _ tyd name Nothing ty =
-  sep $
-  text name <+>
-  text ":" :
-  [printType tyd ty]
-
-printComm' :: Bool -> TypeDefs -> DoubleLTerm -> Doc
-printComm' True tyd te =
-  sep $
+  printLTerm tyd var <+>
   text "=" :
-  [printLTerm tyd te]
-printComm' False _ _ =
-  empty
+  [printLTermWithType te ty tyd] 
+printComm tyd var Nothing ty =
+  printLTermWithType var ty tyd
+
+
+printLTermWithType :: DoubleLTerm -> DoubleType -> TypeDefs -> Doc
+printLTermWithType te ty op =
+  sep $
+  printLTerm op te <+>
+  text ":" :
+  [printType op ty]
 
 printPrintAllComm :: LamDefs -> TypeDefs -> Doc
 printPrintAllComm ted tyd =
-  foldr (\(name, (mte, ty)) r -> printPrintAllComm' tyd name mte ty $$ r)
+  foldr (\(name, (mte, ty)) r -> printPrintAllComm' tyd (lambTermVar name) (isJust mte) ty $$ r)
   empty $ getLamTable ted
 
-printPrintAllComm' :: TypeDefs -> String -> Maybe DoubleLTerm -> DoubleType -> Doc
-printPrintAllComm' tyd name mte ty =
-  (if isJust mte then text "-" else text "*") <+>
-  printComm False tyd name mte ty
+printPrintAllComm' :: TypeDefs -> DoubleLTerm -> Bool -> DoubleType -> Doc
+printPrintAllComm' tyd name theorem ty =
+  (if theorem then text "-" else text "*") <+>
+  printComm tyd name Nothing ty
 
 --------------------------------------------------------------------------------------------  
 -- Impresión de la prueba de un teorema.

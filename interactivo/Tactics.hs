@@ -27,7 +27,7 @@ habitar Assumption =
      q <- getTBTypeVars
      --i <- maybeToProof AssuE $ S.findIndexL (\(_,p,t') -> positiveShift (q - p) t' == t) c
      (i,hy) <- maybeToProof AssuE $
-              S.foldrWithIndex (\index (h,_,p,t') r -> if positiveShift (q - p) t' == t then return (index,h) else r) Nothing c
+              S.foldrWithIndex (\index (h,_,p,Just t') r -> if positiveShift (q - p) t' == t then return (index,h) else r) Nothing c
      endSubProof
      modifyTerm $ simplifyLTerm $ LVar (hy, Bound i)
 habitar Intro =
@@ -40,19 +40,19 @@ habitar (Apply h) =
      t <- maybeToProof EmptyType x
      n <- getTTermVars
      cn <- getConflictNames
-     i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
      c <- getTermContext
+     i <- maybeToProof (HypoE h) $ getHypoPosition (c,n) cn h
      q <- getTBTypeVars
-     applyComm (hypothesis h cn) i t (getTypeVar q $ S.index c i)
+     applyComm (hypothesis h cn) i t (renameType q $ S.index c i)
 habitar (Elim h) =
   do x <- getType
      t <- maybeToProof EmptyType x
      n <- getTTermVars
      cn <- getConflictNames
-     i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
      c <- getTermContext
+     i <- maybeToProof (HypoE h) $ getHypoPosition (c,n) cn h
      q <- getTBTypeVars
-     elimComm (hypothesis h cn) i t (getTypeVar q $ S.index c i)
+     elimComm (hypothesis h cn) i t (renameType q $ S.index c i)
 habitar CLeft =
   do x <- getType
      case x of
@@ -91,11 +91,11 @@ habitar (Exact (LamT te)) =
      tt <- maybeToProof EmptyType x
      op <- getTypeDefinitions
      n <- getTTermVars
-     cn <- getConflictNames
      btc <- getBTypeContext
      ftc <- getFTypeContext
      ld <- getLamDefinitions
-     te' <- eitherToProof $ withoutName op ftc btc (cn,n) ld te
+     c <- getTermContext
+     te' <- eitherToProof $ withoutName (n+1) btc c op ftc ld te
      exactTerm te' tt  
 habitar (Exact (T ty)) =
   do x <- getType
@@ -104,15 +104,15 @@ habitar (Exact (T ty)) =
      btc <- getBTypeContext
      ftc <- getFTypeContext
      ld <- getLamDefinitions
-     ty' <- eitherToProof $ renamedType2 btc ftc op ld ty
+     c <- getTermContext
+     ty' <- eitherToProof $ renamedType2 btc c ftc op ld ty
      exactType ty'     
 habitar (Exact (Appl aps)) =
   do op <- getTypeDefinitions
      btc <- getBTypeContext
      ftc <- getFTypeContext
-     n <- getTTermVars
-     cn <- getConflictNames
-     t <- eitherToProof $ disambiguatedTerm btc ftc op (cn,n) aps
+     c <- getTermContext
+     t <- eitherToProof $ disambiguatedTerm c btc ftc op aps
      x <- getType
      case t of
        Right te ->
@@ -135,14 +135,14 @@ habitar (Unfold s (Just h)) =
      (tt, _, _) <- maybeToProof (UnfoldE1 s) $ getTypeData s op
      n <- getTTermVars
      cn <- getConflictNames
-     i <- maybeToProof (HypoE h) $ getHypoPosition cn n h
      c <- getTermContext
-     let (x,y,z,t) = S.index c i
+     i <- maybeToProof (HypoE h) $ getHypoPosition (c,n) cn h
+     let (x,y,z,Just t) = S.index c i
      btc <- getBTypeContext
      ftc <- getFTypeContext
      ld <- getLamDefinitions
      let r = unfoldComm btc ftc op ld s t tt
-     updateTermContext i (x,y,z,r)
+     updateTermContext i (x,y,z,Just r)
 habitar (Absurd ty) =
   do x <- getType
      case x of
@@ -152,7 +152,8 @@ habitar (Absurd ty) =
                  btc <- getBTypeContext
                  ftc <- getFTypeContext
                  ld <- getLamDefinitions
-                 tty <- eitherToProof $ renamedType2 btc ftc op ld ty
+                 c <- getTermContext
+                 tty <- eitherToProof $ renamedType2 btc c ftc op ld ty
                  newSubProofs 2 [ Just tty
                                 , Just (RenamedType not_id [tty]) ]
                  modifyTerm $ addDHT (\x y -> ((LVar ("intro_bottom", Free "intro_bottom"))
@@ -168,7 +169,8 @@ habitar (CExists ty) =
             btc <- getBTypeContext
             ftc <- getFTypeContext
             ld <- getLamDefinitions
-            ty' <- eitherToProof $ renamedType2 btc ftc op ld ty
+            c <- getTermContext
+            ty' <- eitherToProof $ renamedType2 btc c ftc op ld ty
             replaceType $ typeSubs 1 btc ftc op ld t [ty']
             modifyTerm $ addHT (\x -> EPack ty' x tt)
        _ -> throw CommandInvalid
@@ -179,7 +181,8 @@ habitar (Cut ty) =
      btc <- getBTypeContext
      ftc <- getFTypeContext
      ld <- getLamDefinitions
-     tty <- eitherToProof $ renamedType2 btc ftc op ld ty
+     c <- getTermContext
+     tty <- eitherToProof $ renamedType2 btc c ftc op ld ty
      newSubProofs 2 [ Just (Fun tty t)
                     , Just tty ]
      modifyTerm $ addDHT (\x y -> x :@: y)
@@ -195,13 +198,13 @@ introComm (Just (Fun t1 t2)) =
      to <- getTTermVars
      cn <- getConflictNames
      let h = hypothesis to cn
-     addTermContext (h, tv, q, t1)
+     addTermContext (h, tv, q, Just t1)
      replaceType t2
      modifyTerm $ addHT (\x -> Abs h t1 x)
 introComm (Just (ForAll v t)) =
   do modifyTVars (+1)
      tv <- getTVars
-     addBTypeContext (tv, v)
+     addBTypeContext (v, tv)
      addConflicNameInProof v
      replaceType t
      modifyTerm $ addHT (\x -> BAbs v x)
@@ -222,19 +225,19 @@ elimComm :: TermVar -> Int -> DoubleType -> DoubleType -> Proof ()
 elimComm h i t (Exists v tt) =
   do modifyTVars (+1)
      tv <- getTVars
-     addBTypeContext (tv, v)
+     addBTypeContext (v, tv)
      modifyTVars (+1)
      q <- getTBTypeVars
      tv <- getTVars
      to <- getTTermVars
      cn <- getConflictNames
-     let hy = hypothesis (to - i)  cn
-     addTermContext (hy, tv, q, tt)
+     let hy = hypothesis (to - i) cn
+     addTermContext (hy, tv, q, Just tt)
      btc <- getBTypeContext
      ftc <- getFTypeContext
      op <- getTypeDefinitions
      ld <- getLamDefinitions
-     replaceType $ renamedValidType1 1 (bTypeVar v S.<| btc) ftc op ld t
+     replaceType $ renamedValidType1 1 (typeVar0 v S.<| btc) ftc op ld t
      modifyTerm $ addHT (\x -> EUnpack v hy (LVar (h, Bound i)) x)
 elimComm h i t (RenamedType s [t1,t2])
   | s == and_id =
@@ -395,10 +398,10 @@ unfoldComm btc ftc op te oper (Fun t t') body =
       t2 = unfoldComm btc ftc op te oper t' body
   in Fun t1 t2
 unfoldComm btc ftc op te oper (ForAll v t) body =
-  let t' = unfoldComm (bTypeVar v S.<| btc) ftc op te oper t body
+  let t' = unfoldComm (typeVar0 v S.<| btc) ftc op te oper t body
   in (ForAll v t')
 unfoldComm btc ftc op te oper (Exists v t) body =
-  let t' = unfoldComm (bTypeVar v S.<| btc) ftc op te oper t body
+  let t' = unfoldComm (typeVar0 v S.<| btc) ftc op te oper t body
   in (Exists v t')
 
 ----------------------------------------------------------------------------------------------------------------------
@@ -406,8 +409,8 @@ unfoldComm btc ftc op te oper (Exists v t) body =
 
 -- Obtiene el tipo de la variable de término, renombrando su tipo sin nombre, de acuerdo
 -- a la profundidad dada por el 1º argumento.
-getTypeVar :: Int -> TermVarWithType -> DoubleType
-getTypeVar n (_,_,m, t) = positiveShift (n-m) t
+renameType :: Int -> TermVarWithType -> DoubleType
+renameType n (_,_,m,Just t) = positiveShift (n-m) t
 
 maybeToProof :: SemanticException -> Maybe a -> Proof a
 maybeToProof excep Nothing = throw excep

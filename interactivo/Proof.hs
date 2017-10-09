@@ -7,7 +7,8 @@ import GlobalState
 import TermsWithHoles
 import Control.Monad.State.Lazy (get, modify)
 import qualified Data.Sequence as S
-
+import Hypothesis
+  
 type Proof = StateExceptions ProofConstruction SemanticException
 
 

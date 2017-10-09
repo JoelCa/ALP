@@ -200,38 +200,44 @@ withoutName' i ters tebs tyrs tybs fs op tn (e ::: t) =
 ----------------------------------------------------------------------------------------------------------------------
 -- Transformadores para aplicaciones ambiguas.
 
--- ARREGLAR
--- basicDisambiguatedTerm :: FTypeContext -> TypeDefs -> GenTree String
---                        -> Either SemanticException (Either DoubleType DoubleLTerm)
--- basicDisambiguatedTerm ftc op = disambiguatedTerm S.empty ftc op (empty, 0)
+basicDisambiguatedTerm :: FTypeContext -> TypeDefs -> GenTree String
+                       -> Either SemanticException (Either DoubleType DoubleLTerm)
+basicDisambiguatedTerm ftc op = disambiguatedTerm S.empty S.empty ftc op
 
--- -- Convierte a una aplicacion ambigua en una aplicación de tipos, o en una aplicación de lambda términos.
--- disambiguatedTerm :: BTypeContext -> FTypeContext ->  TypeDefs -> (IntSet, Int)
---                   -> GenTree String -> Either SemanticException (Either DoubleType DoubleLTerm)
--- disambiguatedTerm btc ftc op cnn t =
---   case disambiguatedType btc ftc op t of
---     Left (TypeE _) -> return $ Right $ disambiguatedLTerm cnn t
---     Left e -> throw e
---     Right ty -> return $ Left ty
+-- Convierte a una aplicacion ambigua en una aplicación de tipos, o en una aplicación de lambda términos.
+disambiguatedTerm :: TermContext -> BTypeContext -> FTypeContext -> TypeDefs
+                  -> GenTree String -> Either SemanticException (Either DoubleType DoubleLTerm)
+disambiguatedTerm tc btc ftc op t =
+  case disambiguatedType btc ftc op t of
+    Right ty -> return $ Left ty
+    Left (TypeE _) -> return $ Right $ disambiguatedLTerm tc t
+    Left (TypeVarE _) -> return $ Right $ disambiguatedLTerm tc t
+    Left e -> throw e
+    
+-- Convierte la aplicación ambigua, en una aplicación de tipos.
+-- Si no puede, falla.
+disambiguatedType :: BTypeContext -> FTypeContext -> TypeDefs
+                  -> GenTree String -> Either SemanticException DoubleType
+disambiguatedType bs fs op (Node x []) =
+  -- NO es necesario rs, ni el contexto de términos.
+  transformTypeVar (\w _ _ -> w) S.empty bs S.empty fs op x 
+disambiguatedType bs fs op (Node x xs) =
+  transformType op x xs $ disambiguatedType bs fs op
 
-
--- disambiguatedType :: BTypeContext -> FTypeContext -> TypeDefs
---                   -> GenTree String -> Either SemanticException DoubleType
--- disambiguatedType bs fs op (Node x []) =
---   transformTypeVar (\w _ _ -> w) S.empty bs fs op x -- NO es necesario rs
--- disambiguatedType bs fs op (Node x xs) =
---   transformType op x xs $ disambiguatedType bs fs op
-
--- ARREGLAR
 -- Convierte una aplicacion en una aplicación de lambda términos, si es posible.
--- disambiguatedLTerm :: (IntSet, Int) -> GenTree String -> DoubleLTerm
--- disambiguatedLTerm cnn (Node x xs) =
---   foldl (\r node ->
---             let t = disambiguatedLTerm cnn node
---             in r :@: t
---         )
---   (LVar (x, getTermVar x cnn)) xs
--- disambiguatedLTerm _ Nil = error "error: disambiguatedLTerm, no debería pasar."
+-- Se asume que los espacios de nombres entre las variables de tipo y términos
+-- son disyuntos.
+disambiguatedLTerm :: TermContext -> GenTree String -> DoubleLTerm
+disambiguatedLTerm tc (Node x xs) =
+  foldl (\r node ->
+            let t = disambiguatedLTerm tc node
+            in r :@: t
+        ) var xs
+  where var =  case getTermVar x tc S.empty of
+                 Right (Just m) -> LVar (x, Bound m)
+                 Right Nothing -> LVar (x, Free x)
+                 Left _ -> error "error: disambiguatedLTerm, no debería pasar."
+disambiguatedLTerm _ Nil = error "error: disambiguatedLTerm, no debería pasar."
 
 
 transformType :: TypeDefs -> String -> [a]
@@ -272,7 +278,7 @@ getTypeVar' i s tyc tec
        return Nothing
   | S.null tec =
     case S.findIndexL (\w -> fst w == s) tyc of
-      Just x -> return $ return $ i + x + 1
+      Just x -> return $ return $ i + x
       Nothing -> return Nothing
   | otherwise =
       let x = S.index tyc 0
@@ -302,7 +308,7 @@ getTermVar' i s tec tyc
          return Nothing
   | S.null tyc =
       case S.findIndexL (\w -> fst4 w == s) tec of
-        Just x -> return $ return $ i + x + 1
+        Just x -> return $ return $ i + x
         Nothing -> return Nothing
   | otherwise =
       let x = S.index tyc 0

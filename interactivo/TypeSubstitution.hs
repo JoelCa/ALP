@@ -41,8 +41,8 @@ typeSubs l bs fs op te = typeSubs' 0 l fs bs bs (getTypesNames op) (getNames te)
 typeSubs' :: Int -> Int -> FTypeContext -> BTypeContext -> BTypeContext -> [String]
           -> [String] -> DoubleType -> [DoubleType] -> DoubleType
 typeSubs' n l fs bs rs op tn (TVar (v, Bound x)) ts
-  | x < n = case S.findIndexL (\(_,x) -> x == v) bs of
-              Just i -> TVar (snd $ S.index rs i, Bound x)
+  | x < n = case S.findIndexL (\(x,_) -> x == v) bs of
+              Just i -> TVar (fst $ S.index rs i, Bound x)
               Nothing -> error "error: typeSubs', no debería pasar."
   | (n <= x) && (x < l) =
       let ty = ts !! (l - x - 1)
@@ -50,12 +50,12 @@ typeSubs' n l fs bs rs op tn (TVar (v, Bound x)) ts
   | otherwise = TVar (v, Bound $ x - l + n)
 typeSubs' _ _ _ _ _ _ _ x@(TVar (_, Free _)) _ = x
 typeSubs' n l fs bs rs op tn (ForAll v t1) ts =
-  let v' = getRename v (snd, rs) (id, fs) (id, op) (id, tn)
-      tt = typeSubs' (n+1) (l+1) fs (bTypeVar v S.<| bs) (bTypeVar v' S.<| rs) op tn t1 ts
+  let v' = getRename v (fst, rs) (id, fs) (id, op) (id, tn) (id, [])
+      tt = typeSubs' (n+1) (l+1) fs (typeVar0 v S.<| bs) (typeVar0 v' S.<| rs) op tn t1 ts
   in ForAll v' tt
 typeSubs' n l fs bs rs op tn (Exists v t1) ts =
-  let v' = getRename v (snd, rs) (id, fs) (id, op) (id, tn) 
-      tt = typeSubs' (n+1) (l+1) fs (bTypeVar v S.<| bs) (bTypeVar v' S.<| rs) op tn t1 ts
+  let v' = getRename v (fst, rs) (id, fs) (id, op) (id, tn) (id, [])
+      tt = typeSubs' (n+1) (l+1) fs (typeVar0 v S.<| bs) (typeVar0 v' S.<| rs) op tn t1 ts
   in Exists v' tt
 typeSubs' n l fs bs rs op tn (Fun t1 t2) ts =
   let tt1 = typeSubs' n l fs bs rs op tn t1 ts

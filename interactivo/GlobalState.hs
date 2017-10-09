@@ -6,8 +6,7 @@ import qualified LambdaTermDefinition as LTD
 import qualified TypeDefinition as TD
 import qualified Data.Sequence as S
 import Parser (getHypothesisValue)
-
-type ConflictNames = IS.IntSet
+import Hypothesis
 
 -- Definiciones globales.
 data GlobalState = Global { fTypeContext :: FTypeContext
@@ -32,7 +31,7 @@ addConflictName :: String -> GlobalState -> GlobalState
 addConflictName s g = g {conflict = addConflictName' s $ conflict g}
   where addConflictName' s c =
           case getHypothesisValue s of
-            Just n -> IS.insert n c
+            Just n -> insertCN c n
             Nothing -> c
 
 addConflictNames :: [String] -> GlobalState -> GlobalState
@@ -43,7 +42,7 @@ initialGlobal :: GlobalState
 initialGlobal = Global { fTypeContext = S.empty
                        , lamDef = LTD.empty
                        , typeDef = TD.empty
-                       , conflict = IS.empty
+                       , conflict = emptyCN
                        }
 
 isLamDef :: String -> GlobalState -> Bool

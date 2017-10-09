@@ -11,17 +11,20 @@ getRename :: (Foldable t1, Foldable t2, Foldable t3, Foldable t4, Foldable t5)
           => String -> (a -> String, t1 a) -> (b -> String, t2 b) -> (c -> String, t3 c)
           -> (d -> String, t4 d) -> (e -> String, t5 e) -> String
 getRename s (f,xs) (g,ys) (h,zs) (i, ws) (j, ts) =
-  case getHypothesisValue s of
-    Just _ ->
-      (head s) : '_' : (tail s)
-    Nothing ->
-      if p < -1  then s else s ++ show (succ p)
-      where p = posfix s f xs
-                `max` posfix s g ys
-                `max` posfix s h zs
-                `max` posfix s i ws
-                `max` posfix s j ts
-
+  if p < -1  then s' else s' ++ show (succ p)
+  where
+    -- Hacemos este renombramiento para que "s" no
+    -- este en el espacio de nombres de las hipótesis.
+    s' = case getHypothesisValue s of
+           Just _ ->
+             (head s) : '_' : (tail s)
+           Nothing ->
+             s
+    p = posfix s' f xs
+        `max` posfix s' g ys
+        `max` posfix s' h zs
+        `max` posfix s' i ws
+        `max` posfix s' j ts
 
 -- getRename :: (Foldable t1, Foldable t2, Foldable t3, Foldable t4) => String -> (a -> String, t1 a)
 --           -> (b -> String, t2 b) -> (c -> String, t3 c) -> (d -> String, t4 d) -> String

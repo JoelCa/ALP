@@ -10,7 +10,7 @@ import System.IO (Handle)
   -- Estado general.
 data ProverState = PSt { proof :: Maybe ProofState
                        , global :: GlobalState
-                       , save :: Maybe Handle
+                       , tempSave :: (FilePath, Handle)
                        , lastComm :: Maybe String
                        , cc :: Int                    -- Contador del número de entradas dadas por el usuario.
                        }
@@ -65,13 +65,13 @@ proofStarted :: ProverState -> Bool
 proofStarted p = isJust $ proof p
 
 -- Estado inicial.
-initialProver :: ProverState
-initialProver = PSt { global = initialGlobal
-                    , proof = Nothing
-                    , save = Nothing
-                    , lastComm = Nothing
-                    , cc = 0
-                    }
+initialProver :: (FilePath, Handle) -> ProverState
+initialProver h = PSt { global = initialGlobal
+                      , proof = Nothing
+                      , tempSave = h
+                      , lastComm = Nothing
+                      , cc = 0
+                      }
 
 modifyGlobal :: (GlobalState -> GlobalState) -> ProverState -> ProverState
 modifyGlobal f p = p {global = f $ global p}
@@ -88,22 +88,18 @@ addLastComm :: ProverState -> ProverState
 addLastComm p@(PSt {proof = Just pr, lastComm = Just c}) = p {proof = Just $ pr {history = c : history pr}}
 addLastComm p@(PSt {proof = Nothing, lastComm = Just _}) = p
 
-saveHistory :: Handle -> ProverState -> ProverState
-saveHistory file p  = p {save = Just file}
-
-isWithHistory :: ProverState -> Bool
-isWithHistory (PSt {save = s}) = isJust s
-
 setLastCommand :: String -> ProverState -> ProverState
 setLastCommand c p  = p {lastComm = Just c}
+
+setTempHandle :: Handle -> ProverState -> ProverState
+setTempHandle h p@(PSt {tempSave = (name, oldh)}) = p {tempSave = (name, h)}
 
 getLastCommand :: ProverState -> String
 getLastCommand (PSt {lastComm = Just c}) = c
 getLastCommand _ = error "error: getLastCommand, no debería pasar."
 
-getHistoryFile :: ProverState -> Handle
-getHistoryFile (PSt {save = Just file}) = file
-getHistoryFile _ = error "error: getFileHistory, no debería pasar."
+getTempFile :: ProverState -> (FilePath, Handle)
+getTempFile (PSt {tempSave = file}) = file
 
 getProofCommands :: ProverState -> [String]
 getProofCommands (PSt {proof = Just pr}) = history pr

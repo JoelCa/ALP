@@ -2,7 +2,7 @@ module PrettyPrinter where
 
 import Common
 import Proof
-import TypeDefinition (TypeDefs, getTypeData)
+import TypeDefinition (TypeDefs, getTypeData, getTypesNames)
 import LambdaTermDefinition (LamDefs, getLamTable)
 import Text.PrettyPrint
 import Data.List
@@ -458,13 +458,19 @@ printLTermWithType te ty op =
 
 printPrintAllComm :: LamDefs -> TypeDefs -> Doc
 printPrintAllComm ted tyd =
+  foldr (\name r -> (text "." <+> printCommType name) $$ r ) empty (getTypesNames tyd) $$
   foldr (\(name, (mte, ty)) r -> printPrintAllComm' tyd (lambTermVar name) (isJust mte) ty $$ r)
-  empty $ getLamTable ted
+  empty (getLamTable ted)
 
 printPrintAllComm' :: TypeDefs -> DoubleLTerm -> Bool -> DoubleType -> Doc
 printPrintAllComm' tyd name theorem ty =
   (if theorem then text "-" else text "*") <+>
   printComm tyd name Nothing ty
+
+printCommType :: String -> Doc
+printCommType name =
+  text name <+>
+  text ":: *"
 
 --------------------------------------------------------------------------------------------  
 -- Impresión de la prueba de un teorema.

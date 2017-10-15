@@ -8,7 +8,9 @@ import Tactics (habitar)
 import Parser (isLoadOrSaveCommand, commandsFromFiles, reservedWords, getCommand)
 import Hypothesis (isHypothesis)
 import Text.PrettyPrint (render)
-import PrettyPrinter (help, printLTerm, printProof, printType, printPrintComm, printPrintAllComm, printTheorem, printLTermWithType)
+import PrettyPrinter (help, printLTerm, printProof, printType, printPrintComm,
+                      printPrintAllComm, printTheorem, printLTermWithType,
+                      printCommType)
 import Transformers
 import ErrorMsj (printError)
 import TypeInference (basicTypeInference)
@@ -202,7 +204,7 @@ printCommand :: EPosition -> String -> ProverInputState ()
 printCommand pos x =
   do s <- lift get
      let g = global s
-     when (not $ isLamDef x g) $ throwSemanError pos $ NotExistE x
+     when (not $ isLamDef x g || isType x g) $ throwSemanError pos $ NotExistE x
 
 inferCommand :: EPosition -> LTerm1 -> ProverInputState (DoubleLTerm, DoubleType)
 inferCommand pos x =
@@ -217,7 +219,9 @@ printCommandPrinting :: String -> ProverInputState ()
 printCommandPrinting x =
   do s <- lift get
      let g = global s
-     outputStrLn $ render $ printPrintComm (typeDef g) (lambTermVar x) (getLamTerm x g) (getLamTermType x g)
+     when (isLamDef x g) (outputStrLn $ render $ printPrintComm (typeDef g) (lambTermVar x)
+                          (getLamTerm x g) (getLamTermType x g))
+     when (isType x g) (outputStrLn $ render $ printCommType x)
 
 printCommandPrintingAll :: ProverInputState ()
 printCommandPrintingAll =
@@ -233,9 +237,8 @@ inferCommandPrinting te ty =
 otherTacticsCPrinting :: TypeDefs ->  DoubleType ->  ProofConstruction
                       -> ProverInputState ()
 otherTacticsCPrinting op ty pc
-  | isFinalTerm pc = do outputStrLn $ "Prueba completa.\n" ++
-                          renderLTerm op (getLTermFromProof pc ty)
-                        outputStrLn $ show (getLTermFromProof pc ty) ++ "\n"
+  | isFinalTerm pc = outputStrLn $ "Prueba completa.\n" ++
+                     renderLTerm op (getLTermFromProof pc ty)
   | otherwise = outputStrLn $ renderProof pc
   
 
@@ -279,8 +282,7 @@ saveCommand0 (Just (name, proof, ty)) =
   do s <- lift get
      writeHistory $ render $ printTheorem (typeDef $ global s) name ty (getLastCommand s : proof)
 saveCommand0 Nothing =
-  do s <- lift get
-     writeHistory $ getLastCommand s
+     lift $ modify $ addLastComm
 
 -- Proceso de guardado. Luego de que NO se halla ingresado una táctica.
 saveCommand1 :: Command -> ProverInputState ()

@@ -148,7 +148,7 @@ Chequemos que los nombres de los hipótesis NO coincidan con los nombres de los 
 - qqq = \t.\x:t.intro_and [t] [t] x x.
   Theorem t56: forall w, w -> (w /\ w) /\ (w -> w).
 Para chequear el exact sobre una definición de término.
-La prueba es: intros; exact (intro_and [w /\ w] [w -> w] (qqq [w] H0) (\f:w.f)).
+La prueba es: intros; exact (intro_and [w /\ w] [w -> w] (qqq [w] H1) (\f:w.f)).
 - algo w = forall x, w -> w.
   Theorem x: forall q, q -> q.
   Theorem t57: forall a, a -> algo a.

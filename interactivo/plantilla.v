@@ -244,6 +244,11 @@ Definition x x y := forall w:Prop, forall v:Prop, x /\ y.
 Print x.
 Check x.
 
+Print All.
+
+Print t.
+
+
 Theorem tt22 : forall w, (x w) (w -> w).
 
 Theorem t22: forall c:Prop, c -> c.  Proof.  intros.  assumption.  Qed.

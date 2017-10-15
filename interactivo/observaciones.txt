@@ -179,11 +179,7 @@ El parser interactivo, solo acepta de a un comando por vez.
 
 
 HACER:
-- Terminar de arreglar los renombramientos.
-- Arreglar ejemplo 6 de casos.txt.
-- Chequear los ejemplos del archivo "casos.txt"
 - Comentar la primera línea de un archivo.
-- Hacer que el comando save guarde todos los comandos exitosos dados hasta el momento por el usuario.
 - Mostrar estado de la prueba, si se carga de un archivo una prueba incompleta.
 
 HECHO:
@@ -208,6 +204,10 @@ Ej.
 H5 = \a.\x:a.x.
 Theorem hh2: forall q, q -> q /\ q -> q -> q -> q -> forall t, q /\ q.
 intros.
+- Terminar de arreglar los renombramientos.
+- Chequear los ejemplos del archivo "casos.txt"
+- Hacer que el comando save guarde todos los comandos exitosos dados hasta el momento por el usuario.
+- Añadido comando Print capaz de imprimir definiciones de tipos.
 
 FALTA:
 - Chequear el parser de las hipotesis.

@@ -408,7 +408,7 @@ elimP :: Parser Tactic
 elimP = tacticIndexArg "elim" Elim
 
 printP :: Parser Tactic
-printP = tacticIdentArg "Print" Print
+printP = tacticOneArg (identifier <|> symbolIdent) "Print" Print
 
 checkP :: Parser Tactic
 checkP = tacticOneArg lambTerm "Check" Infer

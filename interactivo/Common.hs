@@ -107,6 +107,7 @@ data Command = Theorem String Type1
   -- Comandos de la línea de comandos
 data CLICommand = Escaped ECommand
                 | Lang Command
+                deriving (Show)
 
 data ECommand = Exit
               | Abort
@@ -114,6 +115,11 @@ data ECommand = Exit
               | Save String
               | Help
               deriving (Show)
+
+
+data TInput = Complete String
+            | Incomplete String
+            deriving (Show)
 
 data BodyDef = LTerm LTerm1
              | EmptyLTerm Type1
@@ -155,7 +161,7 @@ data SemanticException = PNotFinished | PNotStarted | ExistE String
                        | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 DoubleType
                        | ExactE2 DoubleType | ExactE3 | PSE | EmptyType | TypeE String
                        | InferE DoubleLTerm InferException | UnfoldE1 String
-                       | TermVarE String | TypeVarE String
+                       | TermVarE String | TypeVarE String | IncompleteCommad
                        deriving (Show, Typeable)
 
 data PException a = SemanticE a

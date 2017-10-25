@@ -151,10 +151,12 @@ Proof.
 unfold iff.
 split.
 intro.
+Print Scopes.
 assumption.
 intro.
 assumption.
 Qed.
+Print Hint *.
 
 Print All. 
 

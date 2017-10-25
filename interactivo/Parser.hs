@@ -11,28 +11,29 @@ import qualified Data.Sequence as S (Seq, empty, (<|), (|>), singleton, fromList
 import qualified Control.Exception as E (try)
 import Data.List (isSuffixOf)
 import Data.Char (isSpace)
+import qualified Data.List.NonEmpty as LNE (fromList)
 
 type Parser = Parsec Void String
 
 type ProofCommands = Either ProverException [(EPosition, Command)]
 
-type CommandLineCommand = Either ProverException (EPosition, CLICommand)
+type CommandLineCommand = Either ProverException (Maybe (EPosition,String), [(EPosition,CLICommand)], Maybe (EPosition,String))
 
 
 interactive :: String
 interactive = "<interactive>"
-
 
 reservedWords = ["Propositions", "Types", "Theorem", "Axiom", "Print", "Check", "forall"
                 , "exists",  "let", "in", "as","assumption", "intro", "intros", "split",
                  "left", "right", "apply", "elim", "absurd", "cut", "unfold", "exact",
                  ":load", ":abort", ":quit", ":help", ":save", ":l", ":a", ":q", ":h", ":s"]
 
-reservedSymbols = ["=", "->", ":"] --, and_id, or_id, iff_id, not_id]
+reservedSymbols = ["=", "->", ":", "//", "/*", "*/"] --, and_id, or_id, iff_id, not_id]
 
 sc :: Parser ()
-sc = L.space space1 lineCmnt empty
-  where lineCmnt  = L.skipLineComment "//"
+sc = L.space space1 empty blockCmnt
+  where --lineCmnt  = L.skipLineComment "%%"
+        blockCmnt = L.skipBlockComment "(*" "*)"
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
@@ -98,20 +99,22 @@ commandsFromFiles files =
   do content <- mapM (\f -> either Left (\x -> Right (f, x)) <$> (E.try $ readFile f)) files
      case sequence content of
        Right xs ->
-         case mapM (\(f,s) -> parse (space *> commands) f s) xs of
+         case mapM (\(f,s) -> parse (lexeme space *> commands <* eof) f s) xs of
            Right x -> return $ Right $ concat x
            Left e -> return $ Left $ SyntaxE  e
        Left e -> return $ Left $ FileE e
 
--- CHEQUEAR
 commands :: Parser [(EPosition, Command)]
-commands = many ((\x y -> (x,y)) <$> (getLinePos <$> getPosition) <*> command) <* eof
+commands = many ((\x y -> (x,y)) <$> (getLinePos <$> getPosition) <*> command)
 -- commands = do xs <- many p
 --               (do x <- p
 --                   return (xs++[x])
 --                <|> do eof
 --                       return xs)
 --   where p = (\x y -> (x,y)) <$> (getLinePos <$> getPosition) <*> command
+
+commandsLine :: EPosition -> Parser [(EPosition, Command)]
+commandsLine pos = many $ try ((\x -> (pos,x)) <$> command) 
 
 getLinePos :: SourcePos -> EPosition
 getLinePos (SourcePos n l c) = (n, unPos l)
@@ -125,21 +128,101 @@ getCommand s line =
     Right x -> Right x
     Left e -> Left $ SyntaxE  e
 
-cliWithPosition :: Int -> Parser (EPosition, CLICommand)
+cliWithPosition :: Int -> Parser (Maybe (EPosition,String), [(EPosition,CLICommand)], Maybe (EPosition,String))
 cliWithPosition line =
   do setPosition (newPosition interactive line)
-     space *> ((\x -> ((interactive, line), x)) <$> cliCommand) <* eof
+     lexeme space *> cliCommand <* eof
 
-cliCommand :: Parser CLICommand
-cliCommand = do c <- command
-                return $ Lang c
-             <|> do ec <- escapedCommand
-                    return $ Escaped ec
+cliCommand :: Parser (Maybe (EPosition,String), [(EPosition,CLICommand)], Maybe (EPosition,String))
+cliCommand = do pos <- getLinePos <$> getPosition
+                (do ec <- escapedCommand
+                    return (Nothing, [(pos,Escaped ec)], Nothing)
+                 <|> do (x,cs,y)  <- langCommands pos
+                        return (x, map (\(x,y) -> (x,Lang y)) cs, y))
+              
 
 testeo :: Show a => Parser a -> String -> IO ()
 testeo p s = case parse p "" s of
                Left e -> putStrLn $ parseErrorPretty e
                Right x -> putStrLn $ show x
+
+-- Retorna una tupla donde:
+-- 1. Posible comando incompleto, terminado con un punto.
+-- 2. Comandos completos.
+-- 3. Posible comando incompleto, NO terminado por un punto.
+langCommands :: EPosition -> Parser (Maybe (EPosition,String), [(EPosition,Command)], Maybe (EPosition,String))
+langCommands pos =
+  do (pre, cs) <- lexeme space *> langCommands' pos
+     space
+     end <- atEnd
+     if end
+       then return (pre, cs, Nothing)
+       else (do --satisfy (\x -> x /= '.') <?> "comando"
+                post <- incompleteCommand1
+                return (pre, cs, Just (pos,post)))
+       where resto =
+               do r <- lexeme $ takeWhileP Nothing (\x -> x /= '.')
+                  (do dot
+                      unexpected EndOfInput
+                   <|> return r) 
+
+langCommands' :: EPosition -> Parser (Maybe (EPosition,String), [(EPosition,Command)])
+langCommands' pos =
+  do x <- initial
+     cs <- commandsLine pos
+     case x of
+       Just (Left y) -> return (Nothing, (pos,y):cs)
+       Just (Right z) -> return (Just (pos,z), cs)
+       Nothing -> return (Nothing, cs)
+  where initial = do c <- try $ command
+                     return $ Just $ Left c
+                  <|> do ic <- try $ incompleteCommand0
+                         return $ Just $ Right ic
+                  <|> return Nothing
+
+-- Parsea una string que termine con un punto, omitiendo
+-- los comentarios.
+incompleteCommand0 :: Parser String
+incompleteCommand0 =
+  do c <- lexeme $ takeWhileP Nothing (\x -> (x /= '.') && (x /= '('))
+     (do dot
+         return $ c ++ ['.']
+      <|> do char '('
+             rest <- incompleteCommand0
+             return $ c ++ ['('] ++ rest
+      <|> do end <- atEnd
+             if end
+             then unexpected EndOfInput
+             else do rest <- incompleteCommand0
+                     return $ c ++ rest)
+
+incompleteCommand1 :: Parser String
+incompleteCommand1 =
+  do c <- lexeme $ takeWhileP Nothing (\x -> (x /= '.') && (x /= '('))
+     (do dot
+         unexpected EndOfInput
+      <|> do char '('
+             rest <- incompleteCommand1
+             return $ c ++ ['('] ++ rest
+      <|> do end <- atEnd
+             if end
+             then return c
+             else do rest <- incompleteCommand1
+                     return $ c ++ rest)
+
+
+-- incompleteCommand :: Parser String
+-- incompleteCommand =
+--   do c <- lexeme $ takeWhileP Nothing (\x -> x /= '.')
+--      (do dot
+--          return $ c ++ ['.']
+--       <|> unexpected EndOfInput)
+
+
+-- input1 :: Parser String
+-- input1 = do c <- takeWhile1P Nothing (\x -> x /= '.')
+--             dot
+--             return $ c ++ ['.']
 
 --------------------------------------------------------------------------------------
 -- Parser de los comandos.

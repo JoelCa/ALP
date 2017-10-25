@@ -122,6 +122,8 @@ errorMessage _ (HypoE i) =
   text "error: la hipótesis" <+>
   quotes (text $ printHypo i) <+>
   text "no existe."
+errorMessage _ IncompleteCommad =
+  text "error: comando incompleto inválido."
 
   
 errorInfer :: TypeDefs -> InferException -> Doc

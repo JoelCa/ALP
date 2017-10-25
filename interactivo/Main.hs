@@ -46,7 +46,12 @@ saveHistory file = do s <- lift get
 
 -- Mantiene el último comando.
 setLastComm :: String -> ProverInputState ()
-setLastComm c = lift $ modify $ setLastCommand c
+setLastComm = lift . modify . setLastInput
+
+-- Agrege uno o varios comandos al estado.
+addLastComm :: String -> ProverInputState ()
+addLastComm = lift . modify . addLastInput
+
 
 main :: IO ()
 main = do dir <- getCurrentDirectory
@@ -86,8 +91,7 @@ proverFromCLI =
        Just "" -> proverFromCLI
        Just x ->
          catch (do command <- returnInputFromParser $ getCommand x (getCounter s)
-                   setLastComm x --CHEQUEAR
-                   checkCliCommand command)
+                   checkCommandsLine x command)
          (\e -> outputStrLn (render $ printError (typeDef $ global s) e)
                 >> proverFromCLI)
 
@@ -96,10 +100,38 @@ proverFromFiles files =
   do s <- lift get
      r <- lift $ lift $ commandsFromFiles files
      catch (do commands <- returnInputFromParser r
+               --outputStrLn $ show commands
                checkCommand commands)
        (\e -> outputStrLn (render $ printError (typeDef $ global s) e)
               >> proverFromCLI)
 
+--TERMINAR
+checkCommandsLine :: String
+                  -> (Maybe (EPosition,String), [(EPosition,CLICommand)], Maybe (EPosition,String))
+                  -> ProverInputState ()
+checkCommandsLine input (Nothing, [c], Nothing) =
+  setLastComm input >>
+  checkCliCommand c
+checkCommandsLine input (Nothing, [], Just x) = -- un comando incompleto
+  addLastComm input >>
+  (lift $ modify $ addIncompleteInput x) >>
+  proverFromCLI
+checkCommandsLine input (Just (pos, x), cs, Nothing) = -- fin de comando incompleto
+  do addLastComm input
+     s <- lift get
+     case getIncompleteComm s of --MEJORAR
+       Just (_,inc) ->
+         do command <- returnInputFromParser $ getCommand (x++inc) (getCounter s)
+            case command of
+              (Nothing, [c], Nothing) -> 
+                checkCommand $ map removeCLI $ cs ++ [c]
+                where removeCLI (pos, x) =
+                        case x of
+                          Escaped _ -> error "error: checkCommandsLine, no debería pasar."
+                          Lang x -> (pos, x)
+              _ -> throwSemanError pos IncompleteCommad
+       Nothing -> throwSemanError pos IncompleteCommad
+         
 -- TERMINAR help
 checkCliCommand :: (EPosition, CLICommand) -> ProverInputState ()
 checkCliCommand (_, Escaped Exit) =
@@ -270,8 +302,9 @@ checkCommand' _ (pos, Definition name body) =
 
 -- Chequeo de comandos dados desde un archivo.
 checkCommand'' :: [(EPosition, Command)] -> ProverInputState ()     
-checkCommand'' [] =
-  proverFromCLI
+checkCommand'' [x] =
+  do checkCommand' True x
+     proverFromCLI
 checkCommand'' (x:xs) =
   do checkCommand' False x
      checkCommand'' xs
@@ -280,9 +313,9 @@ checkCommand'' (x:xs) =
 saveCommand0 :: (Maybe (String, [String], DoubleType)) -> ProverInputState ()
 saveCommand0 (Just (name, proof, ty)) =
   do s <- lift get
-     writeHistory $ render $ printTheorem (typeDef $ global s) name ty (getLastCommand s : proof)
+     writeHistory $ render $ printTheorem (typeDef $ global s) name ty (getLastInput s : proof)
 saveCommand0 Nothing =
-     lift $ modify $ addLastComm
+     lift $ modify $ addProofCommand
 
 -- Proceso de guardado. Luego de que NO se halla ingresado una táctica.
 saveCommand1 :: Command -> ProverInputState ()
@@ -290,7 +323,7 @@ saveCommand1 (Theorem _ _) =
   return ()
 saveCommand1 _ =
   do s <- lift get
-     writeHistory $ getLastCommand s
+     writeHistory $ getLastInput s
 
 -- Escribe el/los comando/s al archivo de historial de comandos.
 writeHistory :: String -> ProverInputState ()

@@ -11,10 +11,15 @@ import System.IO (Handle)
 data ProverState = PSt { proof :: Maybe ProofState
                        , global :: GlobalState
                        , tempSave :: (FilePath, Handle)
-                       , lastComm :: Maybe String
+                       , input :: Input
                        , cc :: Int                    -- Contador del número de entradas dadas por el usuario.
                        }
-
+                   
+  -- Mantiene datos de la entrada del usuario.
+data Input = Inp { inp :: String                            -- Entrada del usuario. 
+                 , commands :: [(EPosition,Command)]        -- Comandos ingresados por el usuario.
+                 , incomplete :: Maybe (EPosition,String)   -- Posible comando incompleto ingresado por el usuario.
+                 }
 
   -- Estado de la prueba que se está construyendo.
 data ProofState = PState { name :: String
@@ -69,7 +74,7 @@ initialProver :: (FilePath, Handle) -> ProverState
 initialProver h = PSt { global = initialGlobal
                       , proof = Nothing
                       , tempSave = h
-                      , lastComm = Nothing
+                      , input = Inp {inp = [], commands = [], incomplete = Nothing}
                       , cc = 0
                       }
 
@@ -84,19 +89,39 @@ theoremName :: ProverState -> String
 theoremName (PSt {proof = Just pr}) = name pr
 theoremName _ = error "error: theoremName, no debería pasar."
 
-addLastComm :: ProverState -> ProverState
-addLastComm p@(PSt {proof = Just pr, lastComm = Just c}) = p {proof = Just $ pr {history = c : history pr}}
-addLastComm p@(PSt {proof = Nothing, lastComm = Just _}) = p
+setLastInput :: String -> ProverState -> ProverState
+setLastInput x p@(PSt {input = i}) = p {input = i {inp = x}}
 
-setLastCommand :: String -> ProverState -> ProverState
-setLastCommand c p  = p {lastComm = Just c}
+addLastInput :: String -> ProverState -> ProverState
+addLastInput c p@(PSt {input = Inp {inp = x}}) =
+  p {input = (input p) {inp = x ++ c}}
+
+getLastInput :: ProverState -> String
+getLastInput p@(PSt {input = Inp {inp = x}}) = x
+
+addProofCommand :: ProverState -> ProverState
+addProofCommand p@(PSt {proof = Just pr, input = Inp {inp = cs}}) = p {proof = Just $ pr {history = history pr ++ [cs]}}
+addProofCommand p@(PSt {proof = Nothing}) = error "error: addProofCommand, no debería pasar"
+
+addIncompleteInput :: (EPosition,String) -> ProverState -> ProverState
+addIncompleteInput (pos, inc) p@(PSt {input = Inp {incomplete = x}}) =
+  case x of
+    Nothing -> p {input = (input p) {incomplete = Just (pos, inc)}}
+    Just (_,inc') -> p {input = (input p) {incomplete = Just (pos, inc' ++ inc)}}
 
 setTempHandle :: Handle -> ProverState -> ProverState
 setTempHandle h p@(PSt {tempSave = (name, oldh)}) = p {tempSave = (name, h)}
 
-getLastCommand :: ProverState -> String
-getLastCommand (PSt {lastComm = Just c}) = c
-getLastCommand _ = error "error: getLastCommand, no debería pasar."
+
+getIncompleteComm :: ProverState -> Maybe (EPosition,String)
+getIncompleteComm = incomplete . input
+
+getLineCommands :: ProverState -> [(EPosition,Command)]
+getLineCommands = commands . input
+
+getIncompleteInput :: ProverState -> String
+getIncompleteInput = inp . input
+
 
 getTempFile :: ProverState -> (FilePath, Handle)
 getTempFile (PSt {tempSave = file}) = file

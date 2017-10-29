@@ -5,12 +5,13 @@ import Data.Maybe
 import Data.List (isPrefixOf)
 import qualified Data.Sequence as S
 import Tactics (habitar)
-import Parser (isLoadOrSaveCommand, commandsFromFiles, reservedWords, getCommand)
+import Parser ( isLoadOrSaveCommand, commandsFromFiles, reservedWords
+              , getCommand, getIndividualCommand)
 import Hypothesis (isHypothesis)
 import Text.PrettyPrint (render)
-import PrettyPrinter (help, printLTerm, printProof, printType, printPrintComm,
-                      printPrintAllComm, printTheorem, printLTermWithType,
-                      printCommType)
+import PrettyPrinter ( help, printLTerm, printProof, printType, printPrintComm
+                     , printPrintAllComm, printTheorem, printLTermWithType
+                     , printCommType)
 import Transformers
 import ErrorMsj (printError)
 import TypeInference (basicTypeInference)
@@ -28,12 +29,12 @@ type ProverInputState a = InputT (StateT ProverState IO) a
 
 -- Aborta la prueba.
 abortProof :: ProverInputState ()
-abortProof = lift $ modify $ finishProof
+abortProof = lift $ modify $ deleteProof
                 
 -- Finaliza la prueba.
 reloadProver :: ProverInputState ()
 reloadProver = do s <- lift get
-                  lift $ modify $ finishProof . newLamDefFromProof
+                  lift $ modify $ deleteProof . newLamDefFromProof
 
 -- Guardar el historial de los comandos exitosos.
 saveHistory :: String -> ProverInputState ()
@@ -101,7 +102,8 @@ proverFromFiles files =
      r <- lift $ lift $ commandsFromFiles files
      catch (do commands <- returnInputFromParser r
                --outputStrLn $ show commands
-               checkCommand commands)
+               checkCommands commands
+               proverFromCLI)
        (\e -> outputStrLn (render $ printError (typeDef $ global s) e)
               >> proverFromCLI)
 
@@ -109,29 +111,40 @@ proverFromFiles files =
 checkCommandsLine :: String
                   -> (Maybe (EPosition,String), [(EPosition,CLICommand)], Maybe (EPosition,String))
                   -> ProverInputState ()
-checkCommandsLine input (Nothing, [c], Nothing) =
+checkCommandsLine input (Nothing, [c], Nothing) =  -- Entrada completa
   setLastComm input >>
   checkCliCommand c
-checkCommandsLine input (Nothing, [], Just x) = -- un comando incompleto
+checkCommandsLine input (Nothing, [], Just x) =   -- Un comando incompleto
   addLastComm input >>
   (lift $ modify $ addIncompleteInput x) >>
   proverFromCLI
-checkCommandsLine input (Just (pos, x), cs, Nothing) = -- fin de comando incompleto
+checkCommandsLine input (Nothing, cs, Nothing) =  -- Fin de entrada incompleta
   do addLastComm input
      s <- lift get
-     case getIncompleteComm s of --MEJORAR
-       Just (_,inc) ->
-         do command <- returnInputFromParser $ getCommand (x++inc) (getCounter s)
-            case command of
-              (Nothing, [c], Nothing) -> 
-                checkCommand $ map removeCLI $ cs ++ [c]
-                where removeCLI (pos, x) =
-                        case x of
-                          Escaped _ -> error "error: checkCommandsLine, no debería pasar."
-                          Lang x -> (pos, x)
-              _ -> throwSemanError pos IncompleteCommad
-       Nothing -> throwSemanError pos IncompleteCommad
-         
+     let cs' = getCommands s
+     langCommands cs'
+     langCommands cs
+     lift $ modify $ cleanInput
+     proverFromCLI  
+checkCommandsLine input (Just (pos, x), cs, Nothing) = -- Fin de entrada incompleta
+  do addLastComm input
+     s <- lift get
+     command <- returnInputFromParser $ getIndividualCommand (joinIncompleteComm x s) (snd pos)
+     let cs' = getCommands s
+     langCommands cs'
+     langCommands cs
+     langCommand command
+     lift $ modify $ cleanInput
+     proverFromCLI
+checkCommandsLine input (Just (pos, x), cs, Just (pos', y)) = -- Comandos incompletos
+  do addLastComm input
+     s <- lift get
+     command <- returnInputFromParser $ getIndividualCommand (joinIncompleteComm x s) (snd pos)
+     langCommands cs
+     langCommand command
+     proverFromCLI
+
+
 -- TERMINAR help
 checkCliCommand :: (EPosition, CLICommand) -> ProverInputState ()
 checkCliCommand (_, Escaped Exit) =
@@ -142,7 +155,8 @@ checkCliCommand (_, Escaped Exit) =
           removeFile temp)
      outputStrLn "Saliendo."
 checkCliCommand (_, Escaped Abort) =
-  abortProof >> proverFromCLI
+  abortProof >>
+  proverFromCLI
 checkCliCommand (pos, Escaped (Load files)) =
   do s <- lift get
      when (proofStarted s) $ throwSemanError pos PNotFinished
@@ -150,11 +164,25 @@ checkCliCommand (pos, Escaped (Load files)) =
 checkCliCommand (pos, Escaped (Save file)) =
   do s <- lift get
      when (proofStarted s) $ throwSemanError pos PNotFinished
-     saveHistory file >> proverFromCLI
+     saveHistory file
+     proverFromCLI
 checkCliCommand (_, Escaped Help) =
-  outputStrLn help >> proverFromCLI
+  outputStrLn help >>
+  proverFromCLI
 checkCliCommand (pos, Lang c) =
-  checkCommand [(pos, c)]
+  checkCommands [(pos, c)] >>
+  proverFromCLI
+
+langCommands :: [(EPosition, CLICommand)]
+             -> ProverInputState ()
+langCommands = foldr (\x r -> langCommand x >> r) (return ())
+
+-- Solo procesa un comando del lenguaje.
+langCommand :: (EPosition, CLICommand) -> ProverInputState ()
+langCommand (pos, Lang c) =
+  checkCommands [(pos, c)]
+langCommand (_, Escaped _) =
+  error "error: langCommand, no debería pasar."
 
 
 theoremCommand :: Bool -> EPosition -> String -> Type1 -> ProverInputState ()
@@ -197,25 +225,26 @@ definitionCommand pos name body =
      defCommand pos name body
 
 -- Procesa una táctica. Indica si se ha terminado la prueba
-tacticCommand :: Bool -> EPosition -> Tactic -> ProverInputState (Maybe (String, [String], DoubleType))
+tacticCommand :: Bool -> EPosition -> Tactic -> ProverInputState ()
 tacticCommand printing pos (Print x) =
- do printCommand pos x
-    when printing $ printCommandPrinting x
-    return Nothing
+ printCommand pos x >>
+ (when printing $ printCommandPrinting x)
 tacticCommand printing pos PrintAll =
- do when printing printCommandPrintingAll
-    return Nothing
+ when printing printCommandPrintingAll
 tacticCommand printing pos (Infer x) =
   do (te, ty) <- inferCommand pos x
      when printing $ inferCommandPrinting te ty
-     return Nothing
 tacticCommand printing pos ta =
-  do (hist, op, ty, pc) <- otherTacticsCommand pos ta
-     when printing $ otherTacticsCPrinting op ty pc
-     return ((\(x,y) -> (x,y,ty)) <$> hist)
+  otherTacticsCommand pos ta >>
+  (when printing $ otherTacticsCPrinting)
+
+finishProof :: ProverInputState ()
+finishProof =
+  do s <- lift get
+     when (proofStarted s) $ when (isFinalTerm $ getProofC s) reloadProver
        
 -- Procesa todas las tácticas que no son "Print" ni "Infer".
-otherTacticsCommand :: EPosition -> Tactic -> ProverInputState (Maybe (String, [String]), TypeDefs, DoubleType, ProofConstruction)
+otherTacticsCommand :: EPosition -> Tactic -> ProverInputState ()
 otherTacticsCommand _ (Print _) =
   error "error: otherTacticsCommand, no debería pasar."
 otherTacticsCommand _ (Infer _) =
@@ -227,10 +256,10 @@ otherTacticsCommand pos ta =
          typ = getTypeProof s
      (_ , pc') <- returnInput pos $ runStateExceptions (habitar ta) pc
      lift $ modify $ setProofC pc'
-     teo <- (if isFinalTerm pc'
-              then reloadProver >> (return $ Just $ (theoremName s, getProofCommands s)) 
-              else return Nothing)
-     return (teo, typeDef $ global s, getTypeProof s, pc')
+     -- teo <- (if isFinalTerm pc'
+     --          then reloadProver >> (return $ Just $ (theoremName s, getProofCommands s)) 
+     --          else return Nothing)
+     -- return (teo, typeDef $ global s, getTypeProof s, pc')
 
 printCommand :: EPosition -> String -> ProverInputState ()
 printCommand pos x =
@@ -266,64 +295,80 @@ inferCommandPrinting te ty =
   do s <- lift get
      outputStrLn $ render $ printLTermWithType te ty (typeDef $ global s)
 
-otherTacticsCPrinting :: TypeDefs ->  DoubleType ->  ProofConstruction
-                      -> ProverInputState ()
-otherTacticsCPrinting op ty pc
-  | isFinalTerm pc = outputStrLn $ "Prueba completa.\n" ++
-                     renderLTerm op (getLTermFromProof pc ty)
-  | otherwise = outputStrLn $ renderProof pc
-  
+otherTacticsCPrinting :: ProverInputState ()
+otherTacticsCPrinting =
+  do s <- lift get
+     let (op, ty, pc) = (typeDef $ global s, getTypeProof s, getProofC s)
+     if isFinalTerm pc
+       then outputStrLn $ "Prueba completa.\n" ++
+            renderLTerm op (getLTermFromProof pc ty)
+       else outputStrLn $ renderProof pc
 
--- Tratamiento de los comandos.
-checkCommand :: [(EPosition, Command)] -> ProverInputState ()
-checkCommand [(pos, Tac ta)] =
-  do hist <- tacticCommand True pos ta
-     saveCommand0 hist
-     proverFromCLI
-checkCommand [x] =
-  do checkCommand' True x
-     saveCommand1 (snd x)
-     proverFromCLI
-checkCommand xs =
-  checkCommand'' xs
-
-checkCommand' :: Bool -> (EPosition, Command) -> ProverInputState ()     
-checkCommand' printing (pos, Theorem name ty) =
-  theoremCommand printing pos name ty    
-checkCommand' printing (pos, Tac ta) =
-  do tacticCommand printing pos ta
-     return ()
-checkCommand' _ (pos, Axiom name ty) =
-  axiomCommand pos name ty
-checkCommand' _ (pos, Types ps) =
-  typesVarCommand pos ps
-checkCommand' _ (pos, Definition name body) =
-  definitionCommand pos name body
+-- Tratamiento de comandos.
+checkCommands :: [(EPosition, Command)] -> ProverInputState ()
+checkCommands  [(pos, Tac ta)] =
+  tacticCommand True pos ta >>
+  saveIndCommand0 >>
+  finishProof
+checkCommands [x@(_, Theorem _ _)] =
+  checkIndCommand' True x
+checkCommands [x] =
+  checkIndCommand' True x >>
+  saveIndCommand1
+checkCommands xs =
+  checkCommands' xs
 
 -- Chequeo de comandos dados desde un archivo.
-checkCommand'' :: [(EPosition, Command)] -> ProverInputState ()     
-checkCommand'' [x] =
-  do checkCommand' True x
-     proverFromCLI
-checkCommand'' (x:xs) =
-  do checkCommand' False x
-     checkCommand'' xs
+checkCommands' :: [(EPosition, Command)] -> ProverInputState ()     
+checkCommands' [x] =
+  checkIndCommand' True x
+checkCommands' (x:xs) =
+  checkIndCommand' False x >>
+  checkCommands' xs
+
+-- TERMINAR
+-- Tratamiento de un comando.
+-- checkIndCommand :: (EPosition, Command) -> ProverInputState ()
+-- checkIndCommand  (pos, Tac ta) =
+--   tacticCommand True pos ta
+-- checkIndCommand x =
+--   checkCommands' True x  
+
+checkIndCommand' :: Bool -> (EPosition, Command) -> ProverInputState ()    
+checkIndCommand' printing (pos, Theorem name ty) =
+  theoremCommand printing pos name ty    
+checkIndCommand' printing (pos, Tac ta) =
+  tacticCommand printing pos ta >>
+  finishProof
+checkIndCommand' _ (pos, Axiom name ty) =
+  axiomCommand pos name ty
+checkIndCommand' _ (pos, Types ps) =
+  typesVarCommand pos ps
+checkIndCommand' _ (pos, Definition name body) =
+  definitionCommand pos name body
 
 -- Proceso de guardado. Luego de que se halla ingresado una táctica.
-saveCommand0 :: (Maybe (String, [String], DoubleType)) -> ProverInputState ()
-saveCommand0 (Just (name, proof, ty)) =
+saveIndCommand0 :: ProverInputState ()
+saveIndCommand0 =
   do s <- lift get
-     writeHistory $ render $ printTheorem (typeDef $ global s) name ty (getLastInput s : proof)
-saveCommand0 Nothing =
-     lift $ modify $ addProofCommand
+     when (isInputComplete s) saveIndCommand0'
+     
+saveIndCommand0' :: ProverInputState ()
+saveIndCommand0' =
+  do s <- lift get
+     if proofStarted s
+       then if isFinalTerm $ getProofC s
+            then do let (name, commands, ty) = (theoremName s, getProofCommands s, getTypeProof s)
+                    writeHistory $ render $
+                      printTheorem (typeDef $ global s) name ty (getLastInput s : commands)
+            else lift $ modify $ addProofCommand
+       else writeHistory $ getLastInput s
 
 -- Proceso de guardado. Luego de que NO se halla ingresado una táctica.
-saveCommand1 :: Command -> ProverInputState ()
-saveCommand1 (Theorem _ _) =
-  return ()
-saveCommand1 _ =
+saveIndCommand1 :: ProverInputState ()
+saveIndCommand1 =
   do s <- lift get
-     writeHistory $ getLastInput s
+     when (isInputComplete s) $ writeHistory $ getLastInput s
 
 -- Escribe el/los comando/s al archivo de historial de comandos.
 writeHistory :: String -> ProverInputState ()

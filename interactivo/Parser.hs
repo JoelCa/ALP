@@ -19,6 +19,7 @@ type ProofCommands = Either ProverException [(EPosition, Command)]
 
 type CommandLineCommand = Either ProverException (Maybe (EPosition,String), [(EPosition,CLICommand)], Maybe (EPosition,String))
 
+type CommandLineCommandInd = Either ProverException (EPosition, CLICommand)
 
 interactive :: String
 interactive = "<interactive>"
@@ -121,6 +122,25 @@ getLinePos (SourcePos n l c) = (n, unPos l)
 
 newPosition :: String -> Int -> SourcePos
 newPosition name line = SourcePos name (mkPos line) pos1
+
+getIndividualCommand :: String -> Int -> CommandLineCommandInd
+getIndividualCommand s line =
+  case parse (cliIndWithPosition line) interactive s  of
+    Right x -> Right x
+    Left e -> Left $ SyntaxE  e
+
+cliIndWithPosition :: Int -> Parser (EPosition, CLICommand)
+cliIndWithPosition line =
+  do setPosition (newPosition interactive line)
+     space *> ((\x -> ((interactive, line), x)) <$> cliIndCommand) <* eof
+
+cliIndCommand :: Parser CLICommand
+cliIndCommand = do c <- command
+                   return $ Lang c
+                <|> do ec <- escapedCommand
+                       return $ Escaped ec
+
+
 
 getCommand :: String -> Int -> CommandLineCommand
 getCommand s line =

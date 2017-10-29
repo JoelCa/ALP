@@ -12,13 +12,14 @@ data ProverState = PSt { proof :: Maybe ProofState
                        , global :: GlobalState
                        , tempSave :: (FilePath, Handle)
                        , input :: Input
-                       , cc :: Int                    -- Contador del número de entradas dadas por el usuario.
+                       , cc :: Int                          -- Contador del número de entradas dadas por el usuario.
                        }
                    
   -- Mantiene datos de la entrada del usuario.
-data Input = Inp { inp :: String                            -- Entrada del usuario. 
-                 , commands :: [(EPosition,Command)]        -- Comandos ingresados por el usuario.
-                 , incomplete :: Maybe (EPosition,String)   -- Posible comando incompleto ingresado por el usuario.
+data Input = Inp { inp :: String                            -- Última entrada del usuario.
+                 , isComplete :: Bool                       -- Indica si la última entrada es completa.
+                 , commands :: [(EPosition,CLICommand)]     -- Comandos completos que componen la penúltima entrada incompleta del usuario.
+                 , incomplete :: Maybe (EPosition,String)   -- Posible comando incompleto de la penúltima entrada incompleta del usuario.
                  }
 
   -- Estado de la prueba que se está construyendo.
@@ -49,9 +50,9 @@ getTypeProof (PSt {proof = Just pr}) = types pr
 getTypeProof _ = error "error: getTypeProof, no debería pasar."
 
 
--- Finaliza la prueba.
-finishProof :: ProverState -> ProverState
-finishProof p = p {proof = Nothing}
+-- Borra la prueba.
+deleteProof :: ProverState -> ProverState
+deleteProof p = p {proof = Nothing}
 
 -- La prueba pasa a ser un teorema.
 newLamDefFromProof :: ProverState -> ProverState
@@ -74,7 +75,7 @@ initialProver :: (FilePath, Handle) -> ProverState
 initialProver h = PSt { global = initialGlobal
                       , proof = Nothing
                       , tempSave = h
-                      , input = Inp {inp = [], commands = [], incomplete = Nothing}
+                      , input = Inp {inp = [], isComplete = True, commands = [], incomplete = Nothing}
                       , cc = 0
                       }
 
@@ -90,11 +91,11 @@ theoremName (PSt {proof = Just pr}) = name pr
 theoremName _ = error "error: theoremName, no debería pasar."
 
 setLastInput :: String -> ProverState -> ProverState
-setLastInput x p@(PSt {input = i}) = p {input = i {inp = x}}
+setLastInput x p@(PSt {input = i}) = p {input = i {inp = x, isComplete = True}}
 
 addLastInput :: String -> ProverState -> ProverState
 addLastInput c p@(PSt {input = Inp {inp = x}}) =
-  p {input = (input p) {inp = x ++ c}}
+  p {input = (input p) {inp = x ++ c, isComplete = False}}
 
 getLastInput :: ProverState -> String
 getLastInput p@(PSt {input = Inp {inp = x}}) = x
@@ -116,12 +117,36 @@ setTempHandle h p@(PSt {tempSave = (name, oldh)}) = p {tempSave = (name, h)}
 getIncompleteComm :: ProverState -> Maybe (EPosition,String)
 getIncompleteComm = incomplete . input
 
-getLineCommands :: ProverState -> [(EPosition,Command)]
-getLineCommands = commands . input
+getCommands :: ProverState -> [(EPosition, CLICommand)]
+getCommands = commands . input
 
 getIncompleteInput :: ProverState -> String
 getIncompleteInput = inp . input
 
+joinIncompleteComm :: String -> ProverState -> String
+joinIncompleteComm x (PSt {input = Inp {incomplete = y}}) =
+  case y of
+    Just (_,inc) -> inc ++ x
+    Nothing -> x
+
+addCommands :: [(EPosition,CLICommand)] -> ProverState -> ProverState
+addCommands xs p@(PSt {input = Inp {commands = ys}}) =
+  p {input = (input p) {commands = ys ++ xs}}
+
+cleanCommands :: ProverState -> ProverState
+cleanCommands p = p {input = (input p) {commands = []}}
+
+cleanIncCommand :: ProverState -> ProverState
+cleanIncCommand p = p {input = (input p) {incomplete = Nothing}}
+
+cleanLastInput :: ProverState -> ProverState
+cleanLastInput p = p {input = (input p) {inp = [], isComplete = True}}
+
+cleanInput :: ProverState -> ProverState
+cleanInput = cleanIncCommand . cleanCommands . cleanLastInput 
+
+isInputComplete :: ProverState -> Bool
+isInputComplete = isComplete . input
 
 getTempFile :: ProverState -> (FilePath, Handle)
 getTempFile (PSt {tempSave = file}) = file

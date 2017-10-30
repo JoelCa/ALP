@@ -179,6 +179,8 @@ El parser interactivo, solo acepta de a un comando por vez.
 
 
 HACER:
+- Chequear que pasa si hacemos load de un archivo con un solo comando, y luego hacemos
+save.
 - Añadir mensajes de éxito.
 - Tomar comandos incompletos desde el input.
 - Mostrar estado de la prueba, si se carga de un archivo una prueba incompleta.

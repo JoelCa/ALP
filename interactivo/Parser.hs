@@ -17,9 +17,9 @@ type Parser = Parsec Void String
 
 type ProofCommands = Either ProverException [(EPosition, Command)]
 
-type CommandLineCommand = Either ProverException (Maybe (EPosition,String), [(EPosition,CLICommand)], Maybe (EPosition,String))
+type CommandLineCommand = Either ProverException (Maybe (EPosition,String), [(EPosition,String,CLICommand)], Maybe (EPosition,String))
 
-type CommandLineCommandInd = Either ProverException (EPosition, CLICommand)
+type CommandLineCommandInd = Either ProverException (EPosition, String, CLICommand)
 
 interactive :: String
 interactive = "<interactive>"
@@ -114,8 +114,11 @@ commands = many ((\x y -> (x,y)) <$> (getLinePos <$> getPosition) <*> command)
 --                       return xs)
 --   where p = (\x y -> (x,y)) <$> (getLinePos <$> getPosition) <*> command
 
-commandsLine :: EPosition -> Parser [(EPosition, Command)]
-commandsLine pos = many $ try ((\x -> (pos,x)) <$> command) 
+commandsLine :: EPosition -> Parser [(EPosition, String, Command)]
+commandsLine pos = many $ try ((\(x,y) -> (pos,x,y)) <$> p)
+  where p = do s <- lookAhead $ commandInput
+               c <- command
+               return (s,c)
 
 getLinePos :: SourcePos -> EPosition
 getLinePos (SourcePos n l c) = (n, unPos l)
@@ -129,18 +132,17 @@ getIndividualCommand s line =
     Right x -> Right x
     Left e -> Left $ SyntaxE  e
 
-cliIndWithPosition :: Int -> Parser (EPosition, CLICommand)
+cliIndWithPosition :: Int -> Parser (EPosition, String, CLICommand)
 cliIndWithPosition line =
   do setPosition (newPosition interactive line)
-     space *> ((\x -> ((interactive, line), x)) <$> cliIndCommand) <* eof
+     space *> ((\(x,y) -> ((interactive, line), x, y)) <$> cliIndCommand) <* eof
 
-cliIndCommand :: Parser CLICommand
-cliIndCommand = do c <- command
-                   return $ Lang c
+cliIndCommand :: Parser (String, CLICommand)
+cliIndCommand = do s <- lookAhead $ commandInput
+                   c <- command
+                   return $ (s, Lang c)
                 <|> do ec <- escapedCommand
-                       return $ Escaped ec
-
-
+                       return $ ("", Escaped ec)
 
 getCommand :: String -> Int -> CommandLineCommand
 getCommand s line =
@@ -148,17 +150,17 @@ getCommand s line =
     Right x -> Right x
     Left e -> Left $ SyntaxE  e
 
-cliWithPosition :: Int -> Parser (Maybe (EPosition,String), [(EPosition,CLICommand)], Maybe (EPosition,String))
+cliWithPosition :: Int -> Parser (Maybe (EPosition,String), [(EPosition,String,CLICommand)], Maybe (EPosition,String))
 cliWithPosition line =
   do setPosition (newPosition interactive line)
      lexeme space *> cliCommand <* eof
 
-cliCommand :: Parser (Maybe (EPosition,String), [(EPosition,CLICommand)], Maybe (EPosition,String))
+cliCommand :: Parser (Maybe (EPosition,String), [(EPosition,String,CLICommand)], Maybe (EPosition,String))
 cliCommand = do pos <- getLinePos <$> getPosition
                 (do ec <- escapedCommand
-                    return (Nothing, [(pos,Escaped ec)], Nothing)
+                    return (Nothing, [(pos,"",Escaped ec)], Nothing)
                  <|> do (x,cs,y)  <- langCommands pos
-                        return (x, map (\(x,y) -> (x,Lang y)) cs, y))
+                        return (x, map (\(x,y,z) -> (x,y,Lang z)) cs, y))  --VER
               
 
 testeo :: Show a => Parser a -> String -> IO ()
@@ -170,7 +172,7 @@ testeo p s = case parse p "" s of
 -- 1. Posible comando incompleto, terminado con un punto.
 -- 2. Comandos completos.
 -- 3. Posible comando incompleto, NO terminado por un punto.
-langCommands :: EPosition -> Parser (Maybe (EPosition,String), [(EPosition,Command)], Maybe (EPosition,String))
+langCommands :: EPosition -> Parser (Maybe (EPosition,String), [(EPosition,String,Command)], Maybe (EPosition,String))
 langCommands pos =
   do (pre, cs) <- lexeme space *> langCommands' pos
      space
@@ -186,16 +188,17 @@ langCommands pos =
                       unexpected EndOfInput
                    <|> return r) 
 
-langCommands' :: EPosition -> Parser (Maybe (EPosition,String), [(EPosition,Command)])
+langCommands' :: EPosition -> Parser (Maybe (EPosition,String), [(EPosition,String,Command)])
 langCommands' pos =
   do x <- initial
      cs <- commandsLine pos
      case x of
-       Just (Left y) -> return (Nothing, (pos,y):cs)
+       Just (Left (s,y)) -> return (Nothing, (pos,s,y):cs)
        Just (Right z) -> return (Just (pos,z), cs)
        Nothing -> return (Nothing, cs)
-  where initial = do c <- try $ command
-                     return $ Just $ Left c
+  where initial = do s <- lookAhead $ commandInput
+                     c <- try $ command
+                     return $ Just $ Left (s,c)
                   <|> do ic <- try $ incompleteCommand0
                          return $ Just $ Right ic
                   <|> return Nothing
@@ -230,6 +233,28 @@ incompleteCommand1 =
              else do rest <- incompleteCommand1
                      return $ c ++ rest)
 
+commandInput :: Parser String
+commandInput =
+  do c <- takeWhileP Nothing (\x -> (x /= '.') && (x /= '('))
+     (do string "(*"
+         c' <- commandInput'
+         c'' <- commandInput
+         return $ c ++ "(*" ++ c' ++ c''
+      <|> do char '.'
+             return $ c ++ "." 
+      <|> do char '('
+             c' <- commandInput
+             return $ c ++ "(" ++ c')
+
+commandInput' :: Parser String
+commandInput' =
+  do c <- takeWhileP Nothing (\x -> (x /= '*'))
+     (do string "*)"
+         return $ c ++ "*)"
+      <|> do char '*'
+             c' <- commandInput'
+             return $ c ++ "*" ++ c')
+  
 
 -- incompleteCommand :: Parser String
 -- incompleteCommand =

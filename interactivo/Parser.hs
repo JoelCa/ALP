@@ -226,10 +226,10 @@ incompleteCommand1 =
          unexpected EndOfInput
       <|> do char '('
              rest <- incompleteCommand1
-             return $ c ++ ['('] ++ rest
+             return $ c ++ "(" ++ rest
       <|> do end <- atEnd
              if end
-             then return c
+             then return $ c ++ " "
              else do rest <- incompleteCommand1
                      return $ c ++ rest)
 

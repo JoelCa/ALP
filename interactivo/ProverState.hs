@@ -19,6 +19,7 @@ data ProverState = PSt { proof :: Maybe ProofState
 data Input = Inp { commands :: [(EPosition,String,CLICommand)]  -- Comandos completos que componen la penúltima entrada incompleta del usuario.
                  , incomplete :: Maybe (EPosition,String)       -- Posible comando incompleto de la penúltima entrada incompleta del usuario.
                  }
+             deriving Show
 
   -- Estado de la prueba que se está construyendo.
 data ProofState = PState { name :: String

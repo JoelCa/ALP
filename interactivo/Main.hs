@@ -77,6 +77,7 @@ proverFromCLI :: ProverInputState ()
 proverFromCLI =
   do lift $ modify addCount
      s <- lift get
+     outputStrLn $ "CLI " ++ (show $ input s)
      minput <- getInputLine $ prompt s
      case minput of
        Nothing -> return ()
@@ -84,8 +85,9 @@ proverFromCLI =
        Just x ->
          catch (do command <- returnInputFromParser $ getCommand x (getCounter s)
                    checkCommandsLine command)
-         (\e -> outputStrLn (render $ printError (typeDef $ global s) e)
-                >> proverFromCLI)
+         (\e -> outputStrLn (render $ printError (typeDef $ global s) e) >>
+                (lift $ modify $ cleanInput) >>
+                proverFromCLI)
 
 proverFromFiles :: [String] -> ProverInputState ()
 proverFromFiles files =
@@ -101,32 +103,27 @@ proverFromFiles files =
 --TERMINAR
 checkCommandsLine :: (Maybe (EPosition,String), [(EPosition,String,CLICommand)], Maybe (EPosition,String))
                   -> ProverInputState ()
-checkCommandsLine (Nothing, [c], Nothing) =  -- Entrada completa
+checkCommandsLine (Nothing, [c], Nothing) =        -- Entrada completa "simple"
   checkCliCommand c
-checkCommandsLine (Nothing, [], Just x) =   -- Un comando incompleto
-  (lift $ modify $ addIncompleteInput x) >>
+checkCommandsLine (Nothing, cs, Nothing) =         -- Entrada completa "compuesta"
+  langCommands cs >>
+  proverFromCLI  
+checkCommandsLine (Nothing, cs, Just ic) =         -- Inicio de una entrada incompleta
+  (lift $ modify $ (addIncompleteInput ic) . (addCommands cs)) >>
   proverFromCLI
-checkCommandsLine (Nothing, cs, Nothing) =  -- Fin de entrada incompleta
-  do s <- lift get
-     let cs' = getCommands s
-     langCommands cs'
-     langCommands cs
-     lift $ modify $ cleanInput
-     proverFromCLI  
-checkCommandsLine (Just (pos, x), cs, Nothing) = -- Fin de entrada incompleta
+checkCommandsLine (Just (pos, x), cs, Just ic) =   -- Entrada incompleta
   do s <- lift get
      command <- returnInputFromParser $ getIndividualCommand (joinIncompleteComm x s) (snd pos)
-     let cs' = getCommands s
-     langCommands cs'
-     langCommands cs
-     langCommand command
-     lift $ modify $ cleanInput
+     lift $ modify $ (addIncompleteInput ic) . (addCommands $ command : cs)
      proverFromCLI
-checkCommandsLine (Just (pos, x), cs, Just (pos', y)) = -- Comandos incompletos
+checkCommandsLine (Just (pos, x), cs, Nothing) =   -- Fin de entrada incompleta
   do s <- lift get
      command <- returnInputFromParser $ getIndividualCommand (joinIncompleteComm x s) (snd pos)
-     langCommands cs
+     let cs' = getCommands s
+     langCommands cs'
      langCommand command
+     langCommands cs
+     lift $ modify $ cleanInput
      proverFromCLI
 
 -- TERMINAR help

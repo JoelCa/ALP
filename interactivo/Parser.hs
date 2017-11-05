@@ -29,7 +29,7 @@ reservedWords = ["Propositions", "Types", "Theorem", "Axiom", "Print", "Check", 
                  "left", "right", "apply", "elim", "absurd", "cut", "unfold", "exact",
                  ":load", ":abort", ":quit", ":help", ":save", ":l", ":a", ":q", ":h", ":s"]
 
-reservedSymbols = ["=", "->", ":", "//", "/*", "*/"] --, and_id, or_id, iff_id, not_id]
+reservedSymbols = ["=", "->", ":", "(*", "*)", ".", ";"] --, and_id, or_id, iff_id, not_id]
 
 sc :: Parser ()
 sc = L.space space1 empty blockCmnt
@@ -60,6 +60,9 @@ comma = symbol ","
 
 colon :: Parser String
 colon = symbol ":"
+
+semicolon :: Parser String
+semicolon = symbol ";"
 
 dot :: Parser String
 dot = symbol "."
@@ -138,7 +141,7 @@ cliIndWithPosition line =
      space *> ((\(x,y) -> ((interactive, line), x, y)) <$> cliIndCommand) <* eof
 
 cliIndCommand :: Parser (String, CLICommand)
-cliIndCommand = do s <- lookAhead $ commandInput
+cliIndCommand = do s <- lookAhead $ commandInput  -- try?
                    c <- command
                    return $ (s, Lang c)
                 <|> do ec <- escapedCommand
@@ -182,11 +185,11 @@ langCommands pos =
        else (do --satisfy (\x -> x /= '.') <?> "comando"
                 post <- incompleteCommand1
                 return (pre, cs, Just (pos,post)))
-       where resto =
-               do r <- lexeme $ takeWhileP Nothing (\x -> x /= '.')
-                  (do dot
-                      unexpected EndOfInput
-                   <|> return r) 
+       -- where resto =
+       --         do r <- lexeme $ takeWhileP Nothing (\x -> x /= '.')
+       --            (do dot
+       --                unexpected EndOfInput
+       --             <|> return r) 
 
 langCommands' :: EPosition -> Parser (Maybe (EPosition,String), [(EPosition,String,Command)])
 langCommands' pos =
@@ -196,7 +199,7 @@ langCommands' pos =
        Just (Left (s,y)) -> return (Nothing, (pos,s,y):cs)
        Just (Right z) -> return (Just (pos,z), cs)
        Nothing -> return (Nothing, cs)
-  where initial = do s <- lookAhead $ commandInput
+  where initial = do s <- try $ lookAhead $ commandInput
                      c <- try $ command
                      return $ Just $ Left (s,c)
                   <|> do ic <- try $ incompleteCommand0
@@ -207,12 +210,12 @@ langCommands' pos =
 -- los comentarios.
 incompleteCommand0 :: Parser String
 incompleteCommand0 =
-  do c <- lexeme $ takeWhileP Nothing (\x -> (x /= '.') && (x /= '('))
-     (do dot
-         return $ c ++ ['.']
+  do c <- lexeme $ takeWhileP Nothing (\x -> (x /= ';') && (x /= '('))
+     (do semicolon
+         return $ c ++ ";"
       <|> do char '('
              rest <- incompleteCommand0
-             return $ c ++ ['('] ++ rest
+             return $ c ++ "(" ++ rest
       <|> do end <- atEnd
              if end
              then unexpected EndOfInput
@@ -221,8 +224,8 @@ incompleteCommand0 =
 
 incompleteCommand1 :: Parser String
 incompleteCommand1 =
-  do c <- lexeme $ takeWhileP Nothing (\x -> (x /= '.') && (x /= '('))
-     (do dot
+  do c <- lexeme $ takeWhileP Nothing (\x -> (x /= ';') && (x /= '('))
+     (do semicolon
          unexpected EndOfInput
       <|> do char '('
              rest <- incompleteCommand1
@@ -235,13 +238,13 @@ incompleteCommand1 =
 
 commandInput :: Parser String
 commandInput =
-  do c <- takeWhileP Nothing (\x -> (x /= '.') && (x /= '('))
+  do c <- takeWhileP Nothing (\x -> (x /= ';') && (x /= '('))
      (do string "(*"
          c' <- commandInput'
          c'' <- commandInput
          return $ c ++ "(*" ++ c' ++ c''
-      <|> do char '.'
-             return $ c ++ "." 
+      <|> do char ';'
+             return $ c ++ ";" 
       <|> do char '('
              c' <- commandInput
              return $ c ++ "(" ++ c')
@@ -276,17 +279,17 @@ command = do rword "Theorem"
              name <- identifier
              colon
              t <- typeTerm
-             dot
+             semicolon
              return $ Theorem name t
          <|> do rword "Axiom"
                 name <- identifier
                 colon
                 t <- typeTerm
-                dot
+                semicolon
                 return $ Axiom name t
          <|> do rword "Propositions" <|> rword "Types"
                 ps <- sepByCommaSeq identifier
-                dot
+                semicolon
                 return $ Types ps
          <|> try (do tac <- tactic
                      return $ Tac tac)
@@ -553,7 +556,7 @@ existsP = tacticType1Arg "exists" CExists
 printAllP :: Parser Tactic
 printAllP = do rword "Print"
                symbol "_"
-               dot
+               semicolon
                return PrintAll
 
 unfoldP :: Parser Tactic
@@ -562,9 +565,9 @@ unfoldP = do rword "unfold"
              (do rword "in"
                  char 'H'
                  h <- nat
-                 dot
+                 semicolon
                  return $ Unfold op $ Just h
-              <|> do dot
+              <|> do semicolon
                      return $ Unfold op Nothing)
 
 exactP :: Parser Tactic
@@ -575,19 +578,19 @@ exactP = do rword "exact"
                              return $ LamT te)
                  <|> do ty <- typeTerm
                         return $ T ty
-            dot
+            semicolon
             return $ Exact r
 
 -- Funciones auxiliares para el parser de las tácticas.
 tacticZeroArg :: String -> Tactic -> Parser Tactic
 tacticZeroArg s tac = do rword s
-                         dot
+                         semicolon
                          return tac
 
 tacticOneArg :: Parser a -> String -> (a -> Tactic) -> Parser Tactic
 tacticOneArg p s tac = do rword s
                           arg <- p
-                          dot
+                          semicolon
                           return $ tac arg
 
 tacticIdentArg :: String -> (String -> Tactic) -> Parser Tactic
@@ -606,31 +609,31 @@ definition :: Parser (String, BodyDef)
 definition = do x <- identifier
                 (try (equal >>
                        (try (do ap <- ambiguousApp
-                                dot
+                                semicolon
                                 return (x, Ambiguous ap)))
                         <|> do lt <- lambTerm
-                               dot
+                               semicolon
                                return (x, LTerm lt))
                  <|> try (do (n, xs) <- seqReverseOrd0 identifier
                              equal
                              t <- typeTerm
-                             dot
+                             semicolon
                              return (x, Type ((t, xs), n, False)))
                  <|> do y <- symbolIdent
                         z <- identifier
                         equal
                         t <- typeTerm
-                        dot
+                        semicolon
                         return (y, Type ((t, S.fromList [z, x]), 2, True)))
                  <|> do colon
                         t <- typeTerm
-                        dot
+                        semicolon
                         return (x, EmptyLTerm t)
              <|> do name <- symbolIdent
                     (n, xs) <- seqReverseOrd1 identifier
                     equal
                     t <- typeTerm
-                    dot
+                    semicolon
                     return (name, Type ((t, xs), n, False))
 
 --------------------------------------------------------------------------------------

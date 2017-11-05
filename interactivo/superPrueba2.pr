@@ -1,0 +1,17 @@
+(* Cargar previamente "prueba44.pr" *)
+
+qqq = \t.\x:t.intro_and [t] [t] x x;
+Theorem t56 : forall w, w -> (w /\ w) /\ (w -> w);
+  intros;
+  exact (intro_and [w /\ w] [w -> w] (qqq [w] H1) (\f:w.f));
+algo w = forall x, w -> w;
+Theorem t57 : forall a, a -> algo a;
+  intros;
+  unfold algo;
+  intros;
+  Print _;
+
+(*  assumption;
+Theorem t58 : forall x, forall y, y -> y;
+  intros;
+  assumption; *)

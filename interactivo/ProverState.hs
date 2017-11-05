@@ -100,7 +100,7 @@ theoremName _ = error "error: theoremName, no debería pasar."
 -- getLastInput p@(PSt {input = Inp {inp = x}}) = x
 
 addInput :: String -> ProverState -> ProverState
-addInput input p@(PSt {proof = Just pr}) = p {proof = Just $ pr {history = history pr ++ [input]}}
+addInput input p@(PSt {proof = Just pr}) = p {proof = Just $ pr {history = input : history pr}}
 addInput _ p@(PSt {proof = Nothing}) = error "error: addProofCommand, no debería pasar"
 
 addIncompleteInput :: (EPosition,String) -> ProverState -> ProverState
@@ -144,8 +144,9 @@ cleanIncCommand p = p {input = (input p) {incomplete = Nothing}}
 cleanInput :: ProverState -> ProverState
 cleanInput = cleanIncCommand . cleanCommands
 
--- isInputComplete :: ProverState -> Bool
--- isInputComplete = isComplete . input
+isIncompleteInp :: ProverState -> Bool
+isIncompleteInp (PSt {input = Inp {incomplete = Just _}}) = True
+isIncompleteInp _ = False
 
 getTempFile :: ProverState -> (FilePath, Handle)
 getTempFile (PSt {tempSave = file}) = file

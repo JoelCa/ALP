@@ -29,12 +29,11 @@ type ProverInputState a = InputT (StateT ProverState IO) a
 
 -- Aborta la prueba.
 abortProof :: ProverInputState ()
-abortProof = lift $ modify $ deleteProof
+abortProof = lift $ modify $ cleanInput . deleteProof
                 
 -- Finaliza la prueba.
 reloadProver :: ProverInputState ()
-reloadProver = do s <- lift get
-                  lift $ modify $ deleteProof . newLamDefFromProof
+reloadProver = lift $ modify $ cleanInput . deleteProof . newLamDefFromProof
 
 -- Guardar el historial de los comandos exitosos.
 saveHistory :: String -> ProverInputState ()
@@ -66,9 +65,14 @@ settings = Settings { historyFile = Nothing
                     }
 
 prompt :: ProverState -> String
-prompt s = if proofStarted s
-           then theoremName s ++ " < "
-           else "> "
+prompt s
+  | proofStarted s = theoremName s ++
+                     if isIncompleteInp s
+                     then "<* "
+                     else "< "
+  | otherwise = if isIncompleteInp s
+                then ">* "
+                else "> "
 
 startProver :: ProverInputState ()
 startProver = proverFromFiles ["Prelude.pr"] 
@@ -77,7 +81,7 @@ proverFromCLI :: ProverInputState ()
 proverFromCLI =
   do lift $ modify addCount
      s <- lift get
-     outputStrLn $ "CLI " ++ (show $ input s)
+     --outputStrLn $ "CLI " ++ (show $ input s)
      minput <- getInputLine $ prompt s
      case minput of
        Nothing -> return ()
@@ -100,7 +104,6 @@ proverFromFiles files =
        (\e -> outputStrLn (render $ printError (typeDef $ global s) e)
               >> proverFromCLI)
 
---TERMINAR
 checkCommandsLine :: (Maybe (EPosition,String), [(EPosition,String,CLICommand)], Maybe (EPosition,String))
                   -> ProverInputState ()
 checkCommandsLine (Nothing, [c], Nothing) =        -- Entrada completa "simple"
@@ -137,6 +140,7 @@ checkCliCommand (_, _, Escaped Exit) =
      outputStrLn "Saliendo."
 checkCliCommand (_, _, Escaped Abort) =
   abortProof >>
+  outputStrLn "Prueba abortada." >>
   proverFromCLI
 checkCliCommand (pos, _, Escaped (Load files)) =
   do s <- lift get

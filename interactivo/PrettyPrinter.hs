@@ -481,7 +481,7 @@ printTheorem td name t xs =
   text name <+>
   text ":" <+>
   printType td t <>
-  text "." $$
+  text ";" $$
   nest 2 (printTactics xs)
   
 printTactics :: [String] -> Doc

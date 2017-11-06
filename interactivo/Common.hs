@@ -96,7 +96,7 @@ type FTypeVar = TypeVar
 type FTypeContext = Seq FTypeVar
 
 
-  --Comandos del lenguaje.
+  --Comandos del lenguaje de prueba.
 data Command = Theorem String Type1
              | Axiom String Type1
              | Tac Tactic
@@ -104,8 +104,8 @@ data Command = Theorem String Type1
              | Definition String BodyDef
              deriving (Show)
 
-  -- Comandos de la línea de comandos
-data CLICommand = Escaped ECommand
+  -- Comandos extendidos. 
+data ExtCommand = Escaped ECommand
                 | Lang Command
                 deriving (Show)
 
@@ -116,10 +116,27 @@ data ECommand = Exit
               | Help
               deriving (Show)
 
+  -- Comandos provenientes de la línea de comandos
+data CLICommands = Simple PExtComm
+                 | Compound PCompoundCommand
+                 deriving (Show)
 
-data TInput = Complete String
-            | Incomplete String
-            deriving (Show)
+type PCommand = (EPosition, Command)
+
+type PCommandWithInput a = (EPosition, String, a)
+
+type PExtComm = PCommandWithInput ExtCommand
+
+type PComm = PCommandWithInput Command
+
+type PIncompleteComm = (EPosition, String)
+
+-- Comando compuesto, donde:
+-- 1. Posible comando incompleto, que precede a los comandos completos.
+-- 2. Comandos completos.
+-- 3. Posible comando incompleto, que sucede a los comandos completos.
+type PCompoundCommand = (Maybe PIncompleteComm, [PComm], Maybe PIncompleteComm)
+
 
 data BodyDef = LTerm LTerm1
              | EmptyLTerm Type1
@@ -157,11 +174,11 @@ data SemanticException = PNotFinished | PNotStarted | ExistE String
                        | NotExistE String | AssuE
                        | IntroE1 | ApplyE1 DoubleType DoubleType | HypoE Int
                        | Unif1 | Unif2 | Unif3 | Unif4
-                       | ElimE1 | CommandInvalid | TypeRepeated String
+                       | ElimE1 | InvalidCommand | TypeRepeated String
                        | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 DoubleType
                        | ExactE2 DoubleType | ExactE3 | PSE | EmptyType | TypeE String
                        | InferE DoubleLTerm InferException | UnfoldE1 String
-                       | TermVarE String | TypeVarE String | IncompleteCommad
+                       | TermVarE String | TypeVarE String
                        deriving (Show, Typeable)
 
 data PException a = SemanticE a

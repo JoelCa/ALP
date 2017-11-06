@@ -62,8 +62,8 @@ habitar CLeft =
                  modifyTerm $ addHT (\x -> ((LVar ("intro_or1", Free "intro_or1"))
                                              :!: t1 :!: t2)
                                            :@: x)
-         else throw CommandInvalid
-       _ -> throw CommandInvalid
+         else throw InvalidCommand
+       _ -> throw InvalidCommand
 habitar CRight =
   do x <- getType
      case x of
@@ -73,8 +73,8 @@ habitar CRight =
                  modifyTerm $ addHT (\x -> ((LVar ("intro_or2", Free "intro_or2"))
                                              :!: t1 :!: t2)
                                            :@: x)
-         else throw CommandInvalid
-       _ -> throw CommandInvalid
+         else throw InvalidCommand
+       _ -> throw InvalidCommand
 habitar Split =
   do x <- getType
      case x of
@@ -84,8 +84,8 @@ habitar Split =
                  modifyTerm $ addDHT (\x y -> ((LVar ("intro_and", Free "intro_and"))
                                                 :!: t1 :!: t2)
                                               :@: x :@: y)
-         else throw CommandInvalid
-       _ -> throw CommandInvalid
+         else throw InvalidCommand
+       _ -> throw InvalidCommand
 habitar (Exact (LamT te)) =
   do x <- getType
      tt <- maybeToProof EmptyType x
@@ -159,8 +159,8 @@ habitar (Absurd ty) =
                  modifyTerm $ addDHT (\x y -> ((LVar ("intro_bottom", Free "intro_bottom"))
                                                 :!: tty)
                                               :@: x :@: y)
-         else throw CommandInvalid
-       _ -> throw CommandInvalid
+         else throw InvalidCommand
+       _ -> throw InvalidCommand
 habitar (CExists ty) =
   do x <- getType
      case x of
@@ -173,7 +173,7 @@ habitar (CExists ty) =
             ty' <- eitherToProof $ renamedType2 btc c ftc op ld ty
             replaceType $ typeSubs 1 btc ftc op ld t [ty']
             modifyTerm $ addHT (\x -> EPack ty' x tt)
-       _ -> throw CommandInvalid
+       _ -> throw InvalidCommand
 habitar (Cut ty) =
   do x <- getType
      t <- maybeToProof EmptyType x

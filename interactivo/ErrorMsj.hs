@@ -64,7 +64,7 @@ errorMessage _ Unif4 =
   text "error: unificación inválida 4."
 errorMessage _ ElimE1 =
   text "error: comando elim mal aplicado."
-errorMessage _ CommandInvalid =
+errorMessage _ InvalidCommand =
   text "error: comando inválido."
 errorMessage _ EmptyType =
   text "error: comando inválido. Debe ingresar un tipo."
@@ -122,9 +122,6 @@ errorMessage _ (HypoE i) =
   text "error: la hipótesis" <+>
   quotes (text $ printHypo i) <+>
   text "no existe."
-errorMessage _ IncompleteCommad =
-  text "error: comando incompleto inválido."
-
   
 errorInfer :: TypeDefs -> InferException -> Doc
 errorInfer _ (InferE1 x) =

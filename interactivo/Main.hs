@@ -111,6 +111,9 @@ proverFromFiles files =
               >> proverFromCLI)
 
 --------------------------------------------------------------------------------------
+msjDefOk :: String -> String
+msjDefOk name = "'" ++ name ++ "' cargado" 
+
 
 checkCommandsLine :: CLICommands -> ProverInputState ()
 checkCommandsLine (Simple c) = checkSimpleCommand c
@@ -204,16 +207,19 @@ checkIndCommand (pos, s, x) =
 -- Tratamiento de un comando, sin añadirlo al historial.
 checkIndCommand' :: Bool -> EPosition -> Command -> ProverInputState ()    
 checkIndCommand' printing pos (Theorem name ty) =
-  theoremCommand printing pos name ty    
+  theoremCommand printing pos name ty >>
+  (outputStrLn $ msjDefOk name)
 checkIndCommand' printing pos (Tac ta) =
   tacticCommand printing pos ta >>
   finishProof
 checkIndCommand' _ pos (Axiom name ty) =
-  axiomCommand pos name ty
+  axiomCommand pos name ty >>
+  (outputStrLn $ msjDefOk name)
 checkIndCommand' _ pos (Types ps) =
   typesVarCommand pos ps
 checkIndCommand' _ pos (Definition name body) =
-  definitionCommand pos name body
+  definitionCommand pos name body >>
+  (outputStrLn $ msjDefOk name)
      
 -- Proceso de guardado. Luego de que se halla ingresado una táctica.
 saveIndCommand0 :: String -> ProverInputState ()

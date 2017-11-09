@@ -178,9 +178,9 @@ langCommands' pos =
        Just (Left (s,y)) -> return (Nothing, (pos,s,y):cs)
        Just (Right z) -> return (Just (pos,z), cs)
        Nothing -> return (Nothing, cs)
-  where initial = do s <- try $ lookAhead $ commandInput
-                     c <- try $ command
-                     return $ Just $ Left (s,c)
+  where initial = try (do s <- lookAhead $ commandInput
+                          c <- command
+                          return $ Just $ Left (s,c))
                   <|> do ic <- try $ incompleteCommand0
                          return $ Just $ Right ic
                   <|> return Nothing
@@ -424,7 +424,7 @@ addArgs (TVar op) xs = RenamedType op xs
 addArgs (RenamedType op ys) xs = RenamedType op (ys ++ xs)
 
 
--- Añade el parser de una operación infija.
+-- Retorna el parser de una operación infija.
 infixP :: String -> (Type1 -> Type1 -> Type1)
        -> Parser Type1 -> Parser Type1
 infixP s c p = do u <- p

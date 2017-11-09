@@ -16,6 +16,7 @@ Para ejecutar mi programa, sin ello daba error.
 
 Además es necesario tener el paquete containers con una versión superior o igual a la 0.5.8 
 
+Es posible "instalar" el programa con stack. Yo utilizé stack 1.5.1, con cabal 2.0.0.0
 
 Observaciones
 -------------

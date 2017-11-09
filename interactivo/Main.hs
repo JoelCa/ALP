@@ -23,6 +23,7 @@ import TypeDefinition (TypeDefs, showTypeTable) -- SACAR SHOW
 import LambdaTermDefinition (showLamTable) -- QUITAR
 import System.IO (hClose, openTempFile, hPutStrLn, openFile, IOMode (AppendMode))
 import System.Directory (getCurrentDirectory, copyFile, removeFile)
+import Data.List (intercalate)
 
 type ProverInputState a = InputT (StateT ProverState IO) a
 
@@ -106,11 +107,18 @@ proverFromFiles files =
      catch (do commands <- returnInputFromParser r
                --outputStrLn $ show commands
                checkCommands commands
+               msjFilesOk files
                proverFromCLI)
        (\e -> outputStrLn (render $ printError (typeDef $ global s) e)
               >> proverFromCLI)
 
 --------------------------------------------------------------------------------------
+
+msjFilesOk :: [String] -> ProverInputState ()
+msjFilesOk files =
+  outputStrLn $
+  "Archivos cargados: " ++ intercalate ", " files
+
 
 checkCommandsLine :: CLICommands -> ProverInputState ()
 checkCommandsLine (Simple c) = checkSimpleCommand c
@@ -181,8 +189,9 @@ checkSimpleCommand (pos, s, Lang c) =
 --------------------------------------------------------------------------------------
 
 -- Tratamiento de comandos dados desde un archivo.
--- VER. Que pasa cuando el archivo tiene un solo comando?
 checkCommands :: [PCommand] -> ProverInputState ()
+checkCommands [] =
+  return () 
 checkCommands [(pos, x)] =
   checkIndCommand' True pos x
 checkCommands ((pos, x):xs) =

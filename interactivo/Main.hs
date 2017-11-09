@@ -80,10 +80,6 @@ prompt s
                 then ">* "
                 else "> "
 
-startProver :: ProverInputState ()
-startProver = proverFromFiles ["Prelude.pr"] 
-
-
 proverFromCLI :: ProverInputState ()
 proverFromCLI =
   do lift $ modify addCount
@@ -100,6 +96,18 @@ proverFromCLI =
                 (lift $ modify $ cleanInput) >>
                 proverFromCLI)
 
+prelude = "Prelude.pr"
+
+startProver :: ProverInputState ()
+startProver =
+  do s <- lift get
+     r <- lift $ lift $ commandsFromFiles [prelude]
+     catch (do commands <- returnInputFromParser r
+               checkPreludeCommands commands
+               proverFromCLI)
+       (\e -> outputStrLn (render $ printError (typeDef $ global s) e))
+
+
 proverFromFiles :: [String] -> ProverInputState ()
 proverFromFiles files =
   do s <- lift get
@@ -114,8 +122,7 @@ proverFromFiles files =
 
 --------------------------------------------------------------------------------------
 msjDefOk :: String -> String
-msjDefOk name = "'" ++ name ++ "' cargado" 
-
+msjDefOk name = "'" ++ name ++ "' definido" 
 
 msjFilesOk :: [String] -> ProverInputState ()
 msjFilesOk files =
@@ -191,6 +198,17 @@ checkSimpleCommand (pos, s, Lang c) =
 
 --------------------------------------------------------------------------------------
 
+-- Tratramiento de los comandos del preludio.
+checkPreludeCommands :: [PCommand] -> ProverInputState ()
+checkPreludeCommands [] =
+  return () 
+checkPreludeCommands [(pos, x)] =
+  checkIndCommand' False pos x
+checkPreludeCommands ((pos, x):xs) =
+  checkIndCommand' False pos x >>
+  checkPreludeCommands xs
+
+
 -- Tratamiento de comandos dados desde un archivo.
 checkCommands :: [PCommand] -> ProverInputState ()
 checkCommands [] =
@@ -216,19 +234,18 @@ checkIndCommand (pos, s, x) =
 -- Tratamiento de un comando, sin añadirlo al historial.
 checkIndCommand' :: Bool -> EPosition -> Command -> ProverInputState ()    
 checkIndCommand' printing pos (Theorem name ty) =
-  theoremCommand printing pos name ty >>
-  (outputStrLn $ msjDefOk name)
+  theoremCommand printing pos name ty
 checkIndCommand' printing pos (Tac ta) =
   tacticCommand printing pos ta >>
   finishProof
-checkIndCommand' _ pos (Axiom name ty) =
+checkIndCommand' printing pos (Axiom name ty) =
   axiomCommand pos name ty >>
-  (outputStrLn $ msjDefOk name)
+  (when printing $ outputStrLn $ msjDefOk name)
 checkIndCommand' _ pos (Types ps) =
   typesVarCommand pos ps
-checkIndCommand' _ pos (Definition name body) =
+checkIndCommand' printing pos (Definition name body) =
   definitionCommand pos name body >>
-  (outputStrLn $ msjDefOk name)
+  (when printing $ outputStrLn $ msjDefOk name)
      
 -- Proceso de guardado. Luego de que se halla ingresado una táctica.
 saveIndCommand0 :: String -> ProverInputState ()
@@ -360,8 +377,8 @@ otherTacticsCPrinting =
   do s <- lift get
      let (op, ty, pc) = (typeDef $ global s, getTypeProof s, getProofC s)
      if isFinalTerm pc
-       then outputStrLn $ "Prueba completa.\n" ++
-            renderLTerm op (getLTermFromProof pc ty)
+       then (outputStrLn $ (msjDefOk $ theoremName s) ++ "\n" ++
+             renderLTerm op (getLTermFromProof pc ty))
        else outputStrLn $ renderProof pc
 
 --------------------------------------------------------------------------------------

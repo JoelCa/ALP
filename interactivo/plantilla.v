@@ -123,6 +123,7 @@ Qed.
 Variables p q r t
  g w: Prop.
 
+
 Theorem k: p -> q -> 
 p /\ q /\ p /\ p -> q.
 

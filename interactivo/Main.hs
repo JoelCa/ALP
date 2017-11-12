@@ -11,7 +11,7 @@ import Hypothesis (isHypothesis)
 import Text.PrettyPrint (render)
 import PrettyPrinter ( help, printLTerm, printProof, printType, printPrintComm
                      , printPrintAllComm, printTheorem, printLTermWithType
-                     , printCommType)
+                     , printCommType, msjFilesOk, msjVarsOk)
 import Transformers
 import ErrorMsj (printError)
 import TypeInference (basicTypeInference)
@@ -23,7 +23,7 @@ import TypeDefinition (TypeDefs, showTypeTable) -- SACAR SHOW
 import LambdaTermDefinition (showLamTable) -- QUITAR
 import System.IO (hClose, openTempFile, hPutStrLn, openFile, IOMode (AppendMode))
 import System.Directory (getCurrentDirectory, copyFile, removeFile)
-import Data.List (intercalate)
+import Data.Foldable (toList)
 
 type ProverInputState a = InputT (StateT ProverState IO) a
 
@@ -73,10 +73,10 @@ settings = Settings { historyFile = Nothing
 prompt :: ProverState -> String
 prompt s
   | proofStarted s = theoremName s ++
-                     if isIncompleteInp s
+                     if hasIncompleteInp s
                      then " <* "
                      else " < "
-  | otherwise = if isIncompleteInp s
+  | otherwise = if hasIncompleteInp s
                 then ">* "
                 else "> "
 
@@ -91,6 +91,7 @@ proverFromCLI =
        Just "" -> proverFromCLI
        Just x ->
          catch (do command <- returnInputFromParser $ getCommands x (getCounter s)
+                   outputStrLn $ show command
                    checkCommandsLine command)
          (\e -> outputStrLn (render $ printError (typeDef $ global s) e) >>
                 (lift $ modify $ cleanInput) >>
@@ -115,7 +116,7 @@ proverFromFiles files =
      catch (do commands <- returnInputFromParser r
                --outputStrLn $ show commands
                checkCommands commands
-               msjFilesOk files
+               outputStrLn $ render $ msjFilesOk files
                proverFromCLI)
        (\e -> outputStrLn (render $ printError (typeDef $ global s) e)
               >> proverFromCLI)
@@ -124,12 +125,6 @@ proverFromFiles files =
 msjDefOk :: String -> String
 msjDefOk name = "'" ++ name ++ "' definido" 
 
-msjFilesOk :: [String] -> ProverInputState ()
-msjFilesOk files =
-  outputStrLn $
-  "Archivos cargados: " ++ intercalate ", " files
-
-
 checkCommandsLine :: CLICommands -> ProverInputState ()
 checkCommandsLine (Simple c) = checkSimpleCommand c
 checkCommandsLine (Compound c) = checkCompoundCommands c
@@ -137,8 +132,10 @@ checkCommandsLine (Compound c) = checkCompoundCommands c
 
 checkCompoundCommands :: PCompoundCommand -> ProverInputState ()
 checkCompoundCommands (Nothing, cs, Nothing) =         -- Entrada completa "compuesta"
-  langCommands cs >>
-  proverFromCLI  
+  do s <- lift get
+     when (hasIncompleteInp s) (throwSemanError ((\(x,_,_) -> x) $ head $ cs) InvalidIncompleComm)
+     langCommands cs
+     proverFromCLI  
 checkCompoundCommands (Nothing, cs, Just ic) =         -- Inicio de una entrada incompleta
   (lift $ modify $ (addIncompleteInput ic) . (addCommands cs)) >>
   proverFromCLI
@@ -169,30 +166,39 @@ getLangCommand (pos, _, _) = throwSemanError pos InvalidCommand
 
 -- TERMINAR help
 checkSimpleCommand :: PExtComm -> ProverInputState ()
-checkSimpleCommand (_, _, Escaped Exit) =
+checkSimpleCommand x@(pos, _, _) =
+  do s <- lift get
+     when (hasIncompleteInp s) (throwSemanError pos InvalidIncompleComm)
+     checkSimpleCommand' x
+     
+
+checkSimpleCommand' :: PExtComm -> ProverInputState ()
+checkSimpleCommand' (_, _, Escaped Exit) =
   do s <- lift get
      lift $ lift (
        do let (temp, h) = getTempFile s
           hClose h
           removeFile temp)
      outputStrLn "Saliendo."
-checkSimpleCommand (_, _, Escaped Abort) =
-  abortProof >>
-  outputStrLn "Prueba abortada." >>
-  proverFromCLI
-checkSimpleCommand (pos, _, Escaped (Load files)) =
+checkSimpleCommand' (pos, _, Escaped Abort) =
+  do s <- lift get
+     unless (proofStarted s) $ throwSemanError pos PNotStarted
+     abortProof
+     outputStrLn "Prueba abortada."
+     proverFromCLI
+checkSimpleCommand' (pos, _, Escaped (Load files)) =
   do s <- lift get
      when (proofStarted s) $ throwSemanError pos PNotFinished
      proverFromFiles files
-checkSimpleCommand (pos, _, Escaped (Save file)) =
+checkSimpleCommand' (pos, _, Escaped (Save file)) =
   do s <- lift get
      when (proofStarted s) $ throwSemanError pos PNotFinished
      saveHistory file
      proverFromCLI
-checkSimpleCommand (_, _, Escaped Help) =
+checkSimpleCommand' (_, _, Escaped Help) =
   outputStrLn help >>
   proverFromCLI
-checkSimpleCommand (pos, s, Lang c) =
+checkSimpleCommand' (pos, s, Lang c) =
   checkIndCommand (pos, s, c) >>
   proverFromCLI
 
@@ -241,8 +247,9 @@ checkIndCommand' printing pos (Tac ta) =
 checkIndCommand' printing pos (Axiom name ty) =
   axiomCommand pos name ty >>
   (when printing $ outputStrLn $ msjDefOk name)
-checkIndCommand' _ pos (Types ps) =
-  typesVarCommand pos ps
+checkIndCommand' printing pos (Vars ps) =
+  typesVarCommand pos ps >>
+  (when printing $ outputStrLn $ render $ msjVarsOk $ toList ps)
 checkIndCommand' printing pos (Definition name body) =
   definitionCommand pos name body >>
   (when printing $ outputStrLn $ msjDefOk name)
@@ -436,7 +443,7 @@ emptyLTermDefinition pos name ty =
 
 --------------------------------------------------------------------------------------
 
--- Función auxiliar del comando "Props/Types".
+-- Función auxiliar del comando "Variables".
 -- Determinar si hay nombres de proposiones con nombres conflictivos.
 typeCheckNames :: S.Seq TypeVar -> ProverState -> (Maybe String, Maybe String, [String])
 typeCheckNames ps s = checkSeq ps elem (\t -> invalidName t $ global s) isHypothesis

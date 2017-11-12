@@ -24,7 +24,7 @@ type CommandLineCommand = Either ProverException PExtComm
 interactive :: String
 interactive = "<interactive>"
 
-reservedWords = [ "Propositions", "Types", "Theorem", "Axiom", "Print", "Check", "forall"
+reservedWords = [ "Variables", "Theorem", "Axiom", "Print", "Check", "forall"
                 , "exists",  "let", "in", "as","assumption", "intro", "intros", "split"
                 , "left", "right", "apply", "elim", "absurd", "cut", "unfold", "exact"
                 , ":load", ":abort", ":quit", ":help", ":save", ":l", ":a", ":q", ":h", ":s"
@@ -134,11 +134,11 @@ cliIndWithPosition line =
      space *> ((\(x,y) -> ((interactive, line), x, y)) <$> cliIndCommand) <* eof
 
 cliIndCommand :: Parser (String, ExtCommand)
-cliIndCommand = do s <- try $ lookAhead $ commandInput
-                   c <- command
-                   return $ (s, Lang c)
-                <|> do ec <- escapedCommand
-                       return $ ("", Escaped ec)
+cliIndCommand = do ec <- escapedCommand
+                   return $ ("", Escaped ec)
+                <|> do s <- try $ lookAhead $ commandInput
+                       c <- command
+                       return $ (s, Lang c)
 
 -- Parseo de comandos.
 getCommands :: String -> Int -> CommandLineCommands
@@ -178,9 +178,11 @@ langCommands' pos =
        Just (Left (s,y)) -> return (Nothing, (pos,s,y):cs)
        Just (Right z) -> return (Just (pos,z), cs)
        Nothing -> return (Nothing, cs)
-  where initial = try (do s <- lookAhead $ commandInput
-                          c <- command
-                          return $ Just $ Left (s,c))
+  where initial = do char ':'
+                     empty <?> "escaped command"
+                  <|> try (do s <- lookAhead $ commandInput
+                              c <- command
+                              return $ Just $ Left (s,c))
                   <|> do ic <- try $ incompleteCommand0
                          return $ Just $ Right ic
                   <|> return Nothing
@@ -264,10 +266,10 @@ command = do rword "Theorem"
                 t <- typeTerm
                 semicolon
                 return $ Axiom name t
-         <|> do rword "Propositions" <|> rword "Types"
+         <|> do rword "Variables"
                 ps <- sepByCommaSeq identifier
                 semicolon
-                return $ Types ps
+                return $ Vars ps
          <|> try (do tac <- tactic
                      return $ Tac tac)
          <|> do (name, def) <- definition
@@ -283,23 +285,36 @@ escapedCommand =
          names <- many (proofFileName <* space)
          return $ Load names
   <|> do rword ":save" <|> rword ":s"
-         name <- fileName
-         space
+         name <- proofFileName <* space
          return $ Save name
   <|> do rword ":help" <|> rword ":h"
          return Help
 
 
-fileName :: Parser String
-fileName = many $ satisfy (not . isSpace)
+fileName0 :: Parser String
+fileName0 = takeWhileP Nothing (not . isSpace)
+
+fileName1 :: Parser String
+fileName1  = takeWhileP Nothing (\x -> x /= '"')
 
 proofFileName :: Parser String
 proofFileName =
-  do name <- fileName
-     if isSuffixOf ".pr" name
-       then return name
-       else empty
-              
+  between (char '"') (char '"')
+  (do name <- fileName1
+      checkFileName name)
+  <|> do name <- fileName0
+         checkFileName name
+         
+checkFileName :: String -> Parser String
+checkFileName name =
+  if isSuffixOf ".pr" name
+  then return name
+  else empty <?> ".pr"
+
+
+proofFileName1 :: Parser String
+proofFileName1 =
+  between (char '"') (char '"') fileName1
 
 --------------------------------------------------------------------------------------
 -- Parser del lambda término con nombre.

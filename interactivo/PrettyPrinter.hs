@@ -397,7 +397,7 @@ printBTypeVar (x, _) = text x
 
 --TERMINAR
 helpMessage :: [(String, String)]
-helpMessage = [("Propositions/Types <var>, <var>, ...",
+helpMessage = [("Variables <var>, <var>, ...",
                "Declaración de variables proposicionales.\n"),
                ("<op> <var> <var> ... = <logic term>",
                "Declaración de un operador lógico prefijo.\n"),
@@ -486,3 +486,28 @@ printTheorem td name t xs =
   
 printTactics :: [String] -> Doc
 printTactics xs = foldl (\r x -> text x $$ r) empty xs
+
+--------------------------------------------------------------------------------------------  
+-- Impresión de mensajes exitosos de comandos.
+msjFilesOk :: [String] -> Doc
+msjFilesOk files =
+  sep $
+  text "Archivos cargados:" :
+  commaSeparate files
+
+commaSeparate :: [String] -> [Doc]
+commaSeparate [] = [empty]
+commaSeparate [x] =
+  [text x]
+commaSeparate (x:xs) =
+  text x <>
+  text "," :
+  commaSeparate xs
+
+msjVarsOk :: [String] -> Doc
+msjVarsOk vars =
+  sep $
+  text "Variables asumidas:" :
+  commaSeparate vars
+  
+

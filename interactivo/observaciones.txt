@@ -180,10 +180,6 @@ El parser interactivo, solo acepta de a un comando por vez.
 
 
 HACER:
-- Chequear que pasa si hacemos load de un archivo con un solo comando, y luego hacemos
-save.
-- Añadir mensajes de éxito.
-- Tomar comandos incompletos desde el input.
 - Mostrar estado de la prueba, si se carga de un archivo una prueba incompleta.
 
 HECHO:
@@ -214,6 +210,10 @@ intros.
 - Añadido comando Print capaz de imprimir definiciones de tipos.
 - Comentar la primera línea de un archivo.
 - Comentario en bloque de la forma "(*" "*)". NO usamos comentario de la línea.
+- Admitir entrada incompleta.
+- Chequear que pasa si hacemos load de un archivo con un solo comando, y luego hacemos
+save.
+- Añadir mensajes de éxito.
 
 FALTA:
 - Chequear el parser de las hipotesis.

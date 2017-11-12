@@ -126,9 +126,9 @@ cleanIncCommand p = p {input = (input p) {incomplete = Nothing}}
 cleanInput :: ProverState -> ProverState
 cleanInput = cleanIncCommand . cleanCommands
 
-isIncompleteInp :: ProverState -> Bool
-isIncompleteInp (PSt {input = Inp {incomplete = Just _}}) = True
-isIncompleteInp _ = False
+hasIncompleteInp :: ProverState -> Bool
+hasIncompleteInp (PSt {input = Inp {incomplete = Just _}}) = True
+hasIncompleteInp _ = False
 
 setTempHandle :: Handle -> ProverState -> ProverState
 setTempHandle h p@(PSt {tempSave = (name, oldh)}) = p {tempSave = (name, h)}

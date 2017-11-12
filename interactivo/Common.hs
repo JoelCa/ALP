@@ -100,7 +100,7 @@ type FTypeContext = Seq FTypeVar
 data Command = Theorem String Type1
              | Axiom String Type1
              | Tac Tactic
-             | Types (Seq TypeVar)
+             | Vars (Seq TypeVar)
              | Definition String BodyDef
              deriving (Show)
 
@@ -178,7 +178,7 @@ data SemanticException = PNotFinished | PNotStarted | ExistE String
                        | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 DoubleType
                        | ExactE2 DoubleType | ExactE3 | PSE | EmptyType | TypeE String
                        | InferE DoubleLTerm InferException | UnfoldE1 String
-                       | TermVarE String | TypeVarE String
+                       | TermVarE String | TypeVarE String | InvalidIncompleComm
                        deriving (Show, Typeable)
 
 data PException a = SemanticE a

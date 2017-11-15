@@ -91,7 +91,7 @@ proverFromCLI =
        Just "" -> proverFromCLI
        Just x ->
          catch (do command <- returnInputFromParser $ getCommands x (getCounter s)
-                   outputStrLn $ show command
+                   --outputStrLn $ show command
                    checkCommandsLine command)
          (\e -> outputStrLn (render $ printError (typeDef $ global s) e) >>
                 (lift $ modify $ cleanInput) >>
@@ -104,7 +104,7 @@ startProver =
   do s <- lift get
      r <- lift $ lift $ commandsFromFiles [prelude]
      catch (do commands <- returnInputFromParser r
-               checkPreludeCommands commands
+               checkCommands commands
                proverFromCLI)
        (\e -> outputStrLn (render $ printError (typeDef $ global s) e))
 
@@ -122,8 +122,7 @@ proverFromFiles files =
               >> proverFromCLI)
 
 --------------------------------------------------------------------------------------
-msjDefOk :: String -> String
-msjDefOk name = "'" ++ name ++ "' definido" 
+-- Chequeo de comandos
 
 checkCommandsLine :: CLICommands -> ProverInputState ()
 checkCommandsLine (Simple c) = checkSimpleCommand c
@@ -131,12 +130,12 @@ checkCommandsLine (Compound c) = checkCompoundCommands c
 
 
 checkCompoundCommands :: PCompoundCommand -> ProverInputState ()
-checkCompoundCommands (Nothing, cs, Nothing) =         -- Entrada completa "compuesta"
+checkCompoundCommands (Nothing, cs, Nothing) =         -- Entrada "compuesta" completa
   do s <- lift get
-     when (hasIncompleteInp s) (throwSemanError ((\(x,_,_) -> x) $ head $ cs) InvalidIncompleComm)
+     when (hasIncompleteInp s) (throwSemanError ((\(x,_,_) -> x) $ head $ cs) InvalidCompComm)
      langCommands cs
      proverFromCLI  
-checkCompoundCommands (Nothing, cs, Just ic) =         -- Inicio de una entrada incompleta
+checkCompoundCommands (Nothing, cs, Just ic) =         -- Inicio de una entrada compuesta
   (lift $ modify $ (addIncompleteInput ic) . (addCommands cs)) >>
   proverFromCLI
 checkCompoundCommands (Just (pos, x), cs, Just ic) =   -- Entrada incompleta
@@ -145,7 +144,7 @@ checkCompoundCommands (Just (pos, x), cs, Just ic) =   -- Entrada incompleta
      command' <- getLangCommand command
      lift $ modify $ (setIncompleteInput ic) . (addCommands $ command' : cs)
      proverFromCLI
-checkCompoundCommands (Just (pos, x), cs, Nothing) =   -- Fin de entrada incompleta
+checkCompoundCommands (Just (pos, x), cs, Nothing) =   -- Fin de entrada compuesta
   do s <- lift get
      command <- returnInputFromParser $ getIndividualCommand (joinIncompleteComm x s) (snd pos)
      command' <- getLangCommand command
@@ -161,14 +160,14 @@ langCommands = foldr (\x r -> checkIndCommand x >> r) (return ())
 
 getLangCommand :: PExtComm -> ProverInputState PComm
 getLangCommand (pos, s, Lang x) = return (pos, s, x) 
-getLangCommand (pos, _, _) = throwSemanError pos InvalidCommand  
+getLangCommand (pos, _, _) = throwSemanError pos InvalidCompComm  
 
 
 -- TERMINAR help
 checkSimpleCommand :: PExtComm -> ProverInputState ()
 checkSimpleCommand x@(pos, _, _) =
   do s <- lift get
-     when (hasIncompleteInp s) (throwSemanError pos InvalidIncompleComm)
+     when (hasIncompleteInp s) (throwSemanError pos InvalidCompComm)
      checkSimpleCommand' x
      
 
@@ -202,30 +201,18 @@ checkSimpleCommand' (pos, s, Lang c) =
   checkIndCommand (pos, s, c) >>
   proverFromCLI
 
---------------------------------------------------------------------------------------
-
--- Tratramiento de los comandos del preludio.
-checkPreludeCommands :: [PCommand] -> ProverInputState ()
-checkPreludeCommands [] =
-  return () 
-checkPreludeCommands [(pos, x)] =
-  checkIndCommand' False pos x
-checkPreludeCommands ((pos, x):xs) =
-  checkIndCommand' False pos x >>
-  checkPreludeCommands xs
-
 
 -- Tratamiento de comandos dados desde un archivo.
 checkCommands :: [PCommand] -> ProverInputState ()
 checkCommands [] =
   return () 
 checkCommands [(pos, x)] =
-  checkIndCommand' True pos x
+  checkIndCommand' False pos x
 checkCommands ((pos, x):xs) =
   checkIndCommand' False pos x >>
   checkCommands xs
 
--- Tratamiento de un comando, añadiendolo al historial.
+-- Tratamiento de un solo comando, añadiendolo al historial.
 checkIndCommand :: PComm -> ProverInputState ()
 checkIndCommand  (pos, s, Tac ta) =
   tacticCommand True pos ta >>
@@ -253,7 +240,10 @@ checkIndCommand' printing pos (Vars ps) =
 checkIndCommand' printing pos (Definition name body) =
   definitionCommand pos name body >>
   (when printing $ outputStrLn $ msjDefOk name)
-     
+
+--------------------------------------------------------------------------------------
+-- Mantenimiento del historial de comandos
+
 -- Proceso de guardado. Luego de que se halla ingresado una táctica.
 saveIndCommand0 :: String -> ProverInputState ()
 saveIndCommand0 input =
@@ -277,6 +267,7 @@ writeHistory h =
      lift $ lift $ hPutStrLn (snd $ getTempFile s) h 
 
 --------------------------------------------------------------------------------------
+-- Procesamiento de comandos
 
 theoremCommand :: Bool -> EPosition -> String -> Type1 -> ProverInputState ()
 theoremCommand printing pos name ty =
@@ -389,6 +380,7 @@ otherTacticsCPrinting =
        else outputStrLn $ renderProof pc
 
 --------------------------------------------------------------------------------------
+-- Procesamiento de las definiciones de lambda términos y tipos.
 
 -- Trata el comando de definición.
 -- Define el término dado por el 2º argumento.
@@ -475,6 +467,9 @@ renderType op = render . printType op
 -- Impresión de la prueba en construcción
 renderProof :: ProofConstruction -> String
 renderProof p = render $ printProof (tsubp p) (typeDef $ cglobal p) (fTypeContext $ cglobal p) (subps p)
+
+msjDefOk :: String -> String
+msjDefOk name = "'" ++ name ++ "' definido" 
 
 returnInput :: EPosition -> Either SemanticException a -> ProverInputState a
 returnInput pos (Left exception) = throwIO $ SemanticE (pos, exception)

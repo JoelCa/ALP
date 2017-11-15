@@ -1,4 +1,4 @@
-Propositions p,q,r,t,y;
+Variables p,q,r,t,y;
 
 Theorem t23 : forall o,
                 forall t, (forall w, forall r, o /\ w) -> o /\ t;

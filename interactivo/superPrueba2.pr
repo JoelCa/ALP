@@ -10,8 +10,10 @@ Theorem t57 : forall a, a -> algo a;
   unfold algo;
   intros;
   Print _;
+  assumption;
 
-(*  assumption;
+(*
 Theorem t58 : forall x, forall y, y -> y;
   intros;
-  assumption; *)
+  assumption; 
+*)

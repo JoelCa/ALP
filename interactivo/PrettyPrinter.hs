@@ -426,7 +426,8 @@ helpMessage = [("Variables <var>, <var>, ...",
                (":quit",
                "Salir.\n"),
                (":help",
-               "Imprime este mensaje de ayuda.\n")
+               "Imprime este mensaje de ayuda.\n"),
+               ("Todos los comandos no escapados deben finalizar con ';'","")
                ]
 
 help :: String

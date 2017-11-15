@@ -178,6 +178,8 @@ definido por el usuario. COQ si lo permite.
 Por ejemplo: "comando1. comando2."
 El parser interactivo, solo acepta de a un comando por vez. 
 
+- Un comando compuesto c1;c2;..;cn es exitoso si cada uno de los comandos que lo componen es exitoso.
+Si uno de los comandos falla, entonces todo el comando compuesto falla.
 
 HACER:
 - Mostrar estado de la prueba, si se carga de un archivo una prueba incompleta.

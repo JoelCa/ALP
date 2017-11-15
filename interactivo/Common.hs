@@ -178,7 +178,7 @@ data SemanticException = PNotFinished | PNotStarted | ExistE String
                        | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 DoubleType
                        | ExactE2 DoubleType | ExactE3 | PSE | EmptyType | TypeE String
                        | InferE DoubleLTerm InferException | UnfoldE1 String
-                       | TermVarE String | TypeVarE String | InvalidIncompleComm
+                       | TermVarE String | TypeVarE String | InvalidCompComm
                        deriving (Show, Typeable)
 
 data PException a = SemanticE a

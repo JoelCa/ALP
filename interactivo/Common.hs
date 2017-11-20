@@ -6,13 +6,11 @@ module Common where
 
 import Data.Typeable
 import System.Console.Haskeline.MonadException (Exception)
-import Data.Map (Map)
 import Control.Monad (ap, liftM)
 import Control.Monad.State.Lazy
 import Data.Void (Void)
 import Text.Megaparsec (ParseError)
-import Control.Monad.Reader (Reader)
-import Data.Sequence (Seq, foldlWithIndex)
+import Data.Sequence (Seq)
 
 type TermVar = String
 
@@ -48,9 +46,10 @@ instance Eq (DoubleType) where
     then aux xs ys
     else False
     where aux [] [] = True
-          aux (x:xs) (y:ys) = if x == y
-                              then aux xs ys
+          aux (a:as) (b:bs) = if a == b
+                              then aux as bs
                               else False
+          aux _ _ = False
   _ == _ = False
 
   -- Lambda término con nombre, y tipos con nombres.
@@ -96,7 +95,7 @@ type FTypeVar = TypeVar
 type FTypeContext = Seq FTypeVar
 
 
-  --Comandos del lenguaje de prueba.
+  -- Comandos del lenguaje.
 data Command = Theorem String Type1
              | Axiom String Type1
              | Tac Tactic
@@ -104,11 +103,12 @@ data Command = Theorem String Type1
              | Definition String BodyDef
              deriving (Show)
 
-  -- Comandos extendidos. 
+  -- Comandos del lenguaje, y comandos de control. 
 data ExtCommand = Escaped ECommand
                 | Lang Command
                 deriving (Show)
 
+  -- Comandos de control.
 data ECommand = Exit
               | Abort
               | Load [String]
@@ -116,19 +116,25 @@ data ECommand = Exit
               | Help
               deriving (Show)
 
-  -- Comandos provenientes de la línea de comandos
+  -- Comandos provenientes de la línea de comandos.
 data CLICommands = Simple PExtComm
                  | Compound PCompoundCommand
                  deriving (Show)
 
+  -- Comando del lenguaje, junto con su posición de aparición.
 type PCommand = (EPosition, Command)
 
 type PCommandWithInput a = (EPosition, String, a)
 
+  -- Comando, junto con su posición, en sus dos representaciones,
+  -- concreta y abstracta.
 type PExtComm = PCommandWithInput ExtCommand
 
+  -- Comando del lenguaje, junto con su posición, en sus dos
+  -- representaciones, concreta y abstracta.
 type PComm = PCommandWithInput Command
 
+  -- Comando incompleto, junto con su posición.
 type PIncompleteComm = (EPosition, String)
 
 -- Comando compuesto, donde:
@@ -156,7 +162,7 @@ type TypeDefWithName = TypeDef (Type1, Seq TypeVar)
 
 type TypeDefNoName = TypeDef DoubleType
 
-  -- Tácticas.
+  -- Tácticas de prueba.
 data Tactic = Assumption | Apply Int | Intro | Intros | Split
             | Elim Int | CLeft | CRight | Print String | PrintAll 
             | CExists Type1 | Cut Type1 | Exact ExactB
@@ -164,12 +170,13 @@ data Tactic = Assumption | Apply Int | Intro | Intros | Split
             | Absurd Type1
             deriving (Show)
 
+  -- Táctica "exact".
 data ExactB = LamT LTerm1
             | T Type1
             | Appl (GenTree String)
             deriving (Show)
 
-  -- Excepciones.
+  -- Excepciones del lenguaje.
 data SemanticException = PNotFinished | PNotStarted | ExistE String
                        | NotExistE String | AssuE
                        | IntroE1 | ApplyE1 DoubleType DoubleType | HypoE Int
@@ -186,40 +193,40 @@ data PException a = SemanticE a
                   | FileE IOError
                   deriving (Show, Typeable)
 
+  -- Excepciones junto con su posición de aparición. 
 type ProverExceptionPos = PException (EPosition, SemanticException)
 
+  -- Excepciones, sin su posición.
 type ProverException = PException SemanticException
 
+  -- Posición.
 type EPosition = (String, Int)
 
---type ExceptionPos = (EPosition, ProofException)
-
+  -- Errores del comando "infer",
 data InferException = InferE1 String | InferE2 DoubleLTerm DoubleType
                     | InferE3 DoubleLTerm String | InferE4 DoubleLTerm
                      deriving (Show, Typeable)
                               
-instance Exception ProverExceptionPos
-
-  -- Arbol general.
+  -- Árbol. Útil en la representación de una aplicación "ambigua"
+  -- (aplicación de lambda términos, o "aplicación" de tipos).
 data GenTree a = Nil | Node a [GenTree a]
                deriving (Show)
 
 
-  -- Operación NO "foldeable".
---type NotFoldeableOp = (String, Operands)
-
-  -- Tipos dados por default.
+  -- Nombre de tipos dados en el preludio.
 and_id = ['/', '\\']
 or_id = ['\\', '/']
 bottom_id = "False"
 iff_id = "<->"
 not_id = "~"
 
--- getNumArgs :: FoldeableOp -> Operands
--- getNumArgs (_,_,n,_) = n
 
+--------------------------------------------------------------------------------------
+-- Instancias.
 
-  -- Instancias.
+instance Exception ProverExceptionPos
+
+-- Estado.
 newtype StateExceptions s e a = StateExceptions { runStateExceptions :: s -> Either e (a, s) }
 
 

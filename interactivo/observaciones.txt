@@ -50,7 +50,7 @@ en el tipo sin nombre el término "TBound 0" por "TFree x". Es util cuando se co
 en el comando "assumption".
 
 
-- El lambda término final tiene un tipo alpha equivalente al dado por el usuario.
+- YA NO VALE. El lambda término final tiene un tipo alpha equivalente al dado por el usuario.
 Por ejemplo, si el tipo es: (forall k, k -> k) -> (forall j, j) -> (forall y, y).
 Se tiene el lambda término \x:(forall k, k -> k).x (forall j, j), el cual tendría tipo
 (forall k, k -> k) -> (forall j, j) -> (forall j, j)
@@ -139,7 +139,7 @@ Es decir, t0 [x := w] = t0.
 - Los lambda términos pueden tener variables libres, las cuales solo pueden ser nombres
 de teoremas.
 
-- ARREGLAR. Consideramos que en el lambda término ingresado por el usuario, los nombres de las variables de términos
+- ARREGLADO. Consideramos que en el lambda término ingresado por el usuario, los nombres de las variables de términos
 pueden coincidir con los teoremas. Es decir, que en este caso NO la renombramos.
 
 - Consideramos que ninguna definición (de tipo o de lambda término), puede ser recursiva.
@@ -161,28 +161,36 @@ Además, cuando no se construye una prueba, NO se pueden invocar tácticas. En C
 - A la hora de imprimir un lambda término, hacemos que las variables de términos ligadas sean
 distintas a las variables de tipo ligadas (no tenemos en cuenta a las variables que se declaran
 en los tipos), para que sea más facil de entender al lambda término imprimido.
-Además, NO renombramos las variables de tipo ligadas. Por ello, se pueden dar esta situación:
+
+- ARREGLADO. NO renombramos las variables de tipo ligadas. Por ello, se pueden dar esta situación:
 > Theorem x: forall w, w -> w.
 > algo = \x.\z:x.x.
 > Print algo.
 (\x. \y:x. x) as (forall x, x -> (forall w, w -> w))
 Donde, la variable de tipo ligada "x", coincide con la variable de término "x".
 
-- No es posible comentar la primera línea de un archivo.
+- ARREGLADO. No es posible comentar la primera línea de un archivo.
 
 - Consideramos que en las operaciones de not anidadas deben ir espacios.
 Por ejemplo: "~ ~ p", NO se puede escribir como "~~ p". Pues, "~~" puede ser un operador
 definido por el usuario. COQ si lo permite. 
 
-- El parser de archivos acepta varios comandos en la misma línea. 
-Por ejemplo: "comando1. comando2."
-El parser interactivo, solo acepta de a un comando por vez. 
+- El parser de archivos acepta varios comandos en la misma línea, e incluso un comando en distintas líneas. 
+Por ejemplo: 
+"comando1; comando2;"
+"parte1 de comando
+ parte2 de comando;"
+El parser interactivo, también. 
 
 - Un comando compuesto c1;c2;..;cn es exitoso si cada uno de los comandos que lo componen es exitoso.
 Si uno de los comandos falla, entonces todo el comando compuesto falla.
 
+
+
 HACER:
-- Mostrar estado de la prueba, si se carga de un archivo una prueba incompleta.
+- Ver si están todos los casos "Left" en "disambiguatedTerm" del archivo Transformers.hs
+- Ver "ErrorMsj.hs", mensaje de errores.
+- Probar el caso de unificación.
 
 HECHO:
 - Revisar el parser para ver si 'rword "False"' está bien, cuando False ya no es una palabra reservada.
@@ -212,7 +220,7 @@ intros.
 - Añadido comando Print capaz de imprimir definiciones de tipos.
 - Comentar la primera línea de un archivo.
 - Comentario en bloque de la forma "(*" "*)". NO usamos comentario de la línea.
-- Admitir entrada incompleta.
+- Admitir entrada incompleta en la interfaz interactiva.
 - Chequear que pasa si hacemos load de un archivo con un solo comando, y luego hacemos
 save.
 - Añadir mensajes de éxito.
@@ -225,4 +233,3 @@ de teoremas probados.
 - En el pretty printer de un lambda término sin nombre, hacer que las variables de términos ligadas sean
 distintas a las variables de tipo libre y nombres de operadores.
 - Explicar en el informe el renombre de lambda términos (tanto de var. de tipos, como de términos).
-- Mejorar Print (Print All, Print de tipos)

@@ -3,9 +3,9 @@ module TypeSubstitution where
 import Common
 import LambdaTermDefinition (LamDefs, getNames)
 import TypeDefinition
-import qualified Data.Sequence as S
 import Transformers
 import RenamedVariables
+import qualified Data.Sequence as S
 
 
 -- Realiza la sustitución de tipos: (((t [T1]) [T2])..) [Tn].

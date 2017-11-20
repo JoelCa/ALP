@@ -5,59 +5,13 @@ import Proof
 import TypeDefinition (TypeDefs, getTypeData, getTypesNames)
 import LambdaTermDefinition (LamDefs, getLamTable)
 import Text.PrettyPrint
-import Data.List
-import qualified Data.Sequence as S
-import Hypothesis (hypothesis)
-import qualified Data.IntSet as IS
-import Data.Set (Set)
-import qualified Data.Set as Set
 import Data.Maybe (isJust)
+import qualified Data.Sequence as S
 
 -----------------------
 --- pretty printer
 -----------------------
 
--- Lista de posibles nombres para variables de términos.
-vars :: [String]
-vars = [ c : n | n <- "" : map show nats, c <- ['x','y','z'] ++ ['p'..'w'] ]
-  where nats :: [Integer]
-        nats = [1..]
-
-varsAndOps :: DoubleType -> Set String
-varsAndOps (TVar (x,_)) = Set.singleton x
-varsAndOps (Fun t u) = Set.union (varsAndOps t) (varsAndOps u)
-varsAndOps (ForAll x t) = Set.insert x $ varsAndOps t 
-varsAndOps (Exists x t) = Set.insert x $ varsAndOps t
-varsAndOps (RenamedType x ts) =
-  foldr (\t r -> Set.insert x $ Set.union (varsAndOps t) r) Set.empty ts
- 
-
--- Obtiene las siguientes variables:
--- a. Variables de términos libres.
--- b. Variables de tipo ligadas.
--- c. Variables de tipo libres.
--- d. Nombre de operadores.
-varsInTerm :: LTerm2 -> Set String
-varsInTerm (LVar (Free n)) =
-  Set.singleton n
-varsInTerm (w :@: u)          =
-  Set.union (varsInTerm w) (varsInTerm u)
-varsInTerm (BAbs x u)         =
-  Set.insert x $ varsInTerm u
-varsInTerm (w :!: t)      =
-  Set.union (varsInTerm w) (varsAndOps t)
-varsInTerm (Abs () t w)      =
-  Set.union (varsInTerm w) (varsAndOps t)
-varsInTerm (EPack t w t') =
-  Set.union (varsInTerm w) (Set.union (varsAndOps t) (varsAndOps t'))
-varsInTerm (EUnpack x () t u)     =
-  Set.insert x $ Set.union (varsInTerm t) (varsInTerm u)
-varsInTerm (w ::: t)      =
-  Set.union (varsInTerm w) (varsAndOps t)
-varsInTerm _              =
-  Set.empty
-
---------------------------------------------------------------------------------------------  
 parenIf :: Bool -> Doc -> Doc
 parenIf False d   = d
 parenIf True d    = parens d
@@ -153,80 +107,6 @@ printLTerm' op (i, j) (t ::: ty) =
     text "as" <+>
     parens (printType op ty) ]
 
-
--- Pretty-printer de lambda término sin nombre, y tipos con nombres.
-printLTermNoName :: TypeDefs -> LTerm2 -> Doc 
-printLTermNoName op t = printLTermNoName' op (1, False) [] (vars \\ (Set.toList $ varsInTerm t))  t
-
-printLTermNoName' :: TypeDefs -> (Int, Bool) -> [String] -> [String] -> LTerm2 -> Doc
-printLTermNoName' _ _ bs _  (LVar (Bound x)) =
-  text $ bs !! x
-printLTermNoName' _ _ _  _  (LVar (Free n)) =
-  text n
-printLTermNoName' op (i, j) bs fs (t :@: u) =
-  parenIf ((i < pApp) || ((i == pApp) && j)) $   
-  sep $
-  printLTermNoName' op (pApp, False) bs fs t :
-  [printLTermNoName' op (pApp, True) bs fs u]
-printLTermNoName' op (i, j) bs (f:fs) (Abs () t u) =
-  parenIf (i < pLam) $ 
-  sep $
-  text "\\" <> 
-  text f <> 
-  text ":" <> 
-  printType op t <>
-  text "." :
-  [nest 2  $ printLTermNoName' op (pLam, j) (f:bs) fs u]
-printLTermNoName' op (i,j) bs fs (BAbs x u) =
-  parenIf (i < pBLam) $
-  sep $
-  text "\\" <> 
-  text x <> 
-  text "." :
-  [nest 2 $ printLTermNoName' op (pBLam, j) bs fs u]
-printLTermNoName' op (i,j) bs fs (t :!: ty) =
-  parenIf ((i < pBApp) || ((i == pBApp) && j)) $ 
-  sep $
-  printLTermNoName' op (pBApp, False) bs fs t :
-  [ nest 2 $
-    text "[" <>
-    printType op ty <>
-    text "]" ]
-printLTermNoName' op (i,j) bs fs (EPack ty t tty) =
-  parenIf (i < pEPack) $
-  sep $
-  text "{*" <>
-  printType op ty <>
-  text "," :
-  printLTermNoName' op (pEPack, j) bs fs t <>
-  text "}" :
-  [ nest 2 $
-    text "as" <+>
-    printType op tty ]
-printLTermNoName' op (i,j) bs (f:fs) (EUnpack x () t u) =
-  parenIf (i < pEUnpack) $
-  sep $
-  text "let" :
-  text "{" <>
-  text x <>
-  text "," :
-  text f <>
-  text "}" <+>
-  text "=" :
-  [ nest 2 $
-    printLTermNoName' op (pEUnpack, j) bs fs t <+>
-    text "in" <+>
-    printLTermNoName' op (pEUnpack, j) (f:bs) fs u ]
-printLTermNoName' op (i,j) bs fs (t ::: ty) =
-  parenIf (i == pAs) $
-  sep $
-  printLTermNoName' op (pAs, j) bs fs t :
-  [ nest 2 $
-    text "as" <+>
-    parens (printType op ty) ]
-printLTermNoName' _ _ _ [] (Abs _ _ _) =
-  error "prinTerm': no hay nombres para elegir"
-  
 --------------------------------------------------------------------------------------------  
 -- Pretty-printer de tipos con nombres.
 -- Consideramos que las operaciones "custom", son a lo suma binaria.
@@ -262,7 +142,7 @@ printType' (p,left) op (Exists v t) =
   text v <>
   text "," :
   [nest 2 $ printType' (7,left) op t]
-printType' prec@(p,left) op (RenamedType s [t1, t2])
+printType' prec op (RenamedType s [t1, t2])
   | s == and_id = printBinInfix (\x t -> printType' x op t) s prec 3 t1 t2
   | s == or_id = printBinInfix (\x t -> printType' x op t) s prec 4 t1 t2
   | s == iff_id = printBinInfix (\x t -> printType' x op t) s prec 6 t1 t2
@@ -288,7 +168,7 @@ printBinInfix f s (p,left) n t1 t2 =
 
 printPrefix :: ((Int, Bool) -> a -> Doc) -> String
             -> (Int, Bool) -> [a] -> Doc
-printPrefix f s _ [] 
+printPrefix _ s _ [] 
   | s == bottom_id = text $ bottom_id
   | otherwise = text s
 printPrefix f s (p, left) [t]
@@ -333,7 +213,7 @@ printLevelGoals i tp op (t:ts) =
 
 printGoal :: TypeDefs -> Maybe DoubleType -> Doc
 printGoal op (Just ty) = printType op ty
-printGoal op Nothing = text "*"
+printGoal _ Nothing = text "*"
 
 printContext :: TypeDefs -> (FTypeContext, BTypeContext) -> TermContext -> Doc
 printContext op (ftc,btc) c =
@@ -358,19 +238,6 @@ printRestContext op btc c
                    else printRestContext op btc (S.drop 1 c) $$
                         printTermVar op y
 
--- Obtiene el nombre una hipótesis.
--- Argumentos:
--- 1. Nombres conflictivos.
--- 2. Nombre "candidato" (mayor a los nombres conflictivos).
--- Resultado:
--- Tupla donde la 1º componente es el nombre para una hipótesis,
--- y la 2º componente es el 1º argumento, al que le extrajeron los
--- nombres conflictivos "visitados".
--- getValidName :: IS.IntSet -> Int -> (Int, IS.IntSet)
--- getValidName cn n = let (cn', isMember, _) = IS.splitMember n cn
---                         n' = if isMember then error $ show (n,n-1) else n
---                     in (n', cn')
-
 printRestTermC :: TypeDefs -> TermContext -> Doc
 printRestTermC op c
   | S.null c = empty
@@ -393,7 +260,7 @@ printBTypeVar :: BTypeVar -> Doc
 printBTypeVar (x, _) = text x
 
 --------------------------------------------------------------------------------------------  
--- Help
+-- Comando Help
 
 --TERMINAR
 helpMessage :: [(String, String)]
@@ -510,5 +377,3 @@ msjVarsOk vars =
   sep $
   text "Variables asumidas:" :
   commaSeparate vars
-  
-

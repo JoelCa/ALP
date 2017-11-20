@@ -4,29 +4,40 @@ import Common
 import GlobalState
 import Proof (ProofConstruction, newProofC, getLTermFromProof)
 import Data.Maybe (isJust)
-import Data.Sequence (Seq)
 import System.IO (Handle)
 
   -- Estado general.
-data ProverState = PSt { proof :: Maybe ProofState
-                       , global :: GlobalState
-                       , tempSave :: (FilePath, Handle)
-                       , input :: Input
+data ProverState = PSt { proof :: Maybe ProofState          -- Datos de la posible prueba en construcción.
+                       , global :: GlobalState              -- Datos "globales".
+                       , tempSave :: (FilePath, Handle)     -- Dirección del historial de comandos ingresados por el usuario.
+                       , input :: Input                     -- Datos de un comando compuesto.
                        , cc :: Int                          -- Contador del número de entradas dadas por el usuario.
                        }
                    
-  -- Mantiene datos de la entrada incompleta del usuario.
+  -- Mantiene datos para la construcción de un comando compuesto.
 data Input = Inp { commands :: [PComm]                      -- Comandos completos que componen la penúltima entrada incompleta del usuario.
                  , incomplete :: Maybe PIncompleteComm      -- Posible comando incompleto de la penúltima entrada incompleta del usuario.
                  }
-             deriving Show
-
+             
   -- Estado de la prueba que se está construyendo.
 data ProofState = PState { name :: String
                          , types :: DoubleType
                          , constr :: ProofConstruction
                          , history :: [String]
                          }
+
+-- Estado inicial.
+initialProver :: (FilePath, Handle) -> ProverState
+initialProver h = PSt { global = initialGlobal
+                      , proof = Nothing
+                      , tempSave = h
+                      , input = Inp {commands = [], incomplete = Nothing}
+                      , cc = 0
+                      }
+
+-- Inicia una nueva prueba.
+newProof :: String -> DoubleType -> DoubleType -> ProverState -> ProverState
+newProof name ty tyr p = p {proof = Just $ newProof' (global p) name ty tyr}
 
 -- Genera una nueva prueba.
 newProof' :: GlobalState -> String -> DoubleType -> DoubleType -> ProofState
@@ -35,10 +46,6 @@ newProof' g name ty tyr = PState { name = name
                                  , constr = newProofC g tyr
                                  , history = []
                                  }
-
--- Inicia una nueva prueba.
-newProof :: String -> DoubleType -> DoubleType -> ProverState -> ProverState
-newProof name ty tyr p = p {proof = Just $ newProof' (global p) name ty tyr}
 
 getProofC :: ProverState -> ProofConstruction
 getProofC (PSt {proof = Just pr}) = constr pr
@@ -68,15 +75,6 @@ newEmptyLamDefinition name ty  = modifyGlobal (addConflictName name . addEmptyLa
 proofStarted :: ProverState -> Bool
 proofStarted p = isJust $ proof p
 
--- Estado inicial.
-initialProver :: (FilePath, Handle) -> ProverState
-initialProver h = PSt { global = initialGlobal
-                      , proof = Nothing
-                      , tempSave = h
-                      , input = Inp {commands = [], incomplete = Nothing}
-                      , cc = 0
-                      }
-
 modifyGlobal :: (GlobalState -> GlobalState) -> ProverState -> ProverState
 modifyGlobal f p = p {global = f $ global p}
 
@@ -90,7 +88,7 @@ theoremName _ = error "error: theoremName, no debería pasar."
 
 addInput :: String -> ProverState -> ProverState
 addInput input p@(PSt {proof = Just pr}) = p {proof = Just $ pr {history = input : history pr}}
-addInput _ p@(PSt {proof = Nothing}) = error "error: addProofCommand, no debería pasar"
+addInput _ (PSt {proof = Nothing}) = error "error: addProofCommand, no debería pasar"
 
 addIncompleteInput :: PIncompleteComm -> ProverState -> ProverState
 addIncompleteInput (pos, inc) p@(PSt {input = Inp {incomplete = x}}) =

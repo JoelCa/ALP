@@ -2,11 +2,11 @@ module TypeInference where
 
 import Common
 import LambdaTermDefinition (LamDefs)
-import qualified LambdaTermDefinition as LTD (lookup)
 import TypeDefinition
 import Transformers (positiveShift, negativeShift)
 import TypeSubstitution
 import qualified Data.Sequence as S
+import qualified LambdaTermDefinition as LTD (lookup)
 
 -- Algoritmo de inferencia de tipos de un lambda término.
 
@@ -32,11 +32,11 @@ typeInference n c te op t = case typeInference' n c te op t of
 
 typeInference' :: Int -> TermContext -> LamDefs -> TypeDefs
                -> DoubleLTerm -> Either InferException DoubleType
-typeInference' n _ te _ (LVar (_, Free x)) =
+typeInference' _ _ te _ (LVar (_, Free x)) =
   case LTD.lookup x te of
     Just (_, t) -> return t
     Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean teoremas.
-typeInference' n c te _ (LVar (_, Bound x)) =
+typeInference' n c _ _ (LVar (_, Bound x)) =
   let (_,_,m,Just t) = S.index c x
   in return $ positiveShift (n-m) t
 typeInference' n c te op (Abs _ t e) =
@@ -81,12 +81,12 @@ typeInference' n c te op (e ::: t) =
        then return t
        else throw $ InferE2 e t
 
--- Compara los tipos sin nombres, extiende la definición de los tipos.
+-- Compara los tipos, extiende la definición de los tipos.
 fullEqualTypes :: TypeDefs -> DoubleType -> DoubleType -> Bool
 fullEqualTypes op (Fun t1 t2) (Fun t1' t2') = fullEqualTypes op t1 t1' && fullEqualTypes op t2 t2'
 fullEqualTypes op (ForAll _ t) (ForAll _ t') = fullEqualTypes op t t'
 fullEqualTypes op (Exists _ t) (Exists _ t') = fullEqualTypes op t t'
-fullEqualTypes op t1@(RenamedType s xs) t2@(RenamedType s' ys)
+fullEqualTypes op (RenamedType s xs) t2@(RenamedType s' ys)
   | s == s' = aux xs ys
   | otherwise =
       case getTypeData s op of

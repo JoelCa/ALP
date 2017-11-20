@@ -5,17 +5,15 @@ import LambdaTermDefinition (LamDefs)
 import TypeDefinition (TypeDefs, getTypeData)
 import Proof
 import TermsWithHoles
-import RenamedVariables
 import Hypothesis
 import Transformers
-import TypeInference (typeInference)
+import TypeInference (typeInference, fullEqualTypes)
 import TypeUnification (unification)
 import TypeSubstitution (typeSubs)
 import Control.Monad (unless, when)
-import qualified Data.Map.Strict as M (Map, lookup, insert, empty, size)
+import qualified Data.Map.Strict as M (Map, lookup, size)
 import Data.Maybe (fromJust, isJust)
 import qualified Data.Sequence as S
-import Data.Foldable (find)
 
 
 -- Contruye la prueba.
@@ -25,7 +23,6 @@ habitar Assumption =
      t <- maybeToProof EmptyType x 
      c <- getTermContext
      q <- getTBTypeVars
-     --i <- maybeToProof AssuE $ S.findIndexL (\(_,p,t') -> positiveShift (q - p) t' == t) c
      (i,hy) <- maybeToProof AssuE $
               S.foldrWithIndex (\index (h,_,p,Just t') r -> if positiveShift (q - p) t' == t then return (index,h) else r) Nothing c
      endSubProof
@@ -164,7 +161,7 @@ habitar (Absurd ty) =
 habitar (CExists ty) =
   do x <- getType
      case x of
-       Just tt@(Exists v t) ->
+       Just tt@(Exists _ t) ->
          do op <- getTypeDefinitions
             btc <- getBTypeContext
             ftc <- getFTypeContext
@@ -216,7 +213,7 @@ introComm _ = throw IntroE1
 introsComm :: Proof ()
 introsComm = catch (do habitar Intro
                        introsComm)
-             ((\e -> return ()) :: SemanticException -> Proof ())
+             ((\_ -> return ()) :: SemanticException -> Proof ())
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando ELIM
@@ -369,8 +366,8 @@ exactTerm te tt =
      ld <- getLamDefinitions
      q <- getTBTypeVars
      op <- getTypeDefinitions
-     t <- eitherToProof $ typeInference q c ld op te
-     unless (t == tt) $ throw $ ExactE1 tt
+     t <- eitherToProof $ typeInference q c ld op te     
+     unless (fullEqualTypes op t tt) $ throw $ ExactE1 tt
      endSubProof
      modifyTerm $ simplifyLTerm te
 

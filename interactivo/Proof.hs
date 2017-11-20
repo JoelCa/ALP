@@ -28,7 +28,7 @@ data SubProof = SP { termContext :: TermContext    -- Vars. de término.
                                                    -- términos disponibles. Útil para el pretty printer.
                    , ty :: [Maybe DoubleType]      -- Tipo objetivo, de cada subprueba contenida.
                    }
-
+              deriving Show
 
 -- Operaciones que modifican el estado de la monada Proof.
 -- Es decir que, estas operaciones cambian la prueba.
@@ -229,4 +229,3 @@ getLTermFromProof (PConstruction {term=t}) ty =
 -- Chequea si la prueba a terminado.
 isFinalTerm :: ProofConstruction -> Bool
 isFinalTerm (PConstruction {term=t}) = withoutHoles t
-

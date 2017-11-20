@@ -2,7 +2,7 @@ module TypeUnification where
 
 import Common
 import Transformers (positiveShift, negativeShift)
-import qualified Data.Map.Strict as M (Map, lookup, insert, empty, size)
+import qualified Data.Map.Strict as M (Map, lookup, insert, empty)
 
 -- Algoritmo de unificación para el comando APPLY.
 unification :: Bool -> Int -> DoubleType -> DoubleType
@@ -52,7 +52,7 @@ unif pos n sust (Exists _ t) (Exists _ tt) =
 unif pos n sust (RenamedType x ts) (RenamedType y tts)
   | x == y = unifRename pos n sust ts tts
   | otherwise = throw Unif4
-  where unifRename pos n sust [] [] = return sust
+  where unifRename _ _ sust [] [] = return sust
         unifRename pos n sust (t:ts) (tt:tts) =
           do res <- unif pos n sust t tt
              unifRename pos n res ts tts 

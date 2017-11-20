@@ -1,7 +1,6 @@
 module GlobalState where
 
 import Common
-import qualified Data.IntSet as IS
 import qualified LambdaTermDefinition as LTD
 import qualified TypeDefinition as TD
 import qualified Data.Sequence as S
@@ -9,7 +8,7 @@ import Parser (getHypothesisValue)
 import Hypothesis
 
 -- Definiciones globales.
-data GlobalState = Global { fTypeContext :: FTypeContext
+data GlobalState = Global { fTypeContext :: FTypeContext    -- Variables de tipo libres.
                           , lamDef :: LTD.LamDefs           -- Lambda términos definidos.
                           , typeDef :: TD.TypeDefs          -- Tipos definidos.
                           , conflict :: ConflictNames       -- Nombres de expresiones conflictivas

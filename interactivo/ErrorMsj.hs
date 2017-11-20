@@ -17,8 +17,6 @@ printError op (SyntaxE e) =
 printError _ (FileE e) =
   text $ show $ e
 
---printErrorNoPos :: TypeDefs -> ExceptionPos -> Doc
---printErrorNoPos op (_, e) = errorMessage op e 
 
 filePos :: String -> Int -> Doc
 filePos file line =
@@ -29,7 +27,7 @@ filePos file line =
   int 1 <>
   colon
   
--- Mensajes de errores semánticos.
+-- Mensajes de errores.
 errorMessage :: TypeDefs -> SemanticException -> Doc
 errorMessage _ PNotFinished =
   text "error: prueba no terminada."

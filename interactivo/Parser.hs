@@ -6,12 +6,10 @@ import qualified Text.Megaparsec.Char.Lexer as L
 import Text.Megaparsec.Char
 import Control.Applicative (empty)
 import Data.Void (Void)
-import Control.Monad.Reader
-import qualified Data.Sequence as S (Seq, empty, (<|), (|>), singleton, fromList)
-import qualified Control.Exception as E (try)
 import Data.List (isSuffixOf)
 import Data.Char (isSpace)
-import qualified Data.List.NonEmpty as LNE (fromList)
+import qualified Data.Sequence as S (Seq, empty, (<|), (|>), singleton, fromList)
+import qualified Control.Exception as E (try)
 
 type Parser = Parsec Void String
 
@@ -30,12 +28,11 @@ reservedWords = [ "Variables", "Theorem", "Axiom", "Print", "Check", "forall"
                 , ":load", ":abort", ":quit", ":help", ":save", ":l", ":a", ":q", ":h", ":s"
                 ]
 
-reservedSymbols = ["=", "->", ":", "(*", "*)", ".", ";"] --, and_id, or_id, iff_id, not_id]
+reservedSymbols = ["=", "->", ":", "(*", "*)", ".", ";"]
 
 sc :: Parser ()
 sc = L.space space1 empty blockCmnt
-  where --lineCmnt  = L.skipLineComment "%%"
-        blockCmnt = L.skipBlockComment "(*" "*)"
+  where blockCmnt = L.skipBlockComment "(*" "*)"
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
@@ -116,12 +113,12 @@ commands = many ((\x y -> (x,y)) <$> (getLinePos <$> getPosition) <*> command)
 
 
 getLinePos :: SourcePos -> EPosition
-getLinePos (SourcePos n l c) = (n, unPos l)
+getLinePos (SourcePos n l _) = (n, unPos l)
 
 newPosition :: String -> Int -> SourcePos
 newPosition name line = SourcePos name (mkPos line) pos1
 
--- Parseo de un solo comando "extendido".
+-- Parseo de un comando proveniente de la línea de comandos.
 getIndividualCommand :: String -> Int -> CommandLineCommand
 getIndividualCommand s line =
   case parse (cliIndWithPosition line) interactive s  of
@@ -149,7 +146,7 @@ getCommands s line =
     Left e ->
       case parse (cliWithPosition line) interactive s of
         Right x -> Right $ Compound x
-        Left e -> Left $ SyntaxE  e
+        Left e' -> Left $ SyntaxE  e'
 
 cliWithPosition :: Int -> Parser PCompoundCommand
 cliWithPosition line =
@@ -656,18 +653,21 @@ lexeme2 = L.lexeme sc2
 nat2 :: SParser Int
 nat2 = fromInteger <$> lexeme2 L.decimal
 
--- ARREGLAR
--- NO debe tomar cosas de la forma H0024
 getHypothesisValue :: String -> Maybe Int
 getHypothesisValue = parseMaybe $
-                     char 'H' >> nat2
+                     char 'H' >>
+                     (do char '0'
+                         (do digitChar
+                             empty
+                          <|> return 0)
+                      <|> nat2)
 
 
 getInt :: String -> Maybe Int
 getInt s = parseMaybe nat2 s
 
 --------------------------------------------------------------------------------------
--- Parser para identificar el comando escapado "load".
+-- Parser para identificar el comando de control "load".
 isLoadOrSaveCommand :: String -> Bool
 isLoadOrSaveCommand s = case parse (space *> rword2 ":load" <|> rword2 ":l"
                                      <|> rword2 ":save" <|> rword2 ":s") "" s of

@@ -26,14 +26,6 @@ getRename s (f,xs) (g,ys) (h,zs) (i, ws) (j, ts) =
         `max` posfix s' i ws
         `max` posfix s' j ts
 
--- getRename :: (Foldable t1, Foldable t2, Foldable t3, Foldable t4) => String -> (a -> String, t1 a)
---           -> (b -> String, t2 b) -> (c -> String, t3 c) -> (d -> String, t4 d) -> String
--- getRename s (f,xs) (g,ys) (h,zs) (i, ws) =
---   if p < -1  then s else s ++ show (succ p)
---   where p = posfix s f xs
---             `max` posfix s g ys
---             `max` posfix s h zs
---             `max` posfix s i ws
 
 posfix :: Foldable t => String -> (a -> String) -> t a -> Int
 posfix s f xs = foldr (\x i -> maybe i (max i) $ getIntPosfix s $ f x) (-2) xs

@@ -10,7 +10,7 @@ printError :: TypeDefs -> ProverExceptionPos -> Doc
 printError op (SemanticE ((file,pos), e)) =  
   filePos file pos $$
   errorMessage op e 
-printError op (SyntaxE e) =
+printError _ (SyntaxE e) =
   sep $
   (text $ parseErrorPretty e) :
   [text "error de sintaxis."]
@@ -70,10 +70,6 @@ errorMessage _ (TypeRepeated s) =
   text "error:" <+>
   quotes (text s) <+>
   text "repetida."
-errorMessage _ (TypeNotExists s) =
-  text "error:" <+>
-  quotes (text s) <+>
-  text "no existe en el entorno."
 errorMessage _ (OpE1 s) =
   text "error: cantidad de operandos en la operación" <+>
   quotes (text s) <>
@@ -83,25 +79,23 @@ errorMessage _ (OpE2 s) =
   quotes (text s) <+>
   text "no existe."
 errorMessage _ (TermVarE s) =
-  text "error: se esperaba una variable de lambda término." <+>  --VER: Esta bien decir: variable de lambda término? 
+  text "error: se esperaba una variable de lambda término." <+> 
   quotes (text s) <+>
   text "es una variable tipo."  
 errorMessage _ (TypeVarE s) =
   text "error: se esperaba una variable de tipo." <+>
   quotes (text s) <+>
-  text "es una variable de lambda término."  --VER: Esta bien decir: variable de lambda término? 
+  text "es una variable de lambda término."
 errorMessage op (ExactE1 ty) =
   text "error: el término ingresado no tiene el tipo" <+>
-  printType op ty <>
+  quotes (printType op ty) <>
   char '.'
 errorMessage op (ExactE2 ty) =
-  text "error: debe ingresar una prueba de" <+>
-  printType op ty <>
+  text "error: debe ingresar un término de tipo" <+>
+  quotes (printType op ty) <>
   char '.'
 errorMessage _ ExactE3 =
   text "error: lo ingresado no es válido."
-errorMessage _ PSE =
-  text "error: operación sobre el estado interno inválida."
 errorMessage _ (TypeE x) =
   text "error: el tipo" <+>
   quotes (text x) <+>
@@ -121,11 +115,11 @@ errorMessage _ (HypoE i) =
   quotes (text $ printHypo i) <+>
   text "no existe."
 errorMessage _ InvalidCompComm =
-  text "error: comando compuesto inválido"
+  text "error: comando compuesto inválido."
   
 errorInfer :: TypeDefs -> InferException -> Doc
 errorInfer _ (InferE1 x) =
-  text "La variable de término" <+>
+  text "La variable de lambda término" <+>
   quotes (text x) <+>
   text "no fue declarada."
 errorInfer op (InferE2 te ty) =

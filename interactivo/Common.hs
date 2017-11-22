@@ -182,8 +182,8 @@ data SemanticException = PNotFinished | PNotStarted | ExistE String
                        | IntroE1 | ApplyE1 DoubleType DoubleType | HypoE Int
                        | Unif1 | Unif2 | Unif3 | Unif4
                        | ElimE1 | InvalidCommand | TypeRepeated String
-                       | TypeNotExists String | OpE1 String | OpE2 String | ExactE1 DoubleType
-                       | ExactE2 DoubleType | ExactE3 | PSE | EmptyType | TypeE String
+                       | OpE1 String | OpE2 String | ExactE1 DoubleType
+                       | ExactE2 DoubleType | ExactE3 | EmptyType | TypeE String
                        | InferE DoubleLTerm InferException | UnfoldE1 String
                        | TermVarE String | TypeVarE String | InvalidCompComm
                        deriving (Show, Typeable)

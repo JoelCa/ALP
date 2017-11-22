@@ -129,7 +129,7 @@ hasIncompleteInp (PSt {input = Inp {incomplete = Just _}}) = True
 hasIncompleteInp _ = False
 
 setTempHandle :: Handle -> ProverState -> ProverState
-setTempHandle h p@(PSt {tempSave = (name, oldh)}) = p {tempSave = (name, h)}
+setTempHandle h p@(PSt {tempSave = (name, _)}) = p {tempSave = (name, h)}
 
 getTempFile :: ProverState -> (FilePath, Handle)
 getTempFile (PSt {tempSave = file}) = file

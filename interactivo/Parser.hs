@@ -143,10 +143,10 @@ getCommands s line =
   case getIndividualCommand s line of
     Right x ->
       Right $ Simple x
-    Left e ->
+    Left _ ->
       case parse (cliWithPosition line) interactive s of
         Right x -> Right $ Compound x
-        Left e' -> Left $ SyntaxE  e'
+        Left e -> Left $ SyntaxE  e
 
 cliWithPosition :: Int -> Parser PCompoundCommand
 cliWithPosition line =
@@ -473,15 +473,15 @@ sepByCommaSeq p = do x <- p
 --------------------------------------------------------------------------------------
 -- Parser de aplicaciones (genérico).
 applications :: (Parser a -> Parser b) -> Parser u -> (u -> a) -> (a -> b -> a) -> Parser a
-applications args unit c appendApp =
-  do par <- app
-     x <- args app
-     return $ appendApp par x
+applications args unit c append =
+  do par <- appl
+     x <- args appl
+     return $ append par x
      where
-       app =
+       appl =
          do v <- unit
             return $ c v
-         <|> (parens $ applications args unit c appendApp)
+         <|> (parens $ applications args unit c append)
 
 --------------------------------------------------------------------------------------
 -- Parser de las tácticas.

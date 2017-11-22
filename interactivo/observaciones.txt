@@ -185,11 +185,10 @@ El parser interactivo, también.
 - Un comando compuesto c1;c2;..;cn es exitoso si cada uno de los comandos que lo componen es exitoso.
 Si uno de los comandos falla, entonces todo el comando compuesto falla.
 
+- Cuando definimos un tipo "x", llamamos a "x" operador.
 
 
 HACER:
-- Ver si están todos los casos "Left" en "disambiguatedTerm" del archivo Transformers.hs
-- Ver "ErrorMsj.hs", mensaje de errores.
 - Probar el caso de unificación.
 
 HECHO:
@@ -224,6 +223,8 @@ intros.
 - Chequear que pasa si hacemos load de un archivo con un solo comando, y luego hacemos
 save.
 - Añadir mensajes de éxito.
+- Ver si están todos los casos "Left" en "disambiguatedTerm" del archivo Transformers.hs
+- Ver "ErrorMsj.hs", mensaje de errores.
 
 FALTA:
 - Chequear el parser de las hipotesis.

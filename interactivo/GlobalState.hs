@@ -28,8 +28,8 @@ addType s d g = g {typeDef = TD.insert s d $ typeDef g}
 -- Añade un nombre conflicto, si lo es.
 addConflictName :: String -> GlobalState -> GlobalState
 addConflictName s g = g {conflict = addConflictName' s $ conflict g}
-  where addConflictName' s c =
-          case getHypothesisValue s of
+  where addConflictName' x c =
+          case getHypothesisValue x of
             Just n -> insertCN c n
             Nothing -> c
 

@@ -52,8 +52,8 @@ unif pos n sust (Exists _ t) (Exists _ tt) =
 unif pos n sust (RenamedType x ts) (RenamedType y tts)
   | x == y = unifRename pos n sust ts tts
   | otherwise = throw Unif4
-  where unifRename _ _ sust [] [] = return sust
-        unifRename pos n sust (t:ts) (tt:tts) =
-          do res <- unif pos n sust t tt
-             unifRename pos n res ts tts 
+  where unifRename _ _ sus [] [] = return sus
+        unifRename po m sus (x:xs) (y:ys) =
+          do res <- unif po m sus x y
+             unifRename po m res xs ys 
 unif _ _ _ _ _ = throw Unif4

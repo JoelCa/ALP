@@ -1,9 +1,7 @@
 module Transformers where
 
 import Common
-import Data.List (find)
 import RenamedVariables
-import Hypothesis
 import TypeDefinition hiding (empty)
 import LambdaTermDefinition (LamDefs, getNames)
 import Control.Monad (when)
@@ -116,12 +114,12 @@ positiveShiftAndRename n = positiveShiftAndRename' 0 n
 positiveShiftAndRename' :: Int -> Int -> BTypeContext -> BTypeContext
                         -> FTypeContext -> [String]
                         -> [String] -> DoubleType -> DoubleType
-positiveShiftAndRename' m n rs bs fs op _ (TVar (a, b@(Bound x)))
+positiveShiftAndRename' m n rs bs _ _ _ (TVar (a, b@(Bound x)))
   | x < m = case S.findIndexL (\w -> fst w == a) bs of
               Just i -> TVar (fst $ S.index rs i, b)
               Nothing -> error "error: positiveShiftAndRename', no debería pasar."
   | otherwise = TVar (a, Bound (x+n)) 
-positiveShiftAndRename' _ _ _ _ _ _ _ (TVar (a, b@(Free x))) =
+positiveShiftAndRename' _ _ _ _ _ _ _ (TVar (a, b@(Free _))) =
   TVar (a, b)
 positiveShiftAndRename' m n rs bs fs op tn (ForAll x t) =
   let v = getRename x (fst, rs) (id, fs) (id, op) (id, tn) (id, [])
@@ -156,7 +154,7 @@ withoutName i bs tc op fs te = withoutName' i tc tc bs bs fs op (getNames te)
 
 withoutName' :: Int -> TermContext -> TermContext -> BTypeContext -> BTypeContext -> FTypeContext
              -> TypeDefs -> [String] -> LTerm1 -> Either SemanticException DoubleLTerm
-withoutName' _ ters tebs tyrs tybs _ _ _ w@(LVar x) =
+withoutName' _ ters tebs _ tybs _ _ _ (LVar x) =
   do v <- getTermVar x tebs tybs
      case v of
        Just m -> return $ LVar (fst4 $ S.index ters m, Bound m)
@@ -358,7 +356,7 @@ negativeShift' m n (TVar (t,t'@(Bound x)))
   | x < m = return $ TVar (t,t')
   | (m <= x) && (x < n) = Nothing
   | otherwise = return $ TVar (t, Bound $ x - n + m)
-negativeShift' _ _ (TVar (t, t'@(Free f))) = return $ TVar (t,t')
+negativeShift' _ _ (TVar (t, t'@(Free _))) = return $ TVar (t,t')
 negativeShift' m n (Fun t1 t2) =
   do x  <- negativeShift' m n t1
      y <- negativeShift' m n t2

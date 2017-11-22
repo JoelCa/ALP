@@ -93,8 +93,8 @@ fullEqualTypes op (RenamedType s xs) t2@(RenamedType s' ys)
         Just (tt,args,_)-> fullEqualTypes op (typeSubsNoRename args tt xs) t2
         Nothing -> error "error: fullEqualTypes, no debería pasar."
   where aux [] [] = True
-        aux (x:xs) (y:ys) = if fullEqualTypes op x y
-                            then aux xs ys
+        aux (a:as) (b:bs) = if fullEqualTypes op a b
+                            then aux as bs
                             else False
 fullEqualTypes op (RenamedType s xs) t =
   case getTypeData s op of
@@ -109,7 +109,7 @@ fullEqualTypes _ t1 t2 = t1 == t2
 
 -- Obtiene el tipo básico.
 basicType :: DoubleType -> TypeDefs -> DoubleType
-basicType t@(RenamedType s xs) op =
+basicType (RenamedType s xs) op =
   case getTypeData s op of
     Just (tt,args,_) -> basicType (typeSubsNoRename args tt xs) op
     Nothing -> error "error: basicType, no debería pasar."

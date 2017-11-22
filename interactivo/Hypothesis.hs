@@ -2,7 +2,7 @@ module Hypothesis where
 
 import Common (TermVar, TermContext)
 import qualified Data.IntSet as IS
-import Control.Monad (unless, when)
+import Control.Monad (unless)
 import Parser (getHypothesisValue)
 import Data.Sequence (findIndexL)
 

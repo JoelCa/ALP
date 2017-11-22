@@ -1,6 +1,5 @@
 module RenamedVariables where
 
-import Common
 import Data.List (stripPrefix)
 import Parser (getInt, getHypothesisValue)
 

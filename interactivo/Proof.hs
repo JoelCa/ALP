@@ -44,12 +44,11 @@ getGlobalAttr :: (GlobalState -> a) -> Proof a
 getGlobalAttr f = do ps <- get
                      return $ f $ cglobal $ ps
 
-
 getAttribute :: (SubProof -> a) -> Proof a
 getAttribute f = do ps <- get
                     let x = subps ps
                     if null x
-                      then throw $ PSE
+                      then error "error: getAttribute, no debería pasar."
                       else return $ f $ head x
 
 getType :: Proof (Maybe DoubleType)
@@ -203,20 +202,20 @@ endSubProof =
 -- Funciones sobre ProofConstruction
 
 newSubProof :: Int -> DoubleType -> SubProof
-newSubProof n ty = SP { termContext = S.empty,
-                        bTypeContext = S.empty,
-                        lsubp = 1,
-                        tvars = n,
-                        ty = [Just ty]
+newSubProof n t = SP { termContext = S.empty,
+                       bTypeContext = S.empty,
+                       lsubp = 1,
+                       tvars = n,
+                       ty = [Just t]
                       }
 
 
 newProofC :: GlobalState -> DoubleType -> ProofConstruction
-newProofC g ty = PConstruction { tsubp = 1
-                               , subps = [newSubProof (length $ fTypeContext $ g) ty]
-                               , cglobal = g
-                               , term = emptyLTerm
-                               }
+newProofC g t = PConstruction { tsubp = 1
+                              , subps = [newSubProof (length $ fTypeContext $ g) t]
+                              , cglobal = g
+                              , term = emptyLTerm
+                              }
 
 -- Obtiene el lambda término final de la prueba construida.
 getLTermFromProof :: ProofConstruction -> DoubleType -> DoubleLTerm

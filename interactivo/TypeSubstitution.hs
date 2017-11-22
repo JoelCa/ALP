@@ -41,7 +41,7 @@ typeSubs l bs fs op te = typeSubs' 0 l fs bs bs (getTypesNames op) (getNames te)
 typeSubs' :: Int -> Int -> FTypeContext -> BTypeContext -> BTypeContext -> [String]
           -> [String] -> DoubleType -> [DoubleType] -> DoubleType
 typeSubs' n l fs bs rs op tn (TVar (v, Bound x)) ts
-  | x < n = case S.findIndexL (\(x,_) -> x == v) bs of
+  | x < n = case S.findIndexL (\(w,_) -> w == v) bs of
               Just i -> TVar (fst $ S.index rs i, Bound x)
               Nothing -> error "error: typeSubs', no debería pasar."
   | (n <= x) && (x < l) =
@@ -104,7 +104,7 @@ basicTypeSubs' n x@(TVar (tt, Bound m)) t
   | n == m = positiveShift n t
   | m > n = TVar (tt, Bound (m-1))
   | otherwise = x
-basicTypeSubs' n x@(TVar (_, Free _)) _ = x
+basicTypeSubs' _ x@(TVar (_, Free _)) _ = x
 basicTypeSubs' n (ForAll v t1) t =
   let tt = basicTypeSubs' (n+1) t1 t
   in ForAll v tt

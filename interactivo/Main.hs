@@ -142,8 +142,6 @@ checkSimpleCommand :: PExtComm -> ProverInputState ()
 checkSimpleCommand x@(pos, _, _) =
   do s <- lift get
      when (hasIncompleteInp s) (throwSemanError pos InvalidCompComm)
-     --when (proofStarted s) $ outputStrLn $ show $ subps $ getProofC s
-     outputStrLn $ show $ x
      checkSimpleCommand' x
      
 
@@ -470,7 +468,7 @@ returnInput pos (Left exception) = throwIO $ SemanticE (pos, exception)
 returnInput _ (Right x) = return x
 
 returnInputFromParser :: Either ProverException a -> ProverInputState a
-returnInputFromParser (Left (SemanticE e)) = error "error: returnInputFromParser, no debería suceder."
+returnInputFromParser (Left (SemanticE _)) = error "error: returnInputFromParser, no debería suceder."
 returnInputFromParser (Left (SyntaxE e)) = throwIO (SyntaxE e :: ProverExceptionPos)
 returnInputFromParser (Left (FileE e)) = throwIO (FileE e :: ProverExceptionPos)
 returnInputFromParser (Right x) = return x

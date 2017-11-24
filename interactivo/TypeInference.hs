@@ -96,6 +96,8 @@ fullEqualTypes op (RenamedType s xs) t2@(RenamedType s' ys)
         aux (a:as) (b:bs) = if fullEqualTypes op a b
                             then aux as bs
                             else False
+        aux _ _ = False
+        
 fullEqualTypes op (RenamedType s xs) t =
   case getTypeData s op of
     Just (tt,args,_) -> fullEqualTypes op (typeSubsNoRename args tt xs) t

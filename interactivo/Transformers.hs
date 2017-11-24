@@ -220,6 +220,7 @@ disambiguatedType bs fs op (Node x []) =
   transformTypeVar (\w _ _ -> w) S.empty bs S.empty fs op x 
 disambiguatedType bs fs op (Node x xs) =
   transformType op x xs $ disambiguatedType bs fs op
+disambiguatedType _ _ _ Nil = error "error: disambiguatedType, no debería pasar. "
 
 -- Convierte una aplicacion en una aplicación de lambda términos, si es posible.
 -- Se asume que los espacios de nombres entre las variables de tipo y términos

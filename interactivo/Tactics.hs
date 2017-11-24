@@ -407,7 +407,7 @@ unfoldComm btc ftc op te oper (Exists v t) body =
 -- Obtiene el tipo de la variable de término, renombrando su tipo sin nombre, de acuerdo
 -- a la profundidad dada por el 1º argumento.
 renameType :: Int -> TermVarWithType -> DoubleType
-renameType n (_,_,m,Just t) = positiveShift (n-m) t
+renameType n (_, _, m, Just t) = positiveShift (n-m) t
 
 maybeToProof :: SemanticException -> Maybe a -> Proof a
 maybeToProof excep Nothing = throw excep

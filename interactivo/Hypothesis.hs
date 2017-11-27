@@ -6,6 +6,10 @@ import Control.Monad (unless)
 import Parser (getHypothesisValue)
 import Data.Sequence (findIndexL)
 
+-- Nombres en conflicto con los nombre de hipótesis.
+-- Nombre de la forma, H<nro>.
+-- 1. Conjunto de valores con los números que componen los nombres.
+-- 2. Tamaño de 1.
 type ConflictNames = (IS.IntSet, Int)
 
 emptyCN :: ConflictNames
@@ -38,7 +42,7 @@ count i (cn, _) = IS.foldr (\x (m, r) ->
                               else (m, insertCN r x)) (0, emptyCN) cn
 
 
--- Se obtiene la posición que ocupa la hipótesis dada por el 2º arg,
+-- Se obtiene la posición que ocupa la hipótesis dada por el 3º arg,
 -- en el contexto de términos.
 -- Argumentos:
 -- 1. Contexto de términos, junto con su tamaño.

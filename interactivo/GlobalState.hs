@@ -11,7 +11,7 @@ import Hypothesis
 data GlobalState = Global { fTypeContext :: FTypeContext    -- Variables de tipo libres.
                           , lamDef :: LTD.LamDefs           -- Lambda términos definidos.
                           , typeDef :: TD.TypeDefs          -- Tipos definidos.
-                          , conflict :: ConflictNames       -- Nombres de expresiones conflictivas
+                          , conflict :: ConflictNames       -- Nombres de expresiones en conflicto
                                                             -- con los nombres de hipótesis.
                           }
 

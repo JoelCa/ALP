@@ -11,19 +11,19 @@ data ProverState = PSt { proof :: Maybe ProofState          -- Datos de la posib
                        , global :: GlobalState              -- Datos "globales".
                        , tempSave :: (FilePath, Handle)     -- Dirección del historial de comandos ingresados por el usuario.
                        , input :: Input                     -- Datos de un comando compuesto.
-                       , cc :: Int                          -- Contador del número de entradas dadas por el usuario.
+                       , cc :: Int                          -- Contador del número de entradas.
                        }
                    
-  -- Mantiene datos para la construcción de un comando compuesto.
+  -- Mantiene datos de un comando compuesto.
 data Input = Inp { commands :: [PComm]                      -- Comandos completos que componen la penúltima entrada incompleta del usuario.
                  , incomplete :: Maybe PIncompleteComm      -- Posible comando incompleto de la penúltima entrada incompleta del usuario.
                  }
              
   -- Estado de la prueba que se está construyendo.
-data ProofState = PState { name :: String
-                         , types :: DoubleType
-                         , constr :: ProofConstruction
-                         , history :: [String]
+data ProofState = PState { name :: String                   -- Nombre.
+                         , types :: DoubleType              -- Tipo objetivo.
+                         , constr :: ProofConstruction      -- Prueba en construcción.
+                         , pcomm :: [String]                -- Comandos que componen la prueba.
                          }
 
 -- Estado inicial.
@@ -44,7 +44,7 @@ newProof' :: GlobalState -> String -> DoubleType -> DoubleType -> ProofState
 newProof' g name ty tyr = PState { name = name
                                  , types = ty
                                  , constr = newProofC g tyr
-                                 , history = []
+                                 , pcomm = []
                                  }
 
 getProofC :: ProverState -> ProofConstruction
@@ -87,7 +87,7 @@ theoremName (PSt {proof = Just pr}) = name pr
 theoremName _ = error "error: theoremName, no debería pasar."
 
 addInput :: String -> ProverState -> ProverState
-addInput input p@(PSt {proof = Just pr}) = p {proof = Just $ pr {history = input : history pr}}
+addInput input p@(PSt {proof = Just pr}) = p {proof = Just $ pr {pcomm = input : pcomm pr}}
 addInput _ (PSt {proof = Nothing}) = error "error: addProofCommand, no debería pasar"
 
 addIncompleteInput :: PIncompleteComm -> ProverState -> ProverState
@@ -135,7 +135,7 @@ getTempFile :: ProverState -> (FilePath, Handle)
 getTempFile (PSt {tempSave = file}) = file
 
 getProofCommands :: ProverState -> [String]
-getProofCommands (PSt {proof = Just pr}) = history pr
+getProofCommands (PSt {proof = Just pr}) = pcomm pr
 getProofCommands _ = error "error: getProofCommands, no debería pasar."
 
 addCount :: ProverState -> ProverState

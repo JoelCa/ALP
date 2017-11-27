@@ -7,15 +7,14 @@ import LambdaTermDefinition (LamDefs, getNames)
 import Control.Monad (when)
 import Data.Maybe (isJust)
 import qualified Data.Sequence as S
-  
--- Retorna el tipo con nombre, posiblemente renombrado, de su 3º arg.
--- A fin de respetar la Convención 1.
--- Además, genera el tipo sin nombre.
+
+
+-- Retorna el tipo con y sin nombre, posiblemente renombrado, de su 4º arg.
 -- Argumentos:
 -- 1. Varibles de tipo libres.
--- 2. Operaciones "foldeables".
--- 3. Teoremas.
--- 4. Tipo a procesar.
+-- 2. Tipos definidos.
+-- 3. Lambda términos definidos.
+-- 4. Tipo con nombre a procesar.
 -- OBS: Utilizamos esta función sobre tipos que NO requieren del contexto de tipos "ligados".
 renamedType1 :: FTypeContext -> TypeDefs -> LamDefs -> Type1
              -> Either SemanticException DoubleType
@@ -23,7 +22,6 @@ renamedType1 ftc op te = renamedType S.empty S.empty S.empty ftc op (getNames te
 
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
 -- por el 6º argumento.
--- El renombramiento se realiza de modo tal que se respete la Convención 1.
 -- OBS: Utilizamos esta función sobre tipos que requieren del contexto de tipos "ligados".
 renamedType2 :: BTypeContext -> TermContext -> FTypeContext ->  TypeDefs
              -> LamDefs -> Type1 -> Either SemanticException DoubleType
@@ -31,7 +29,6 @@ renamedType2 bs tc ftc op te = renamedType bs bs tc ftc op (getNames te)
 
 -- Retorna el tipo con nombre (renombrado), y sin nombre, del tipo dado
 -- por el 5º argumento.
--- El renombramiento se realiza de modo tal que se respete la Convención 1.
 -- OBS: Solo la utilizamos en el renombramiento del cuerpo de una operación.
 renamedType3 :: S.Seq TypeVar -> FTypeContext ->  TypeDefs -> LamDefs
              -> Type1 -> Either SemanticException DoubleType
@@ -39,7 +36,15 @@ renamedType3 bs ftc op te = renamedType bs' bs' S.empty ftc op (getNames te)
   where bs' = fmap typeVar0 bs
 
 
--- Obtiene el tipo renombrado, y sin nombre, de su 5º arg.
+-- Retorna el tipo con y sin nombre, posiblemente renombrado, de su 7º arg.
+-- Argumentos:
+-- 1. Variables de tipo ligadas renombradas.
+-- 2. Variables de tipo ligadas procesadas.
+-- 3. Variables de términos.
+-- 4. Variables de tipos libres.
+-- 5. Tipos definidos.
+-- 6. Nombres lambda términos definidos.
+-- 7. Tipo con nombre a procesar.
 renamedType :: BTypeContext -> BTypeContext -> TermContext
             -> FTypeContext -> TypeDefs -> [String] -> Type1
             -> Either SemanticException DoubleType
@@ -64,7 +69,8 @@ basicTypeWithoutName :: FTypeContext -> TypeDefs -> Type1
                      -> Either SemanticException DoubleType
 basicTypeWithoutName = typeWithoutName S.empty S.empty
 
--- Obtiene el tipo sin nombre de su 4º arg. No se realiza renombramientos.
+-- Obtiene el tipo con y sin nombre del tipo dado por su 5º arg.
+-- NO se realiza renombramientos.
 typeWithoutName :: BTypeContext -> TermContext -> FTypeContext -> TypeDefs
                 -> Type1 -> Either SemanticException DoubleType
 typeWithoutName bs tc fs op (TVar x) =
@@ -94,17 +100,18 @@ renamedValidType2 :: Int -> BTypeContext -> FTypeContext
 renamedValidType2 n bs = positiveShiftAndRename n bs bs
 
 
--- Renombra las variables de tipo ligadas de un tipo válido.
+-- Renombra las variables de tipo ligadas de un tipo válido,
+-- y realiza un corrimiento "positivo" de las variables de tipoligadas.
 -- Se asume que el tipo dado por el 7º arg. está bien formado. Es decir que,
 -- NO tiene variables escapadas que no han sido declaradas en el contexto.
 -- Argumentos:
 -- 1. Corrimiento positivo.
 -- 2. Conjunto de variables de tipo ligadas renombradas.
--- 3. Conjunto de variables de tipo ligadas no renombradas.
+-- 3. Conjunto de variables de tipo ligadas procesadas.
 -- 4. Conjunto de variables de tipos libres.
 -- 5. Nombres de los tipos definidos.
 -- 6. Nombres de los lambda términos definidos.
--- 7. Tipo sobre el que se realiza el renombramiento.
+-- 7. Tipo sobre el que se realiza el renombramiento y corrimiento.
 positiveShiftAndRename :: Int -> BTypeContext -> BTypeContext
                        -> FTypeContext -> [String]
                        -> [String] -> DoubleType -> DoubleType
@@ -142,16 +149,30 @@ basicWithoutName op fs = withoutName 0 S.empty S.empty op fs
 
 -- Genera el lambda término con renombre de variables de tipo, y variables de término.
 -- Chequea que las variables de tipo sean válidas de acuerdo al contexto de tipo.
--- En caso de ser necesario renombra las variables de tipo "ligadas".
--- Además, chequea que las variables de términos también sean válidas.
--- Se asume que el 1º argumento es mayor o igual a cero.
+-- En caso de ser necesario renombra las variables de tipo ligadas.
 -- Obs: es util generar el lambda término con nombres renombrados para imprimir mejor los errores.
 -- Se usa en el algoritmo de inferencia, y en el comando exact.
+-- 1. Longitud del contexto.
+-- 2. Variables de tipo ligadas.
+-- 3. Variables de términos.
+-- 4. Tipos definidos.
+-- 5. Variables de tipo libre.
+-- 6. Lambda términos definidos.
+-- 7. Lambda término a procesar.
 withoutName :: Int -> BTypeContext -> TermContext -> TypeDefs -> FTypeContext
             -> LamDefs -> LTerm1 -> Either SemanticException DoubleLTerm
 withoutName i bs tc op fs te = withoutName' i tc tc bs bs fs op (getNames te)
 
 
+-- 1. Longitud del contexto.
+-- 2. Variables de término renombradas.
+-- 3. Variables de término procesadas.
+-- 4. Variables de tipo renombradas.
+-- 5. Variables de tipo procesadas.
+-- 6. Variables de tipo libre.
+-- 7. Tipos definidos.
+-- 8. Nombre de lamdba términos definidos.
+-- 9. Lambda término a procesar.
 withoutName' :: Int -> TermContext -> TermContext -> BTypeContext -> BTypeContext -> FTypeContext
              -> TypeDefs -> [String] -> LTerm1 -> Either SemanticException DoubleLTerm
 withoutName' _ ters tebs _ tybs _ _ _ (LVar x) =
@@ -185,7 +206,6 @@ withoutName' i ters tebs tyrs tybs fs op tn (EUnpack x y e1 e2) =
   do ee1 <- withoutName' i ters tebs tyrs tybs fs op tn e1
      let v = getRename x (fst4, ters) (fst, tyrs) (id, fs) (id, getTypesNames op) (id, tn)
          h = getRename y (fst4, ters) (fst, tyrs) (id, fs) (id, getTypesNames op) (id, tn)
-         -- CHEQUEAR indices i.
      ee2 <- withoutName' (i+2) (termVar0 h S.<| ters) (termVar y (i+1) S.<| tebs) (typeVar0 v S.<| tyrs) (typeVar x i S.<| tybs) fs op tn e2
      return $ EUnpack v h ee1 ee2
 withoutName' i ters tebs tyrs tybs fs op tn (e ::: t) =
@@ -216,7 +236,6 @@ disambiguatedTerm tc btc ftc op t =
 disambiguatedType :: BTypeContext -> FTypeContext -> TypeDefs
                   -> GenTree String -> Either SemanticException DoubleType
 disambiguatedType bs fs op (Node x []) =
-  -- NO es necesario rs, ni el contexto de términos.
   transformTypeVar (\w _ _ -> w) S.empty bs S.empty fs op x 
 disambiguatedType bs fs op (Node x xs) =
   transformType op x xs $ disambiguatedType bs fs op
@@ -324,8 +343,8 @@ getTermVar' i s tec tyc
 typeVar :: TypeVar -> Int -> BTypeVar
 typeVar x i = (x, i)
 
--- Genera una variable de tipo para un contexto donde
--- se analiza un tipo.
+-- Genera una variable de tipo sin posición.
+-- Útil en un contexto donde se analiza un tipo.
 typeVar0 :: TypeVar -> BTypeVar
 typeVar0 x = typeVar x (-1)
 
@@ -338,7 +357,7 @@ fromType _ = False
 termVar :: TermVar -> Int -> TermVarWithType
 termVar x i = (x, i, 0, Nothing)
 
--- Genera una variable de término, donde solo nos
+-- Genera una variable de término, donde solo
 -- interesa su nombre.
 termVar0 :: TermVar -> TermVarWithType
 termVar0 x = termVar x 0

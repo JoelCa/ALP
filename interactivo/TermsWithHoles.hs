@@ -15,6 +15,7 @@ type THoles a b = [T2Holes a b]
 
 type LTerm2Holes = T2Holes DoubleLTerm DoubleType
 
+  -- Lamda término con aujeros de términos y tipos.
 type LTermHoles = THoles DoubleLTerm DoubleType
 
 -- Funciones que operan sobre los lambda términos con aujeros.

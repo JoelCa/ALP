@@ -234,3 +234,14 @@ de teoremas probados.
 - En el pretty printer de un lambda término sin nombre, hacer que las variables de términos ligadas sean
 distintas a las variables de tipo libre y nombres de operadores.
 - Explicar en el informe el renombre de lambda términos (tanto de var. de tipos, como de términos).
+
+
+
+Hice un asistente de prueba de la lógica proposicional constructiva de segundo orden,
+este extiende el lenguaje de la lógica proposicional mediante los cuantificadores 'para todo' y 'existe'.
+Hago uso de la relación prueba y lambda término, dado por el isomorfismo de Curry-Howard, para
+dar el lambda término de la prueba que construye el usuario.
+Utilizé el Sistema F extendido, estilo Church. Lo implementé siguiendo las reglas del libro de Pierce.
+De echo, tome como guia el interprete del Sistema F de Pierce.
+A diferencia de su interprete, el mio no implementa la beta-reducción. Solo me limite al chequeo de tipos.
+Para los comandos que forman mi asistente, me base en Coq.   

@@ -11,6 +11,10 @@ import Data.Char (isSpace)
 import qualified Data.Sequence as S (Seq, empty, (<|), (|>), singleton, fromList)
 import qualified Control.Exception as E (try)
 
+-----------------------
+--- parser
+-----------------------
+
 type Parser = Parsec Void String
 
 type FileCommands = Either ProverException [PCommand]
@@ -667,7 +671,7 @@ getInt :: String -> Maybe Int
 getInt s = parseMaybe nat2 s
 
 --------------------------------------------------------------------------------------
--- Parser para identificar el comando de control "load".
+-- Identificación del comando de control "load" o "save".
 isLoadOrSaveCommand :: String -> Bool
 isLoadOrSaveCommand s = case parse (space *> rword2 ":load" <|> rword2 ":l"
                                      <|> rword2 ":save" <|> rword2 ":s") "" s of

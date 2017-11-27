@@ -137,7 +137,6 @@ getLangCommand (pos, s, Lang x) = return (pos, s, x)
 getLangCommand (pos, _, _) = throwSemanError pos InvalidCompComm  
 
 
--- TERMINAR help
 checkSimpleCommand :: PExtComm -> ProverInputState ()
 checkSimpleCommand x@(pos, _, _) =
   do s <- lift get
@@ -428,7 +427,7 @@ reloadProver = lift $ modify $ cleanInput . deleteProof . newLamDefFromProof
 
 
 -- Función auxiliar de "typesVarCommand".
--- Determinar si hay nombres de variables conflictivos, en el primer argumento.
+-- Determina si hay nombres de variables conflictivos en el primer argumento.
 typeCheckNames :: S.Seq TypeVar -> ProverState -> (Maybe String, Maybe String, [String])
 typeCheckNames ps s = checkSeq ps elem (\t -> invalidName t $ global s) isHypothesis
 
@@ -456,7 +455,7 @@ renderLTerm op  = render . printLTerm op
 renderType :: TypeDefs -> DoubleType -> String
 renderType op = render . printType op
 
--- Impresión de la prueba en construcción
+-- Impresión de la prueba en construcción.
 renderProof :: ProofConstruction -> String
 renderProof p = render $ printProof (tsubp p) (typeDef $ cglobal p) (fTypeContext $ cglobal p) (subps p)
 

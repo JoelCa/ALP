@@ -12,8 +12,8 @@ import qualified Data.Sequence as S
 -- Para ello, hace dos cosas:
 -- 1. Renombra todas las variables de tipo ligadas "escapadas" (sin nombres),
 -- nos referimos a aquellas variables cuyo cuantificador no figura en el tipo
--- (sin nombre) del 3º arg.
--- 2. Renombra las variables de tipo ligadas (con nombres) del 3º arg., de modo tal que no halla
+-- del 6º arg.
+-- 2. Renombra las variables de tipo ligadas (con nombres) del 6º arg., de modo tal que no halla
 -- dos var. de tipo ligadas con el mismo nombre, una más anidada que la otra.
 -- Argumentos:
 -- 1. Cantidad de sustituciones a realizar.
@@ -28,16 +28,16 @@ typeSubs :: Int -> BTypeContext -> FTypeContext -> TypeDefs -> LamDefs
 typeSubs l bs fs op te = typeSubs' 0 l fs bs bs (getTypesNames op) (getNames te)
 
 -- Realiza la sust. de tipos.
--- 1. Profundidad ("para todos"), procesados.
--- 2. Cantidad de tipos a reemplazar (podemos pensarlo como el número de corrimientos).
--- 3. Contexto de variables de tipo libres.
--- 4. Contexto de variables de tipo ligadas (con nombres) procesadas.
--- 5. Contexto de los renombres de las variables de tipo ligadas (con nombres) del 4º arg.
+-- 1. Profundidad ("para todos" procesados).
+-- 2. Cantidad de tipos a reemplazar.
+-- 3. Variables de tipo libres.
+-- 4. Variables de tipo ligadas (con nombres) procesadas.
+-- 5. Variables de tipo ligadas renombradas.
 --    Incluye además las var. de tipo ligadas del contexto.
--- 6. Operaciones foldeables.
--- 7. Nombres de los teoremas.
--- 8. Tipo sobre el que se hace la sust. Sin los "para todos" que se van a sustituir.
--- 9. Tipos que se sustituyen.
+-- 6. Nombre de los tipos definidos.
+-- 7. Nombre de los lambda términos definidos.
+-- 8. Tipo sobre el que se hace la substitución. Sin los "para todos" que se van a sustituir.
+-- 9. Substitución.
 typeSubs' :: Int -> Int -> FTypeContext -> BTypeContext -> BTypeContext -> [String]
           -> [String] -> DoubleType -> [DoubleType] -> DoubleType
 typeSubs' n l fs bs rs op tn (TVar (v, Bound x)) ts
@@ -66,16 +66,16 @@ typeSubs' n l fs bs rs op tn (RenamedType s xs) ts =
   in RenamedType s r
 
 
--- Realiza la sust. de tipos. sin nombre.
+-- Realiza la sust. de tipos, solo tiene en cuenta los tipos sin nombre.
 typeSubsNoRename :: Int -> DoubleType -> [DoubleType] -> DoubleType
 typeSubsNoRename _ t [] = t
 typeSubsNoRename l t xs = typeSubsNoRename' 0 l t xs
 
--- Realiza la sust. de tipos, solo tiene en cuenta los tipos sin nombre.
+
 -- 1. Profundidad ("para todos"), procesados.
--- 2. Cantidad de tipos a reemplazar (podemos pensarlo como el número de corrimientos).
--- 3. Tipo sin nombre, sobre el que se hace la sust. Sin los "para todos" que se van a sustituir.
--- 4. Tipos sin nombre que se sustituyen.
+-- 2. Cantidad de tipos a reemplazar.
+-- 3. Tipo sobre el que se hace la substitución. Sin los "para todos" que se van a sustituir.
+-- 4. Substitución.
 typeSubsNoRename' :: Int -> Int -> DoubleType -> [DoubleType] -> DoubleType
 typeSubsNoRename' n l t@(TVar (a, Bound x)) ts
   | x < n = t
@@ -92,9 +92,9 @@ typeSubsNoRename' n l (Fun t1 t2) ts =
 typeSubsNoRename' n l (RenamedType op xs) ts =
   RenamedType op $ map (\x -> typeSubsNoRename' n l x ts) xs
 
+-- Substitución de la forma: "t [T]".
 -- Consideramos que el 1º argumento corresponde al cuerpo de una cuantificación ("para todo", "existe").
--- Se reemplaza la variable ligada más "externa" por el 2º argumento.
--- Además, se corrigen las varibles ligadas escapadas sin nombre. No se renombran las variables ligadas
+-- Se corrigen las varibles ligadas escapadas sin nombre. NO se renombran las variables ligadas
 -- con nombre.
 basicTypeSubs :: DoubleType -> DoubleType -> DoubleType
 basicTypeSubs = basicTypeSubs' 0

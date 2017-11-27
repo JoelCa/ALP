@@ -19,17 +19,15 @@ data ProofConstruction = PConstruction { tsubp :: Int              -- Cantidad t
                                        , term :: LTermHoles        -- Lambda termino con aujeros.
                                        }
 
-  -- Conjunto de subpruebas.
+  -- Estado de las subpruebas.
 data SubProof = SP { termContext :: TermContext    -- Vars. de término.
                    , bTypeContext :: BTypeContext  -- Vars. de tipo ligadas.
-                                                   -- Útil para el pretty printer.
                    , lsubp :: Int                  -- Cantidad de subpruebas activas contenidas.
                    , tvars :: Int                  -- Cantidad total de variables de tipo y
                                                    -- términos disponibles. Útil para el pretty printer.
                    , ty :: [Maybe DoubleType]      -- Tipo objetivo, de cada subprueba contenida.
                    }
-              deriving Show
-
+ 
 -- Operaciones que modifican el estado de la monada Proof.
 -- Es decir que, estas operaciones cambian la prueba.
 
@@ -168,7 +166,7 @@ addSubProof t sp =  SP { termContext = x
         y = bTypeContext s
         z = tvars s
 
--- Representa la creación de las subpruebas para cada tipo
+-- Creación de las subpruebas para cada tipo
 -- objetivo dado por el 2º arg.
 newSubProofs :: Int -> [Maybe DoubleType] -> Proof ()
 newSubProofs n ts

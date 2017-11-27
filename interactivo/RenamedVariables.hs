@@ -3,9 +3,8 @@ module RenamedVariables where
 import Data.List (stripPrefix)
 import Parser (getInt, getHypothesisValue)
 
--- Crea una string, que no está en ninguna de las estructuras t1, t2, t3, t4, t5.
--- Además, renombra la string si está en el espacio de nombre de las hipótesis.
--- Crea una string, que no está en ninguna de las estructuras t1, t2, t3.
+-- Renombra la string dada por el primer argumento, de modo tal de que no esté en ninguna de
+-- las estructuras t1, t2, t3, t4, t5, ni tampoco en el espacio de nombre de las hipótesis.
 getRename :: (Foldable t1, Foldable t2, Foldable t3, Foldable t4, Foldable t5)
           => String -> (a -> String, t1 a) -> (b -> String, t2 b) -> (c -> String, t3 c)
           -> (d -> String, t4 d) -> (e -> String, t5 e) -> String

@@ -16,7 +16,7 @@ import Data.Maybe (fromJust, isJust)
 import qualified Data.Sequence as S
 
 
--- Contruye la prueba.
+-- Contruye la prueba a partir de la táctica.
 habitar :: Tactic -> Proof ()
 habitar Assumption =
   do x <- getType
@@ -377,8 +377,8 @@ exactTerm te tt =
 -- Argumentos:
 -- 1. Contexto de variables de tipos ligadas.
 -- 2. Contexto de variables de tipos libres.
--- 3. Operaciones "foldeables".
--- 4. Teoremas.
+-- 3. Tipos definidos.
+-- 4. Lambda términos definidos.
 -- 5. Nombre de la operación a "unfoldear".
 -- 6. Tipo sobre el que se aplica el unfold.
 -- 7. Tipo que define al operador foldeado (sin los para todos).

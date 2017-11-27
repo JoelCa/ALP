@@ -156,6 +156,11 @@ Para probar el renombre del unfold.
 - Theorem x: forall w, w -> w.
   Theorem t58: forall x, forall y, y -> y.
 Para chequear el renombre.
+- Theorem t59: forall b, forall c, (forall a, (forall o, b) -> c) -> forall w, forall d, (forall o, b) -> c;
+Para chequear la unificación.
+- Theorem t60: forall b, forall c, (forall a, (forall o, a)) -> forall w, forall d, (forall o, w);
+Para chequear la unificación.
+
 
 
 Casos de inferencia OK:

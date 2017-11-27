@@ -4,7 +4,7 @@ import Common
 import Transformers (positiveShift, negativeShift)
 import qualified Data.Map.Strict as M (Map, lookup, insert, empty)
 
--- Algoritmo de unificación para el comando APPLY.
+-- Algoritmo de unificación.
 unification :: Bool -> Int -> DoubleType -> DoubleType
             -> Either SemanticException (M.Map Int DoubleType)
 unification True _ = \_ _ -> return M.empty
@@ -14,8 +14,7 @@ unification False n = unif 0 n M.empty
 -- Argumentos:
 -- 1. Cantidad de "para todos" analizados.
 -- 2. Cantidad de instancias a generar.
--- 3. Sustituciones encontradas. La clave indica la posición de la sustitucición (el valor), desde la izquierda.
--- Osea, si c1 < c2 => [t1/v1]..[t2/v2] (donde v1 y v2, son las variables con nombres de las variables sin nombres).
+-- 3. Sustituciones encontradas. La clave indica la posición de la sustitucición, desde la izquierda.
 -- 4. El tipo al que se le halla la unificación (sin los "para todos" externos).
 -- 5. El tipo con el debe unificar el tipo dado en el 4º arg.
 unif :: Int -> Int -> M.Map Int DoubleType
@@ -38,7 +37,7 @@ unif pos n sust t@(TVar (_, Bound i)) tt
                 (\t' -> if t' == tt
                         then return sust
                         else throw Unif2)
-                (negativeShift n t)  -- Probar este caso
+                (negativeShift (n - pos) t)
 unif _ _ sust (TVar (_,Free x)) (TVar (_, Free y))
   | x == y = return sust
   | otherwise = throw Unif3

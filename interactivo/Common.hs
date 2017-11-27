@@ -55,9 +55,7 @@ instance Eq (DoubleType) where
   -- Lambda término con nombre, y tipos con nombres.
 type LTerm1 = LamTerm TermVar TermVar Type1
 
-  -- Lambda término sin nombre, y tipos con y sin nombres.
-type LTerm2 = LamTerm () (VarName TermVar) DoubleType
-
+  -- Lambda término con y sin nombre, y tipos con y sin nombre.
 type DoubleLTerm = LamTerm TermVar (TermVar, VarName TermVar) DoubleType
 
 data LamTerm a b c = LVar b
@@ -72,7 +70,7 @@ data LamTerm a b c = LVar b
 
   -- Para cada variable de término, tenemos (por posición en la 4-tupla):
   -- 1. Nombre.
-  -- 2. Su posición en el contexto, a la hora de imprimirlo.
+  -- 2. Su posición en el contexto.
   -- 3. La profundidad con la que se añadio al contexto,
   -- (la profundidad se refiere a la cantidad de cuantificadores construidos).
   -- 4. Su tipo con y sin nombre.
@@ -121,29 +119,29 @@ data CLICommands = Simple PExtComm
                  | Compound PCompoundCommand
                  deriving (Show)
 
-  -- Comando del lenguaje, junto con su posición de aparición.
+  -- Comando del lenguaje, junto con su posición de aparición en la línea de comandos.
 type PCommand = (EPosition, Command)
 
 type PCommandWithInput a = (EPosition, String, a)
 
-  -- Comando, junto con su posición, en sus dos representaciones,
-  -- concreta y abstracta.
+  -- Comando, junto con su posición.
+  -- En sus dos representaciones, concreta y abstracta.
 type PExtComm = PCommandWithInput ExtCommand
 
-  -- Comando del lenguaje, junto con su posición, en sus dos
-  -- representaciones, concreta y abstracta.
+  -- Comando del lenguaje, junto con su posición
+  -- En sus dos representaciones, concreta y abstracta.
 type PComm = PCommandWithInput Command
 
   -- Comando incompleto, junto con su posición.
 type PIncompleteComm = (EPosition, String)
 
--- Comando compuesto, donde:
--- 1. Posible comando incompleto, que precede a los comandos completos.
--- 2. Comandos completos.
--- 3. Posible comando incompleto, que sucede a los comandos completos.
+  -- Comando compuesto, donde:
+  -- 1. Posible comando incompleto, que precede a los comandos completos.
+  -- 2. Comandos completos.
+  -- 3. Posible comando incompleto, que sucede a los comandos completos.
 type PCompoundCommand = (Maybe PIncompleteComm, [PComm], Maybe PIncompleteComm)
 
-
+  -- Comando de declaración de lambda términos o tipos.
 data BodyDef = LTerm LTerm1
              | EmptyLTerm Type1
              | Type TypeDefWithName
@@ -157,9 +155,10 @@ data BodyDef = LTerm LTerm1
   -- 3. Boleano. True sii es un tipo binario infijo.
 type TypeDef a = (a, Int, Bool)
 
-  -- Definición de un tipo (tipo con nombre). 
+  -- Tipo definido (tipo con nombre). 
 type TypeDefWithName = TypeDef (Type1, Seq TypeVar)
 
+  -- Tipo definido (tipo con nombre y sin nombre).
 type TypeDefNoName = TypeDef DoubleType
 
   -- Tácticas de prueba.
@@ -208,12 +207,12 @@ data InferException = InferE1 String | InferE2 DoubleLTerm DoubleType
                      deriving (Show, Typeable)
                               
   -- Árbol. Útil en la representación de una aplicación "ambigua"
-  -- (aplicación de lambda términos, o "aplicación" de tipos).
+  -- (a priori no se sabe si es una aplicación de lambda términos, o "aplicación" de tipos).
 data GenTree a = Nil | Node a [GenTree a]
                deriving (Show)
 
 
-  -- Nombre de tipos dados en el preludio.
+  -- Nombre de los tipos declarados en el preludio.
 and_id = ['/', '\\']
 or_id = ['\\', '/']
 bottom_id = "False"

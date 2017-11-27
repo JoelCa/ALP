@@ -109,7 +109,7 @@ printLTerm' op (i, j) (t ::: ty) =
 
 --------------------------------------------------------------------------------------------  
 -- Pretty-printer de tipos con nombres.
--- Consideramos que las operaciones "custom", son a lo suma binaria.
+-- Consideramos que las operaciones de "Prelude.pr", son a lo suma binaria.
 -- Además, que las operaciones unaria solo se imprimen de forma prefija.
 -- Obs: Basta con que la primera componente de la tripleta, que se pasa como argumento a
 -- printType', sea mayor o igual a 7, para asegurar que no aparescan paréntesis "externos".
@@ -117,12 +117,10 @@ printType :: TypeDefs -> DoubleType -> Doc
 printType = printType' (7,False)
 
 -- Argumentos:
--- 1. Si el argumento número 3 "x", es un argumento de una operación "op",
--- estonces la componente número uno de la túpla indica la precedencia
--- de "op", mientras que el argumento número 2, nos dice si "x" es la
--- componente izquierda de "op".
--- 2. Operaciones foldeables.
--- 3. Tipo.
+-- 1. Al procesar una operación "op", la componente número uno de la túpla indica la precedencia
+-- de "op", mientras que  la componente dos, nos dice si estamos procesando la componente izquierda de "op".
+-- 2. Tipos definidos.
+-- 3. Tipo a imprimir.
 printType' :: (Int, Bool) -> TypeDefs -> DoubleType -> Doc
 printType' _ _ (TVar (v, _)) =
   text v
@@ -262,44 +260,72 @@ printBTypeVar (x, _) = text x
 --------------------------------------------------------------------------------------------  
 -- Comando Help
 
---TERMINAR
 helpMessage :: [(String, String)]
-helpMessage = [("Variables <var>, <var>, ...",
-               "Declaración de variables proposicionales.\n"),
-               ("<op> <var> <var> ... = <logic term>",
-               "Declaración de un operador lógico prefijo.\n"),
-               ("<var> <sym> <var> = <logic term>",
-               "Declaración de un operador lógico binario infijo.\n"),
-               ("<name> = <lambda term>",
-               "Declaración de un lambda término.\n"),
-               ("<name> : <logic term>",
-               "Declaración de un lambda término vacio.\n"),
-               ("Theorem <name> : <logic term>",
-               "Inicia la prueba de un teorema.\n"),
-               ("<tactic>",
-               "Táctica de una prueba.\n"),
-               ("Axiom <name> : <logic term>",
-               "Se asume un axioma.\n"),
-               ("Print <name>",
-               "Imprime el lambda término asociado.\n"),
-               ("Check <lambda term>",
-               "Infiere el tipo del lambda término.\n"),
-               (":load <files>",
-               "Carga de archivos.\n"),
-               (":save <file>",
-                "Guarda el historial de comandos exitosos.\n"),
-               (":abort",
-               "Cancela la prueba de un teorema.\n"),
-               (":quit",
-               "Salir.\n"),
-               (":help",
-               "Imprime este mensaje de ayuda.\n"),
-               ("Todos los comandos no escapados deben finalizar con ';'","")
-               ]
+helpMessage = [ ("Comandos:", "\n"),
+                ("Variables <var>, <var>, ...",
+                 "Declaración de variables.\n"),
+                ("<name>/<symbol> <var> <var> ... = <type>",
+                 "Declaración de un operador prefijo.\n"),
+                ("<var> <symbol> <var> = <type>",
+                 "Declaración de un operador binario infijo.\n"),
+                ("<name> = <lambda term>",
+                 "Declaración de un lambda término.\n"),
+                ("","Relaciona 'name' con el 'lambda término' en el entorno.\n"),
+                ("<name> : <type>",
+                 "Se asume 'name'. Lo relaciona con 'type' en el contexto.\n"),
+                ("Theorem <name> : <type>",
+                 "Inicia una prueba, o construcción de un lambda término.\n"),
+                ("Axiom <name> : <type>",
+                 "Se asume 'name'. Lo relaciona con 'type' en el contexto.\n"),
+                ("Print <name>",
+                 "Imprime el lambda término asociado.\n"),
+                ("Check <lambda term>",
+                 "Infiere el tipo del lambda término.\n"),
+                ("<tactic>",
+                 "Táctica de una prueba.\n"),
+                ("\nLas tácticas pueden ser:","\n"),
+                ("  assumption",
+                 "Caso trivial.\n"),
+                ("  intro",
+                 "Introducción del '->', 'forall'. Variante: intros.\n"),
+                ("  left",
+                 "Introducción del '\\/' a izquierda.\n"),
+                ("  right",
+                 "Introducción del '\\/' a derecha.\n"),
+                ("  split",
+                 "introducción del '/\\'.\n"),
+                ("  exists <type>",
+                 "introducción del 'exists'.\n"),
+                ("  absurd <type>",
+                 "Introducción de 'False'.\n"),
+                ("  apply <hyphothesis>", "Eliminación de '->', y 'forall'.\n"),
+                ("", "Es posible que no se pueda resolver la unificación del 'forall'.\n"),
+                ("", "Si es asi, el asistente pedirá el ingreso de los valores no resueltos.\n"),
+                ("  elim <hyphotesis>",
+                 "Eliminación de '\\/', '/\\','False', y 'exists'.\n"),
+                ("  cut <type>", "Utilización de lema intermedio.\n"),
+                ("  exact <lambda term>/<type>",
+                 "Explicitación de la prueba.\n"),
+                ("  unfold <name>/<symbol>",
+                 "Eliminación de la definición del operador.\n"),
+                ("", "Variante: unfold <name>/<symbol> in <hyphotesis>. Eliminación en hipótesis.\n"),
+                ("Comandos de control:","\n"),
+                (":load <file> <file> ...",
+                 "Carga de archivos.\n"),
+                (":save <file>",
+                 "Guarda el historial de comandos exitosos.\n"),
+                (":abort",
+                 "Cancela la prueba actual.\n"),
+                (":quit",
+                 "Salir del asistente.\n"),
+                (":help",
+                 "Imprime este mensaje de ayuda.\n"),
+                ("\nLos comandos que no son de control deben finalizar con ';'.","\n")
+              ]
 
 help :: String
 help =
-  concat $ map (\(x,y) -> x ++ replicate ((40 - length x) `max` 2) ' ' ++ y) helpMessage  
+  concat $ map (\(x,y) -> x ++ replicate ((43 - length x) `max` 2) ' ' ++ y) helpMessage  
 
 --------------------------------------------------------------------------------------------  
 -- Comando Print
@@ -356,7 +382,8 @@ printTactics :: [String] -> Doc
 printTactics xs = foldl (\r x -> text x $$ r) empty xs
 
 --------------------------------------------------------------------------------------------  
--- Impresión de mensajes exitosos de comandos.
+-- Impresión de mensajes exitosos.
+
 msjFilesOk :: [String] -> Doc
 msjFilesOk files =
   sep $

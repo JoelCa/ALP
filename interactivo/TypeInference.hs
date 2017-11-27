@@ -8,7 +8,7 @@ import TypeSubstitution
 import qualified Data.Sequence as S
 import qualified LambdaTermDefinition as LTD (lookup)
 
--- Algoritmo de inferencia de tipos de un lambda término.
+-- Algoritmo de inferencia de tipo de un lambda término.
 
 basicTypeInference :: LamDefs -> TypeDefs -> DoubleLTerm
                    -> Either SemanticException DoubleType
@@ -16,11 +16,10 @@ basicTypeInference = typeInference 0 S.empty
 
 -- Infiere el tipo de un lambda término.
 -- Suponemos que ninguna de las pruebas de los teoremas son recursivas.
--- Es decir, que su lambda término es recursivo.
 -- Argumentos:
 -- 1. Indica la profundidad (respecto al cuantificador "para todo")
 -- desde la que se quiere inferir.
--- 2. Contexto de variables de términos, desde el que se quiere inferir.
+-- 2. Contexto de variables de términos.
 -- 3. Lambda términos definidos.
 -- 4. Tipos definidos.
 -- 5. Lambda término con y sin nombre, al que se le quiere inferir su tipo.
@@ -35,7 +34,7 @@ typeInference' :: Int -> TermContext -> LamDefs -> TypeDefs
 typeInference' _ _ te _ (LVar (_, Free x)) =
   case LTD.lookup x te of
     Just (_, t) -> return t
-    Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean teoremas.
+    Nothing -> throw $ InferE1 x -- NO puede haber variables de términos libres que no sean nombres de lambda términos definidos.
 typeInference' n c _ _ (LVar (_, Bound x)) =
   let (_,_,m,Just t) = S.index c x
   in return $ positiveShift (n-m) t

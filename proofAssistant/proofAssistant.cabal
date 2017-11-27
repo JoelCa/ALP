@@ -14,12 +14,15 @@ maintainer:          jxcata@gmail.com
 category:            Math
 build-type:          Simple
 extra-source-files:  ChangeLog.md
+data-dir:            app
+data-files:          Prelude.pr
 cabal-version:       >=1.10
 
 executable proofAssistant
   hs-source-dirs:      app
   main-is:             Main.hs
   other-modules:       Common
+                       PreludePath
                        ErrorMsj
                        GlobalState
                        Hypothesis

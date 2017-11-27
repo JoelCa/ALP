@@ -109,7 +109,7 @@ errorMessage op (InferE te e) =
 errorMessage _ (UnfoldE1 s) =
   text "error:" <+>
   quotes (text s) <+>
-  text "no es un operador foldeable."
+  text "no es un operador."
 errorMessage _ (HypoE i) =
   text "error: la hipótesis" <+>
   quotes (text $ printHypo i) <+>

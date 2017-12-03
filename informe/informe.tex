@@ -27,10 +27,73 @@
 
 \begin{center}
 \section*{Análisis de lenguajes de programación} 
-\subsection*{Borrador del trabajo práctico final}
+\subsection*{Asistente de prueba de la lógica proposicional constructiva de segundo orden}
 \end{center}
 
 \newpage{\pagestyle{empty}\cleardoublepage}
+
+
+\section{Motivación}
+Era de especial intereses para el autor entender la relación entre la lógica y el lambda cálculo.
+De ahi que se le ocurre implementar un asistente de prueba. Se decide utilizar la correspondencia
+que existe entre el Sistema F, y la lógica proposicional constructiva de segundo orden.
+ 
+\section{Fórmulas como tipos}
+Podemos interpretar $M : \sigma$ de dos formas:
+\begin{itemize}
+  \item Término como programa, tipo como especificación: $M$ es una función de tipo $\sigma$.
+  \item Tipo como una fórmula, término como su prueba: $M$ es una prueba de la fórmula $\sigma$.
+\end{itemize}
+
+La correspondencia Curry-Howard fórmulas como tipos, es una correspondencia uno a uno entre términos
+tipados del lambda cálculo y las derivaciones en la lógica proposicional minimal.
+Desde el punto de vista de la lógica: $x_{1}:\tau_{1}, x_{2}:\tau_{2}, \ldots, x_{n}:\tau_{n} \vdash M : \sigma$,
+puede leerse como $M$ es una prueba de $\sigma$ a partir de las hipótesis $\tau_{1}, \tau_{2}, \ldots, \tau_{n}$.
+
+\paragraph{Definición.}  El sistema de lógica proposional minimal $PROP$ consiste de:
+
+
+
+\begin{itemize}
+  \item La siguiente sintaxis abstracta:
+  
+  $prop ::= PropVar | (prop \rightarrow prop)$.
+  
+  \item Reglas de derivación. Donde $\Delta$ es un conjunto de proposiciones, $\sigma$ y $\tau$ son proposiciones.
+   
+  \begin{minipage}[t]{0.4\linewidth}
+
+  \begin{prooftree}
+    \Gamma \vdash n:\mathbb{N} \hspace{0.5cm}
+    \Gamma \vdash xs:\mathbb{N}^{*}
+  \using
+    {\scriptsize \textsc{T-CONS}}
+    \justifies
+    \Gamma \vdash cons \ n \ xs : \mathbb{N}^{*}
+  \end{prooftree}
+   
+  \end{minipage}
+
+  \begin{minipage}[t]{0.5\linewidth}
+
+  \end{minipage}
+
+\end{itemize}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 \section{Data types}
 

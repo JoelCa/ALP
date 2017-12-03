@@ -16,6 +16,7 @@ import ProverState
 import GlobalState
 import Proof (ProofConstruction, getLTermFromProof, isFinalTerm, cglobal, tsubp, subps)
 import TypeDefinition (TypeDefs)
+import PreludePath
 import System.IO (hClose, openTempFile, hPutStrLn, openFile, IOMode (AppendMode))
 import System.Directory (getCurrentDirectory, copyFile, removeFile)
 import Data.Foldable (toList)
@@ -77,6 +78,7 @@ prelude = "Prelude.pr"
 startProver :: ProverInputState ()
 startProver =
   do s <- lift get
+     name <- lift $ lift $ getDataFileName prelude
      r <- lift $ lift $ commandsFromFiles [prelude]
      catch (do commands <- returnInputFromParser r
                checkCommands commands

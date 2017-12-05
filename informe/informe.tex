@@ -83,46 +83,41 @@ puede leerse como $M$ es una prueba de $\sigma$ a partir de las hipótesis $\tau
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 \section{Data types}
 
 \begin{verbatim}
 data ProverState = PSt { proof :: Maybe ProofState
-                       , global :: ProverGlobal
+                       , global :: GlobalState
+                       , tempSave :: (FilePath, Handle)
+                       , input :: Input
+                       , cc :: Int
                        }
 \end{verbatim}
 
 Estado general del asistente.
 \begin{itemize}
   \item \texttt{proof}: representa a la prueba que construye el usuario, si existe.
-  \item \texttt{global}: datos globales.
+  \item \texttt{global}: mantiene datos globales.
+  \item \texttt{tempSave}: historial de comandos.
+  \item \texttt{input}: datos de la entrada compuesta.
+  \item \texttt{cc}: contador, número de líneas del usuario. 
 \end{itemize}
 
 \begin{verbatim}
-data ProverGlobal = PGlobal { fTypeContext :: FTypeContext
-                            , teorems :: Teorems
-                            , opers :: FOperations
-                            }
+data GlobalState = Global { fTypeContext :: FTypeContext
+                          , lamDef :: LTD.LamDefs
+                          , typeDef :: TD.TypeDefs
+                          , conflict :: ConflictNames
+                          }
 \end{verbatim}
 
 Este registro contiene los datos globales del asistente.
 \begin{itemize}
   \item \texttt{fTypeContext}: variables de tipo libres.
-  \item \texttt{teorems}: teoremas probados. Consiste en una lista de pares clave-valor.
-  Donde la clave es el nombre del teorema, y el valor es el lambda término de la prueba,
-  el cual tiene asociado su tipo mediante el constructor \texttt{as}.
-  \item \texttt{opers}: representa a las operaciones que pueden desplegarse.
+  \item \texttt{lamDef}: lambda términos definidos.
+  \item \texttt{typeDef}: representa a los operadores.
+  \item \texttt{conflict}: nombre de lambda términos conflictivos. Es decir que, son nombres
+    que coinciden con el espacio de nombres de las hipótesis.
 \end{itemize}
 
 \begin{verbatim}
@@ -142,8 +137,8 @@ Estado general de la prueba que realiza el usuario.
 \begin{verbatim}
 data ProofConstruction = PConstruction { tsubp :: Int
                                        , subps :: [SubProof]
-                                       , cglobal :: ProverGlobal
-                                       , term :: [SpecialTerm]
+                                       , cglobal :: GlobalState
+                                       , term :: LTermHoles
                                        }
 \end{verbatim}
 
@@ -167,7 +162,7 @@ data SubProof = SP { termContext :: TermContext
 Representa a un conjunto de subpruebas.
 Consideramos que todas ellas tienen el mismo contexto, comparten tanto los campos \texttt{termContext} como \texttt{bTypeContext}.
 \begin{itemize}
-  \item \texttt{termContext}: contexto de las variables de término.
+  \item \texttt{termContext}: contexto de las variables de lambda terminos.
   \item \texttt{bTypeContext}: contexto de las variables de tipo ligadas. Nos referimos a las variables que corresponden a una cuantificación.
   \item \texttt{lsubp}: indica la cantidad de subpruebas que contiene.
   \item \texttt{tvars}: cantidad total de variables de tipo ligadas, y variables de términos.
@@ -177,12 +172,15 @@ Consideramos que todas ellas tienen el mismo contexto, comparten tanto los campo
 
 Utilizamos el siguiente AST para representar a un lambda término:
 \begin{verbatim}
-  data Term  = Bound Int
-             | Free Name 
-             | Term :@: Term
-             | Lam (Type,TType) Term
-             | BLam Var Term
-             | Term :!: (Type,TType)
+  data LamTerm a b c = LVar b
+                   | Abs a c (LamTerm a b c)
+                   | BAbs TypeVar (LamTerm a b c)
+                   | LamTerm a b c :@: LamTerm a b c
+                   | LamTerm a b c :!: c
+                   | EPack c (LamTerm a b c) c
+                   | EUnpack TypeVar a (LamTerm a b c) (LamTerm a b c)
+                   | LamTerm a b c ::: c
+                   deriving (Show, Eq)
 \end{verbatim}
   
 Donde, \texttt{Type} es el AST de los tipos, y \texttt{TType} es el AST de los tipos sin nombres, es decir que estos emplean la notación De Bruijn.

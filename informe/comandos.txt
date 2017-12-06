@@ -1,0 +1,7 @@
+Enviroment: C-c  C-e
+
+Sections: C-c C-s
+
+Previsualización: C-c C-p C-b
+
+Compilacion y visualización: C-c C-c

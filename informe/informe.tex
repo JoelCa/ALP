@@ -25,6 +25,7 @@
 
 \maketitle
 
+
 \begin{center}
 \section*{Análisis de lenguajes de programación} 
 \subsection*{Asistente de prueba de la lógica proposicional constructiva de segundo orden}
@@ -93,6 +94,15 @@ puede leerse como $M$ es una prueba de $\sigma$ a partir de las hipótesis $\tau
 
 
 Decimos que $\Delta \vdash_{Prop} \sigma$ si existe una derivación usando las reglas, con conclusión $\sigma$ y hipótesis en $\Delta$.
+Procedemos a definir lo que entendemos por fórmulas como tipos. Para ello consideramos al contexto en PROP como listas
+($\Delta$ es una lista en la siguiente definición).
+
+\paragraph{Definición}: La noción prueba como término, es decir de derivaciones de PROP a términos del lambda cálculo es
+definido inductivamente como sigue.
+Asociamos a las listas de proposiciones $\Delta$ al contexto $\Gamma$, en donde se reemplaza $\sigma$ en $\delta$ con $x_{i} : \sigma_{i} \in \Gamma$.
+Del lado izquierdo vemos la clausula inductiva de la derivación y del lado derecho, se describe en el lado superior a la líneas,
+los términos que tenemos por inducción, debajo el término asociado a la derivación.
+
 
 
 \section{Data types}

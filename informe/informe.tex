@@ -53,37 +53,46 @@ puede leerse como $M$ es una prueba de $\sigma$ a partir de las hipótesis $\tau
 \paragraph{Definición.}  El sistema de lógica proposional minimal $PROP$ consiste de:
 
 
-
 \begin{itemize}
   \item La siguiente sintaxis abstracta:
   
-  $prop ::= PropVar | (prop \rightarrow prop)$.
+  $prop ::= PropVar \; | \; (prop \rightarrow prop)$.
   
   \item Reglas de derivación. Donde $\Delta$ es un conjunto de proposiciones, $\sigma$ y $\tau$ son proposiciones.
-   
+  
   \begin{minipage}[t]{0.4\linewidth}
-
-  \begin{prooftree}
-    \Gamma \vdash n:\mathbb{N} \hspace{0.5cm}
-    \Gamma \vdash xs:\mathbb{N}^{*}
-  \using
-    {\scriptsize \textsc{T-CONS}}
+  \centering
+    \begin{prooftree}
+      \sigma \rightarrow \tau \hspace{0.5cm} \sigma
+    \using
+      {\scriptsize \textsc{E-$\rightarrow$}}
     \justifies
-    \Gamma \vdash cons \ n \ xs : \mathbb{N}^{*}
-  \end{prooftree}
-   
+      \theta
+    \end{prooftree}
+            
   \end{minipage}
-
   \begin{minipage}[t]{0.5\linewidth}
-
+  \centering
+    \begin{prooftree}
+      \begin{prooftree}
+        [\sigma]^{j} 
+      \proofdotseparation=1.2ex
+      \proofdotnumber=3
+      \leadsto
+        \tau  
+      \end{prooftree}
+    \using
+      {\scriptsize \textsc{I-$\rightarrow^{[j]}$}}
+    \justifies    
+      \sigma \rightarrow \tau
+    \end{prooftree}
+      
   \end{minipage}
-
+   
 \end{itemize}
 
 
-
-
-
+Decimos que $\Delta \vdash_{Prop} \sigma$ si existe una derivación usando las reglas, con conclusión $\sigma$ y hipótesis en $\Delta$.
 
 
 

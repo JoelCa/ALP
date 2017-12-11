@@ -2,16 +2,23 @@
 \usepackage[left=1.5cm,top=2.0cm,right=1.5cm,bottom=2.0cm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
-\usepackage{lmodern}
+\usepackage{lmodern,bm}
 \usepackage[spanish]{babel}
 \usepackage{hyperref}
-\usepackage{graphicx}
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{amssymb}
 \usepackage{tikz}
-\usepackage{prooftree}
+%%\usepackage{prooftree}
+\usepackage{bussproofs}
+\usepackage{latexsym}
 \usepackage{enumitem}
+\usepackage{amsthm}
+
+\newtheorem{theorem}{Teorema}
+\theoremstyle{definition}
+\newtheorem{definition}{Definición}
+
 \usetikzlibrary{positioning, babel,shapes}
 \newdimen\nodeDist
 \nodeDist=35mm
@@ -23,8 +30,7 @@
 
 \begin{document}
 
-\maketitle
-
+\maketitle 
 
 \begin{center}
 \section*{Análisis de lenguajes de programación} 
@@ -49,10 +55,12 @@ Podemos interpretar $M : \sigma$ de dos formas:
 La correspondencia Curry-Howard fórmulas como tipos, es una correspondencia uno a uno entre términos
 tipados del lambda cálculo y las derivaciones en la lógica proposicional minimal.
 Desde el punto de vista de la lógica: $x_{1}:\tau_{1}, x_{2}:\tau_{2}, \ldots, x_{n}:\tau_{n} \vdash M : \sigma$,
-puede leerse como $M$ es una prueba de $\sigma$ a partir de las hipótesis $\tau_{1}, \tau_{2}, \ldots, \tau_{n}$.
+puede leerse como $M$ es una prueba de $\sigma$ a partir de las hipótesis $\tau_{1}, \tau_{2}, \ldots, \tau_{n}$.  
+ 
 
-\paragraph{Definición.}  El sistema de lógica proposional minimal $PROP$ consiste de:
 
+\begin{definition}
+El sistema de lógica proposional minimal $PROP$ consiste de:
 
 \begin{itemize}
   \item La siguiente sintaxis abstracta:
@@ -63,29 +71,24 @@ puede leerse como $M$ es una prueba de $\sigma$ a partir de las hipótesis $\tau
   
   \begin{minipage}[t]{0.4\linewidth}
   \centering
+
     \begin{prooftree}
-      \sigma \rightarrow \tau \hspace{0.5cm} \sigma
-    \using
-      {\scriptsize \textsc{E-$\rightarrow$}}
-    \justifies
-      \theta
+      \AxiomC{$\sigma \rightarrow \tau \hspace{0.5cm} \sigma$}
+      \RightLabel{\scriptsize \textsc{E-$\rightarrow$}}
+      \UnaryInfC{$\tau$}
     \end{prooftree}
             
   \end{minipage}
   \begin{minipage}[t]{0.5\linewidth}
   \centering
     \begin{prooftree}
-      \begin{prooftree}
-        [\sigma]^{j} 
-      \proofdotseparation=1.2ex
-      \proofdotnumber=3
-      \leadsto
-        \tau  
-      \end{prooftree}
-    \using
-      {\scriptsize \textsc{I-$\rightarrow^{[j]}$}}
-    \justifies    
-      \sigma \rightarrow \tau
+      \AxiomC{ $[\sigma]^{j}$}
+      \noLine
+      \UnaryInfC{$\vdots$}
+      \noLine
+      \UnaryInfC{$\tau$}        
+      \RightLabel{\scriptsize \textsc{I-$\rightarrow^{[j]}$}}
+      \UnaryInfC{$\sigma \rightarrow \tau$}
     \end{prooftree}
       
   \end{minipage}
@@ -96,14 +99,255 @@ puede leerse como $M$ es una prueba de $\sigma$ a partir de las hipótesis $\tau
 Decimos que $\Delta \vdash_{Prop} \sigma$ si existe una derivación usando las reglas, con conclusión $\sigma$ y hipótesis en $\Delta$.
 Procedemos a definir lo que entendemos por fórmulas como tipos. Para ello consideramos al contexto en PROP como listas
 ($\Delta$ es una lista en la siguiente definición).
-
-\paragraph{Definición}: La noción prueba como término, es decir de derivaciones de PROP a términos del lambda cálculo es
-definido inductivamente como sigue.
-Asociamos a las listas de proposiciones $\Delta$ al contexto $\Gamma$, en donde se reemplaza $\sigma$ en $\delta$ con $x_{i} : \sigma_{i} \in \Gamma$.
-Del lado izquierdo vemos la clausula inductiva de la derivación y del lado derecho, se describe en el lado superior a la líneas,
-los términos que tenemos por inducción, debajo el término asociado a la derivación.
+  
+\end{definition}
 
 
+
+\begin{definition}
+  La noción prueba como término, es decir derivaciones de PROP a términos del lambda cálculo, se
+  definine inductivamente como sigue.
+  Asociamos a las listas de proposiciones $\Delta$ un contexto $\Gamma$, en donde se reemplaza $\sigma$ en $\Delta$ con $x_{i} : \sigma_{i} \in \Gamma$.
+  Del lado izquierdo vemos la clausula inductiva de la derivación y en el lado derecho, se describe del lado superior a la línea,
+  los términos que tenemos por inducción, y debajo, el término asociado a la derivación.
+
+  \vspace{0.5cm}
+
+  \begin{minipage}[t]{0.4\linewidth}
+    \centering
+
+    \begin{prooftree}
+      \AxiomC{$\sigma \in \Delta$}
+      \UnaryInfC{$\Delta \vdash \sigma$}
+    \end{prooftree}
+
+    \begin{prooftree}
+      \AxiomC{$\sigma \rightarrow \tau \hspace{0.5cm} \sigma$}
+      \UnaryInfC{$\tau$}
+    \end{prooftree}
+
+    \begin{prooftree}
+      \AxiomC { $[\sigma]^{j}$}
+      \noLine
+      \UnaryInfC{$\vdots$}
+      \noLine
+      \UnaryInfC{$\tau$}        
+      \UnaryInfC{$\sigma \rightarrow \tau$}
+    \end{prooftree}
+  \end{minipage}
+  \begin{minipage}[t]{0.5\linewidth}
+    \centering
+
+    \begin{prooftree}  
+      \AxiomC{$x : \sigma \in \Delta$}
+      \UnaryInfC{$\Gamma \vdash x : \sigma$}
+    \end{prooftree}
+
+    \begin{prooftree}  
+      \AxiomC{$\Gamma_{1} \vdash M : \sigma \rightarrow \tau$}
+      \AxiomC{$\Gamma_{2} \vdash N : \sigma$}
+      \BinaryInfC{$\Gamma_{1} \cup \Gamma_{2} \vdash M \; N : \tau$}
+    \end{prooftree}
+
+    \begin{prooftree}  
+      \AxiomC{$\Gamma,x:\sigma \vdash M : \tau$}
+      \UnaryInfC{$\Gamma \vdash \lambda x : \sigma. \; M : \sigma \rightarrow \tau$}
+    \end{prooftree}
+
+  \end{minipage}
+
+  \vspace{0.5cm}
+
+  Si $\mathcal{D}$ es una derivación en PROP, entonces $\overline{\mathcal{D}}$ es un lambda término en $\lambda_{\rightarrow}$.
+
+\end{definition}
+
+
+\begin{theorem}
+  Soundness, Completitud de formulas como tipos.
+
+  \begin{enumerate}
+  \item Si $\mathcal{D}$ es una deducción natural en PROP con conclusión $\sigma$ y hipótesis en $\Delta$, entonces
+    $\bm{x}:\bm{\Delta} \vdash \overline{\mathcal{D}} : \sigma$, en $\lambda_{\rightarrow}$.
+  \item Si $\Gamma \vdash M : \sigma$ en $\lambda_{\rightarrow}$, entonces hay una derivación de $\sigma$ desde $\Delta$ en PROP,
+    donde $\Delta$ es $\Gamma$ sin la asignación de variables.
+  \end{enumerate}
+
+\end{theorem}
+
+La correspondencia fórmulas como tipos constituye un isomorfismo entre derivaciones en PROP y términos bien formados en $\lambda_{\rightarrow}$.
+
+El asistente de prueba, implementa un chequeo de tipos sobre el lambda término que se construye a
+medida que el usuario realiza una prueba. 
+Cuando la prueba halla finalizado, el lambda término asociado a la prueba tendrá como tipo la fórmula probada.
+
+
+\subsection{Lambda cálculo con polimorfismo}
+\label{Lambda cálculo con polimorfismo}
+
+\begin{definition}
+  Los tipos de $\lambda 2$ (Sistema F) estilo Church son:
+
+  $Typ := TVar \; | \; (Typ \rightarrow Typ) \; | \; \forall \alpha . Typ$
+
+\item Las reglas de derivación para el sistema F son:
+
+  \vspace{0.5cm}
+
+  \begin{minipage}[t]{0.4\linewidth}
+    \centering
+
+    \begin{prooftree}  
+      \AxiomC{$x : \sigma \in \Delta$}
+      \UnaryInfC{$\Gamma \vdash x : \sigma$}
+    \end{prooftree}
+
+    \begin{prooftree}  
+      \AxiomC{$\Gamma_{1} \vdash M : \sigma \rightarrow \tau$}
+      \AxiomC{$\Gamma_{2} \vdash N : \sigma$}
+      \BinaryInfC{$\Gamma_{1} \cup \Gamma_{2} \vdash M \; N : \tau$}
+    \end{prooftree}
+
+    \begin{prooftree}  
+      \AxiomC{$\Gamma,x:\sigma \vdash M : \tau$}
+      \UnaryInfC{$\Gamma \vdash \lambda x : \sigma. \; M : \sigma \rightarrow \tau$}
+    \end{prooftree}
+
+  \end{minipage}
+  \begin{minipage}[t]{0.5\linewidth}
+
+    \begin{prooftree}  
+      \AxiomC{$\Gamma \vdash M : \sigma$}
+      \RightLabel{$\alpha \notin FV(\Gamma)$}
+      \UnaryInfC{$\Gamma \vdash \lambda \alpha. M : \forall \alpha. \sigma$}
+    \end{prooftree}
+
+    \begin{prooftree}  
+      \AxiomC{$\Gamma \vdash M : \forall \alpha. \sigma$}
+      \UnaryInfC{$\Gamma \vdash : \sigma [ \alpha := \tau]$}
+    \end{prooftree}
+    
+  \end{minipage}
+
+  \vspace{0.5cm}
+  
+\end{definition}
+
+
+La implementación del Sistema F sigue las reglas de inferencia de tipos que presenta Pierce.
+Se decidió extenderlo con el inclusión del cuantificador existencial, y de \texttt{as}.
+La decisión de añadir al $\exists$ en la semántica del lenguaje, se debe a la tarea de mapear la introducción y eliminación
+del existencial con un lambda término o regla de inferencia de tipo, lo cual surge de manera directa con la inclusión
+del cuantificador al lenguaje. 
+
+Sabemos que es posible describir el existencial de la siguiente manera:
+
+$\exists \alpha. \sigma := \forall \beta. (\forall \alpha. \sigma \rightarrow \beta) \rightarrow \beta$.
+
+Sin embargo, creemos que no es posible dar su regla de introducción y eliminación mediante un lambda término.
+
+\begin{minipage}[t]{0.4\linewidth}
+  Términos:
+  \texttt{
+    \begin{tabbing}
+      left \, \= left\kill
+      t \hspace{-0.1cm} ::= x \\ 
+      \> $\mathtt {\lambda x : T. \; t}$ \\
+      \> t t \\
+      \> $\lambda$X. t \\
+      \> t [T] \\
+      \> \{$^{*}$T, t\} as T \\
+      \> let \{X, x\} = t in t \\
+      \> t as T
+    \end{tabbing} 
+  }
+
+  Contexto:
+  \texttt{
+    \begin{tabbing}
+      left \, \= left\kill
+      $\Gamma$ \hspace{-0.1cm} ::= $\emptyset$ \\
+      \> $\Gamma$, x:T \\ 
+      \> $\Gamma$, X
+    \end{tabbing} 
+  }
+\end{minipage}
+\begin{minipage}[t]{0.5\linewidth}
+  Tipos:
+  \texttt{
+    \begin{tabbing}
+      left \, \= left\kill
+      T \hspace{-0.1cm} ::= X \\
+      \> T $\rightarrow$ T \\
+      \> forall X, T \\
+      \> exists X, T 
+    \end{tabbing} 
+  }
+\end{minipage}
+
+\vspace{0.5cm}
+
+\begin{minipage}[t]{0.4\linewidth}
+  \centering
+
+  \begin{prooftree}  
+      \AxiomC{$\mathtt{x : T \in \Gamma}$}
+      \RightLabel{\scriptsize \textsc{T-Var}}
+      \UnaryInfC{$\mathtt{\Gamma \vdash x : T}$}
+  \end{prooftree}
+
+  \begin{prooftree}  
+    \AxiomC{$\mathtt{\Gamma \vdash t_{1} : T_{11} \rightarrow T_{12} \quad \Gamma \vdash t_{2} : T_{11}}$}
+    \RightLabel{\scriptsize \textsc{T-App}}
+    \UnaryInfC{$\mathtt{\Gamma \vdash t_{1} t_{2} : T_{12}}$}
+  \end{prooftree}
+
+  \begin{prooftree}  
+    \AxiomC{$\mathtt{\Gamma, x: T_{1} \vdash t_{2} : T_{2}}$}
+    \RightLabel{\scriptsize \textsc{T-Abs}}
+    \UnaryInfC{$\mathtt{\Gamma \vdash \lambda x: T_{1}. \; t_{2} : T_{1} \rightarrow T_{2}}$}
+  \end{prooftree}
+  
+  \begin{prooftree}  
+    \AxiomC{$\mathtt{\Gamma \vdash t_{2} : T_{2} [X \rightarrow U]}$}
+    \RightLabel{\scriptsize \textsc{T-Pack}}
+    \UnaryInfC{$\mathtt{\Gamma \vdash \{^{*}U, t_{2}\} \; as \; exists \; X,\;  T_{2}}$}
+    \noLine
+    \UnaryInfC{$\mathtt{: exists \; X,\;  T_{2}}$}
+  \end{prooftree}
+
+\end{minipage}
+\begin{minipage}[t]{0.5\linewidth}
+  \centering  
+
+  \begin{prooftree}
+    \AxiomC{$\mathtt{\Gamma, X \vdash t_{2} : T_{2}}$}
+    \RightLabel{\scriptsize \textsc{T-TAbs}}
+    \UnaryInfC{$\mathtt{\Gamma \vdash \lambda X. \; t_{2} : forall \; X, \; T_{2}}$}
+  \end{prooftree}
+
+  \begin{prooftree}
+    \AxiomC{$\mathtt{\Gamma \vdash t_{1} : forall \; X, \; T_{12}}$}
+    \RightLabel{\scriptsize \textsc{T-TApp}}
+    \UnaryInfC{$\mathtt{\Gamma \vdash t_{1} \; [T_{2}] : T_{12} [X \rightarrow T_{2}]}$}
+  \end{prooftree}
+
+  \begin{prooftree}
+    \AxiomC{$\mathtt{\Gamma \vdash t_{1} : T}$}
+    \RightLabel{\scriptsize \textsc{T-Ascribe}}
+    \UnaryInfC{$\mathtt{\Gamma \vdash t_{1} \; as \; T : T}$}
+  \end{prooftree}
+
+  \begin{prooftree}  
+    \AxiomC{$\mathtt{\Gamma \vdash t_{1} : \{ exists \; X, \; T_{12} \}}$}
+    \AxiomC{$\mathtt{\Gamma, X, x:T_{12}  \vdash t_{2} : T_{2}}$}
+    \RightLabel{\scriptsize \textsc{T-Unpack}}
+    \BinaryInfC{$\mathtt{\Gamma \vdash let \{ X, x \} = t_{1} \; in \; t_{2} : T_{2}}$}
+  \end{prooftree}
+  
+\end{minipage}
+
+\vspace{0.5cm}
 
 
 \section{Data types}
@@ -362,38 +606,38 @@ Consideramos que todos los operadores binarios infijos asocian a derecha.
   así se obtiene el lambda término que lo representa. La demostración de una fórmula puede requerir la prueba de otras fórmulas. Por ejemplo,
   en la demostración $\vdash (p \rightarrow p) \wedge (q \rightarrow q)$, al aplicar la introducción del and, se genera dos nuevas subpruebas.
   
-  \begin{prooftree}
-  \[
-  \[
-  p
-  \using
-  {ass}
-  \justifies
-  p
-  \]
-  \using
-  {i_{\rightarrow}}
-  \justifies
-  p \rightarrow p
-  \]
-  \[
-  \[
-  q
-  \using
-  {ass}
-  \justifies
-  q
-  \]
-  \using
-  {i_{\rightarrow}}
-  \justifies
-  q \rightarrow q
-  \]
-  \using
-  {i_{\wedge}}
-  \justifies
-  (p \rightarrow p) \wedge (q \rightarrow q)
-  \end{prooftree}
+  % \begin{prooftree}
+  % \[
+  % \[
+  % p
+  % \using
+  % {ass}
+  % \justifies
+  % p
+  % \]
+  % \using
+  % {i_{\rightarrow}}
+  % \justifies
+  % p \rightarrow p
+  % \]
+  % \[
+  % \[
+  % q
+  % \using
+  % {ass}
+  % \justifies
+  % q
+  % \]
+  % \using
+  % {i_{\rightarrow}}
+  % \justifies
+  % q \rightarrow q
+  % \]
+  % \using
+  % {i_{\wedge}}
+  % \justifies
+  % (p \rightarrow p) \wedge (q \rightarrow q)
+  % \end{prooftree}
   
   En el asistente tendríamos lo siguiente:
   

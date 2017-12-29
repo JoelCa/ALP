@@ -9,7 +9,6 @@
 \usepackage{subcaption}
 \usepackage{amssymb}
 \usepackage{tikz}
-%%\usepackage{prooftree}
 \usepackage{bussproofs}
 \usepackage{latexsym}
 \usepackage{enumitem}
@@ -41,9 +40,9 @@
 
 
 \section{Motivación}
-Era de especial intereses para el autor entender la relación entre la lógica y el lambda cálculo.
-De ahi que se le ocurre implementar un asistente de prueba. Se decide utilizar la correspondencia
-que existe entre el Sistema F, y la lógica proposicional constructiva de segundo orden.
+Era de especial intereses para el autor entender la cual es la relación entre la lógica y el lambda cálculo.
+Para ello decide implementar un asistente de prueba, el cual emplea la correspondencia
+existente entre el Sistema F, y la lógica proposicional constructiva de segundo orden.
  
 \section{Fórmulas como tipos}
 Podemos interpretar $M : \sigma$ de dos formas:
@@ -60,53 +59,59 @@ puede leerse como $M$ es una prueba de $\sigma$ a partir de las hipótesis $\tau
 
 
 \begin{definition}
-El sistema de lógica proposional minimal $PROP$ consiste de:
+El sistema de lógica proposicional PROP restringido al conectivo de implicación se define de la siguiente manera.
 
 \begin{itemize}
-  \item La siguiente sintaxis abstracta:
+  \item Sintaxis abstracta:
   
   $prop ::= PropVar \; | \; (prop \rightarrow prop)$.
   
   \item Reglas de derivación. Donde $\Delta$ es un conjunto de proposiciones, $\sigma$ y $\tau$ son proposiciones.
-  
-  \begin{minipage}[t]{0.4\linewidth}
-  \centering
+    
+    \begin{minipage}[t]{0.3\linewidth}
+      \centering
+      \begin{prooftree}
+        \AxiomC{$\sigma \in \Delta$}
+        \UnaryInfC{$\Delta \vdash \sigma$}
+      \end{prooftree}
+    \end{minipage}
+    \begin{minipage}[t]{0.3\linewidth}
+      \centering
 
-    \begin{prooftree}
-      \AxiomC{$\sigma \rightarrow \tau \hspace{0.5cm} \sigma$}
-      \RightLabel{\scriptsize \textsc{E-$\rightarrow$}}
-      \UnaryInfC{$\tau$}
-    \end{prooftree}
-            
-  \end{minipage}
-  \begin{minipage}[t]{0.5\linewidth}
-  \centering
-    \begin{prooftree}
-      \AxiomC{ $[\sigma]^{j}$}
-      \noLine
-      \UnaryInfC{$\vdots$}
-      \noLine
-      \UnaryInfC{$\tau$}        
-      \RightLabel{\scriptsize \textsc{I-$\rightarrow^{[j]}$}}
-      \UnaryInfC{$\sigma \rightarrow \tau$}
-    \end{prooftree}
+      \begin{prooftree}
+        \AxiomC{$\sigma \rightarrow \tau \hspace{0.5cm} \sigma$}
+        \RightLabel{\scriptsize \textsc{E-$\rightarrow$}}
+        \UnaryInfC{$\tau$}
+      \end{prooftree}
       
-  \end{minipage}
+    \end{minipage}
+    \begin{minipage}[t]{0.3\linewidth}
+      \centering
+      \begin{prooftree}
+        \AxiomC{ $[\sigma]^{j}$}
+        \noLine
+        \UnaryInfC{$\vdots$}
+        \noLine
+        \UnaryInfC{$\tau$}        
+        \RightLabel{\scriptsize \textsc{I-$\rightarrow^{[j]}$}}
+        \UnaryInfC{$\sigma \rightarrow \tau$}
+      \end{prooftree}
+      
+    \end{minipage}
    
 \end{itemize}
 
-
 Decimos que $\Delta \vdash_{Prop} \sigma$ si existe una derivación usando las reglas, con conclusión $\sigma$ y hipótesis en $\Delta$.
-Procedemos a definir lo que entendemos por fórmulas como tipos. Para ello consideramos al contexto en PROP como listas
-($\Delta$ es una lista en la siguiente definición).
-  
 \end{definition}
 
+Procedemos a definir lo que entendemos por fórmulas como tipos. Para ello consideramos al contexto en PROP como listas
+($\Delta$ es una lista en la siguiente definición).
 
 
 \begin{definition}
-  La noción prueba como término, es decir derivaciones de PROP a términos del lambda cálculo, se
-  definine inductivamente como sigue.
+  La noción de prueba como término, es decir, derivaciones de PROP a términos del lambda cálculo simplemente tipado $\lambda_{\rightarrow}$, 
+  se define inductivamente como sigue.
+
   Asociamos a las listas de proposiciones $\Delta$ un contexto $\Gamma$, en donde se reemplaza $\sigma$ en $\Delta$ con $x_{i} : \sigma_{i} \in \Gamma$.
   Del lado izquierdo vemos la clausula inductiva de la derivación y en el lado derecho, se describe del lado superior a la línea,
   los términos que tenemos por inducción, y debajo, el término asociado a la derivación.
@@ -159,7 +164,6 @@ Procedemos a definir lo que entendemos por fórmulas como tipos. Para ello consi
   \vspace{0.5cm}
 
   Si $\mathcal{D}$ es una derivación en PROP, entonces $\overline{\mathcal{D}}$ es un lambda término en $\lambda_{\rightarrow}$.
-
 \end{definition}
 
 
@@ -176,29 +180,27 @@ Procedemos a definir lo que entendemos por fórmulas como tipos. Para ello consi
 \end{theorem}
 
 La correspondencia fórmulas como tipos constituye un isomorfismo entre derivaciones en PROP y términos bien formados en $\lambda_{\rightarrow}$.
-
-El asistente de prueba, implementa un chequeo de tipos sobre el lambda término que se construye a
-medida que el usuario realiza una prueba. 
-Cuando la prueba halla finalizado, el lambda término asociado a la prueba tendrá como tipo la fórmula probada.
-
+Dicho de otra manera, una fórmula es teorema si y solo si es un tipo habitado.
 
 \subsection{Lambda cálculo con polimorfismo}
 \label{Lambda cálculo con polimorfismo}
 
+El lambda cálculo con polimorfismo (Sistema F) sirve como una notación de las pruebas de la lógica proposicional constructiva
+de segundo orden.
+Comenzamos definiendo al Sistema F.
+
 \begin{definition}
-  Los tipos de $\lambda 2$ (Sistema F) estilo Church son:
+  Los tipos del Sistema F, estilo Church, son:
 
   $Typ := TVar \; | \; (Typ \rightarrow Typ) \; | \; \forall \alpha . Typ$
 
-\item Las reglas de derivación para el sistema F son:
-
-  \vspace{0.5cm}
+  Mientras que las reglas de derivación son :
 
   \begin{minipage}[t]{0.4\linewidth}
     \centering
 
     \begin{prooftree}  
-      \AxiomC{$x : \sigma \in \Delta$}
+      \AxiomC{$x : \sigma \in \Gamma$}
       \UnaryInfC{$\Gamma \vdash x : \sigma$}
     \end{prooftree}
 
@@ -228,126 +230,381 @@ Cuando la prueba halla finalizado, el lambda término asociado a la prueba tendr
     \end{prooftree}
     
   \end{minipage}
-
-  \vspace{0.5cm}
-  
 \end{definition}
 
-
-La implementación del Sistema F sigue las reglas de inferencia de tipos que presenta Pierce.
-Se decidió extenderlo con el inclusión del cuantificador existencial, y de \texttt{as}.
-La decisión de añadir al $\exists$ en la semántica del lenguaje, se debe a la tarea de mapear la introducción y eliminación
-del existencial con un lambda término o regla de inferencia de tipo, lo cual surge de manera directa con la inclusión
-del cuantificador al lenguaje. 
-
-Sabemos que es posible describir el existencial de la siguiente manera:
-
-$\exists \alpha. \sigma := \forall \beta. (\forall \alpha. \sigma \rightarrow \beta) \rightarrow \beta$.
-
-Sin embargo, creemos que no es posible dar su regla de introducción y eliminación mediante un lambda término.
-
-\begin{minipage}[t]{0.4\linewidth}
-  Términos:
-  \texttt{
-    \begin{tabbing}
-      left \, \= left\kill
-      t \hspace{-0.1cm} ::= x \\ 
-      \> $\mathtt {\lambda x : T. \; t}$ \\
-      \> t t \\
-      \> $\lambda$X. t \\
-      \> t [T] \\
-      \> \{$^{*}$T, t\} as T \\
-      \> let \{X, x\} = t in t \\
-      \> t as T
-    \end{tabbing} 
-  }
-
-  Contexto:
-  \texttt{
-    \begin{tabbing}
-      left \, \= left\kill
-      $\Gamma$ \hspace{-0.1cm} ::= $\emptyset$ \\
-      \> $\Gamma$, x:T \\ 
-      \> $\Gamma$, X
-    \end{tabbing} 
-  }
-\end{minipage}
-\begin{minipage}[t]{0.5\linewidth}
-  Tipos:
-  \texttt{
-    \begin{tabbing}
-      left \, \= left\kill
-      T \hspace{-0.1cm} ::= X \\
-      \> T $\rightarrow$ T \\
-      \> forall X, T \\
-      \> exists X, T 
-    \end{tabbing} 
-  }
-\end{minipage}
-
-\vspace{0.5cm}
-
-\begin{minipage}[t]{0.4\linewidth}
+\begin{figure}
   \centering
+  \begin{minipage}[t]{0.35\linewidth}
+    \texttt{
+      \begin{tabbing}
+        left \, \= left\kill
+        Términos: \\
+        t \hspace{-0.1cm} ::= x \\ 
+        \> $\mathtt {\lambda x : T. \; t}$ \\
+        \> t t \\
+        \> $\lambda$X. t \\
+        \> t [T] \\
+        \> \{$^{*}$T, t\} as T \\
+        \> let \{X, x\} = t in t \\
+        \> t as T
+      \end{tabbing} 
+    }
+  \end{minipage}
+  \begin{minipage}[t]{0.3\linewidth}
+    \texttt{
+      \begin{tabbing}
+        left \, \= left\kill
+        Contexto: \\
+        $\Gamma$ \hspace{-0.1cm} ::= $\emptyset$ \\
+        \> $\Gamma$, x:T \\ 
+        \> $\Gamma$, X
+      \end{tabbing} 
+    }
+  \end{minipage}
+  \begin{minipage}[t]{0.3\linewidth}
+    \texttt{
+      \begin{tabbing}
+        left \, \= left\kill
+        Tipos: \\
+        T \hspace{-0.1cm} ::= X \\
+        \> T $\rightarrow$ T \\
+        \> forall X, T \\
+        \> exists X, T 
+      \end{tabbing} 
+    }
+  \end{minipage}
 
-  \begin{prooftree}  
+  \texttt{Reglas de tipos}
+
+  \begin{minipage}[t]{0.4\linewidth}
+    \centering
+    
+    \begin{prooftree}  
       \AxiomC{$\mathtt{x : T \in \Gamma}$}
       \RightLabel{\scriptsize \textsc{T-Var}}
       \UnaryInfC{$\mathtt{\Gamma \vdash x : T}$}
-  \end{prooftree}
+    \end{prooftree}
 
-  \begin{prooftree}  
-    \AxiomC{$\mathtt{\Gamma \vdash t_{1} : T_{11} \rightarrow T_{12} \quad \Gamma \vdash t_{2} : T_{11}}$}
-    \RightLabel{\scriptsize \textsc{T-App}}
-    \UnaryInfC{$\mathtt{\Gamma \vdash t_{1} t_{2} : T_{12}}$}
-  \end{prooftree}
+    \begin{prooftree}  
+      \AxiomC{$\mathtt{\Gamma \vdash t_{1} : T_{11} \rightarrow T_{12} \quad \Gamma \vdash t_{2} : T_{11}}$}
+      \RightLabel{\scriptsize \textsc{T-App}}
+      \UnaryInfC{$\mathtt{\Gamma \vdash t_{1} t_{2} : T_{12}}$}
+    \end{prooftree}
 
-  \begin{prooftree}  
-    \AxiomC{$\mathtt{\Gamma, x: T_{1} \vdash t_{2} : T_{2}}$}
-    \RightLabel{\scriptsize \textsc{T-Abs}}
-    \UnaryInfC{$\mathtt{\Gamma \vdash \lambda x: T_{1}. \; t_{2} : T_{1} \rightarrow T_{2}}$}
-  \end{prooftree}
+    \begin{prooftree}  
+      \AxiomC{$\mathtt{\Gamma, x: T_{1} \vdash t_{2} : T_{2}}$}
+      \RightLabel{\scriptsize \textsc{T-Abs}}
+      \UnaryInfC{$\mathtt{\Gamma \vdash \lambda x: T_{1}. \; t_{2} : T_{1} \rightarrow T_{2}}$}
+    \end{prooftree}
+    
+    \begin{prooftree}  
+      \AxiomC{$\mathtt{\Gamma \vdash t_{2} : T_{2} [X \rightarrow U]}$}
+      \RightLabel{\scriptsize \textsc{T-Pack}}
+      \UnaryInfC{$\mathtt{\Gamma \vdash \{^{*}U, t_{2}\} \; as \; exists \; X,\;  T_{2}}$}
+      \noLine
+      \UnaryInfC{$\mathtt{: exists \; X,\;  T_{2}}$}
+    \end{prooftree}
+
+  \end{minipage}
+  \begin{minipage}[t]{0.5\linewidth}
+    \centering  
+
+    \begin{prooftree}
+      \AxiomC{$\mathtt{\Gamma, X \vdash t_{2} : T_{2}}$}
+      \RightLabel{\scriptsize \textsc{T-TAbs}}
+      \UnaryInfC{$\mathtt{\Gamma \vdash \lambda X. \; t_{2} : forall \; X, \; T_{2}}$}
+    \end{prooftree}
+
+    \begin{prooftree}
+      \AxiomC{$\mathtt{\Gamma \vdash t_{1} : forall \; X, \; T_{12}}$}
+      \RightLabel{\scriptsize \textsc{T-TApp}}
+      \UnaryInfC{$\mathtt{\Gamma \vdash t_{1} \; [T_{2}] : T_{12} [X \rightarrow T_{2}]}$}
+    \end{prooftree}
+
+    \begin{prooftree}
+      \AxiomC{$\mathtt{\Gamma \vdash t_{1} : T}$}
+      \RightLabel{\scriptsize \textsc{T-Ascribe}}
+      \UnaryInfC{$\mathtt{\Gamma \vdash t_{1} \; as \; T : T}$}
+    \end{prooftree}
+
+    \begin{prooftree}  
+      \AxiomC{$\mathtt{\Gamma \vdash t_{1} : \{ exists \; X, \; T_{12} \}}$}
+      \AxiomC{$\mathtt{\Gamma, X, x:T_{12}  \vdash t_{2} : T_{2}}$}
+      \RightLabel{\scriptsize \textsc{T-Unpack}}
+      \BinaryInfC{$\mathtt{\Gamma \vdash let \{ X, x \} = t_{1} \; in \; t_{2} : T_{2}}$}
+    \end{prooftree}
+    
+  \end{minipage}
+  \caption{Sintaxis y reglas de tipos del Sistema F extendido.}
+  \label{SintaxisTiposF}
+\end{figure}
+
+Implementamos el Sistema F siguiendo las reglas de inferencia de tipos que presenta Pierce \cite{pierce}.
+Ver Figura \ref{SintaxisTiposF}.
+Se decidió extenderlo con el inclusión del cuantificador existencial, y la adscripción de un tipo a término.
+Era necesario mapear la introducción y eliminación del existencial con un lambda término o regla de inferencia de tipo, 
+lo cual puede realizarse de manera directa con la inclusión del cuantificador al lenguaje. 
+
+El sistema F, permite la abstracción tanto de términos como tipos. Con lo cual podemos ``definir'' nuevos
+constructores de tipos, a partir del lenguaje, como se muestra a continuación.
+
+\begin{definition}
+  Definición de operadores de la lógica intuicionista.
+
+  \begin{itemize}
+  \item $\bot := \forall \alpha. \alpha$
+  \item $\sigma \wedge \tau := \forall \alpha. (\sigma \rightarrow \tau \rightarrow \alpha) \rightarrow \alpha$
+  \item $\sigma \vee \tau := \forall \alpha. (\sigma \rightarrow \alpha) \rightarrow (\tau \rightarrow \alpha) \rightarrow \alpha$
+  \item $\neg \alpha := \alpha \rightarrow \bot$
+  \item $\alpha \leftrightarrow \beta := (\alpha \rightarrow \beta) \wedge (\beta \rightarrow \alpha)$ 
+  \end{itemize}
+\end{definition}
+
+A partir de la definición anterior es posible definir las reglas de introducción y eliminación
+de los operadores $\bot, \wedge,$ y $\vee$.
+
+Sabemos que es posible describir al existencial de la siguiente manera:
+$\exists \alpha. \sigma := \forall \beta. (\forall \alpha. \sigma \rightarrow \beta) \rightarrow \beta$.
+
+Sin embargo, creemos que no es posible dar su regla de introducción y eliminación mediante un lambda término.
+Por ello, lo añadimos al lenguaje. Ver Figura \ref{SintaxisTiposF}.
+
+
+\subsection{Construcción de pruebas}
+\label{construcciónDePruebas}
+
+El asistente de prueba, implementa un chequeo de tipos sobre el lambda término que se construye a
+medida que el usuario realiza una prueba. 
+Cuando la prueba finaliza el lambda término asociado a la prueba tendrá como tipo la fórmula probada.
+
+Utilizamos  términos con agujeros, de modo tal que sucesivas aplicaciones de las tácticas terminen 
+de armar el lambda término que cumpla con el tipo deseado.
+
+Veamos como se construye el lambda término de acuerdo a la aplicación de las tácticas.
+
+\begin{itemize}
+\item \texttt{assumption}: corresponde a la prueba $H$.
   
-  \begin{prooftree}  
-    \AxiomC{$\mathtt{\Gamma \vdash t_{2} : T_{2} [X \rightarrow U]}$}
-    \RightLabel{\scriptsize \textsc{T-Pack}}
-    \UnaryInfC{$\mathtt{\Gamma \vdash \{^{*}U, t_{2}\} \; as \; exists \; X,\;  T_{2}}$}
+  \AxiomC{$\Gamma$}
+  \noLine
+  \UnaryInfC{$H:\alpha$}
+  \UnaryInfC{$? : \alpha$}
+  \DisplayProof
+
+\item \texttt{intro}: tenemos dos casos.
+
+  \begin{itemize}
+  \item corresponde a la prueba $\lambda H:\alpha. \; ?_{1}$.
+
+    \begin{minipage}[t]{0.2\linewidth}
+      \AxiomC{$\Gamma$}
+      \UnaryInfC{$? : \alpha \rightarrow \beta$}
+      \DisplayProof    
+    \end{minipage}
+    \begin{minipage}[t]{0.1\linewidth}
+      $\rightsquigarrow$
+    \end{minipage}
+    \begin{minipage}[t]{0.1\linewidth}
+      \AxiomC{$\Gamma$}
+      \noLine
+      \UnaryInfC{$H : \alpha$}
+      \UnaryInfC{$?_{1} : \beta$}
+      \DisplayProof    
+    \end{minipage}
+
+  \item corresponde a la prueba $\lambda x. \; ?_{1}$.
+
+    \begin{minipage}[t]{0.2\linewidth}
+      \AxiomC{$\Gamma$}
+      \UnaryInfC{$? : \forall x. \; \beta$}
+      \DisplayProof    
+    \end{minipage}
+    \begin{minipage}[t]{0.1\linewidth}
+      $\rightsquigarrow$
+    \end{minipage}
+    \begin{minipage}[t]{0.1\linewidth}
+      \AxiomC{$\Gamma$}
+      \noLine
+      \UnaryInfC{$x$}
+      \UnaryInfC{$?_{1} : \beta$}
+      \DisplayProof    
+    \end{minipage}
+    
+  \end{itemize}  
+
+\item \texttt{apply H}: corresponde a la prueba $(H \; ?_{1})$.
+
+  \begin{minipage}[t]{0.2\linewidth}
+    \AxiomC{$\Gamma$}
     \noLine
-    \UnaryInfC{$\mathtt{: exists \; X,\;  T_{2}}$}
-  \end{prooftree}
+    \UnaryInfC{$H:\alpha \rightarrow \beta$}
+    \UnaryInfC{$? : \beta$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \noLine
+    \UnaryInfC{$H : \alpha \rightarrow \beta$}
+    \UnaryInfC{$?_{1} : \alpha$}
+    \DisplayProof    
+  \end{minipage}
 
-\end{minipage}
-\begin{minipage}[t]{0.5\linewidth}
-  \centering  
+\item \texttt{cut $\beta$}: corresponde a la prueba $(?_{1} \; ?_{2})$.
 
-  \begin{prooftree}
-    \AxiomC{$\mathtt{\Gamma, X \vdash t_{2} : T_{2}}$}
-    \RightLabel{\scriptsize \textsc{T-TAbs}}
-    \UnaryInfC{$\mathtt{\Gamma \vdash \lambda X. \; t_{2} : forall \; X, \; T_{2}}$}
-  \end{prooftree}
+  \begin{minipage}[t]{0.2\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$? : \alpha$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.2\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$?_{1} : \beta \rightarrow \alpha$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$?_{2} : \beta$}
+    \DisplayProof    
+  \end{minipage}
 
-  \begin{prooftree}
-    \AxiomC{$\mathtt{\Gamma \vdash t_{1} : forall \; X, \; T_{12}}$}
-    \RightLabel{\scriptsize \textsc{T-TApp}}
-    \UnaryInfC{$\mathtt{\Gamma \vdash t_{1} \; [T_{2}] : T_{12} [X \rightarrow T_{2}]}$}
-  \end{prooftree}
-
-  \begin{prooftree}
-    \AxiomC{$\mathtt{\Gamma \vdash t_{1} : T}$}
-    \RightLabel{\scriptsize \textsc{T-Ascribe}}
-    \UnaryInfC{$\mathtt{\Gamma \vdash t_{1} \; as \; T : T}$}
-  \end{prooftree}
-
-  \begin{prooftree}  
-    \AxiomC{$\mathtt{\Gamma \vdash t_{1} : \{ exists \; X, \; T_{12} \}}$}
-    \AxiomC{$\mathtt{\Gamma, X, x:T_{12}  \vdash t_{2} : T_{2}}$}
-    \RightLabel{\scriptsize \textsc{T-Unpack}}
-    \BinaryInfC{$\mathtt{\Gamma \vdash let \{ X, x \} = t_{1} \; in \; t_{2} : T_{2}}$}
-  \end{prooftree}
+\item \texttt{apply H}: tenemos 3 casos.
   
-\end{minipage}
+  \begin{itemize}
+  \item Corresponde a la prueba $(H \; [\theta_{1}] [\theta_{2}] .. [\theta_{n}])$
+    de modo tal que, $\gamma = \beta \; [ x_{1} \rightarrow \theta_{1} ] .. [x_{n} \rightarrow \theta_{n}].$
+    
+    \begin{minipage}[t]{0.2\linewidth}
+      \AxiomC{$\Gamma$}
+      \noLine
+      \UnaryInfC{$H : \forall x_{1}. \forall x_{2}. .. \forall x_{n}. \; \beta$}
+      \UnaryInfC{$? : \gamma$}
+      \DisplayProof
+    \end{minipage}
+    
+  \item Corresponde a la prueba $(H \; ?_{1} .. ?_{n})$.
 
-\vspace{0.5cm}
+    \begin{minipage}[t]{0.3\linewidth}
+      \AxiomC{$\Gamma$}
+      \noLine
+      \UnaryInfC{$H : \alpha_{1} \rightarrow \alpha_{2} \rightarrow ... \rightarrow \alpha_{n}$}
+      \UnaryInfC{$? : \beta$}
+      \DisplayProof
+    \end{minipage}
+    \begin{minipage}[t]{0.1\linewidth}
+      $\rightsquigarrow$
+    \end{minipage}
+    \begin{minipage}[t]{0.1\linewidth}
+      \AxiomC{$\Gamma$}
+      \noLine
+      \UnaryInfC{$H : ..$}
+      \UnaryInfC{$?_{1} : \alpha_{1}$}
+      \DisplayProof    
+    \end{minipage}
+    \begin{minipage}[t]{0.05\linewidth}
+      $\ldots$
+    \end{minipage}
+    \begin{minipage}[t]{0.1\linewidth}
+      \AxiomC{$\Gamma$}
+      \noLine
+      \UnaryInfC{$H : ..$}
+      \UnaryInfC{$?_{n} : \alpha_{n}$}
+      \DisplayProof    
+    \end{minipage}
+
+  \item Corresponde a la prueba $H$.
+
+    \AxiomC{$\Gamma$}
+    \noLine
+    \UnaryInfC{$H:\alpha$}
+    \UnaryInfC{$? : \alpha$}
+    \DisplayProof
+
+  \end{itemize}
+
+\item \texttt{left}: Corresponde a la prueba $(intro\_or1 \; ?_{1})$.
+  
+  \begin{minipage}[t]{0.3\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$? : \alpha \vee \beta$}
+    \DisplayProof
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$?_{1} : \alpha$}
+    \DisplayProof    
+  \end{minipage}
+
+\item \texttt{right}: Corresponde a la prueba $(intro\_or2 \; ?_{1})$.
+  
+  \begin{minipage}[t]{0.3\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$? : \alpha \vee \beta$}
+    \DisplayProof
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$?_{1} : \beta$}
+    \DisplayProof    
+  \end{minipage}
+  
+\item \texttt{split}: Corresponde a la prueba $(intro\_and \; ?_{1} \; ?_{2})$.
+
+  \begin{minipage}[t]{0.3\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$? : \alpha \wedge \beta$}
+    \DisplayProof
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$?_{1} : \alpha$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$?_{2} : \beta$}
+    \DisplayProof    
+  \end{minipage}
+
+\item \texttt{absurd $\alpha$}: Corresponde a la prueba $(intro\_bottom \; ?_{1} \; ?_{2})$.
+
+  \begin{minipage}[t]{0.3\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$? : False$}
+    \DisplayProof
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$?_{1} : \alpha$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$?_{2} : \neg \alpha$}
+    \DisplayProof    
+  \end{minipage}
+
+\item \texttt{elim H}: tenemos varios casos.
+
+
+\end{itemize}
 
 
 \section{Data types}
@@ -776,17 +1033,25 @@ Consideramos que todos los operadores binarios infijos asocian a derecha.
 
 \end{itemize}
 
-\section{Lo que falta}
-\begin{itemize}
-%   \item Hacer el comando \texttt{infer} completo. Es decir, que funcione cuando en el lambda término aparecen operaciones foldeables.
-%   Ver \texttt{Theorem t34}, \texttt{Theorem t35}, en \texttt{casos.txt}.
-%   
-  \item Añadir constantes (creo que serían axiomas).
-  
-  \item Simplificar código.
-\end{itemize}
 
+\begin{thebibliography}{9}
+\bibitem{pierce} 
+  Benjamin C. Pierce. 
+  Types and Programming Languages. 2002.
 
+\bibitem{languageEng}
+  Ana Bove, Luís Soares Barbosa,
+  Alberto Pardo, y
+  Jorge Sousa Pinto.
+  Language Engineering and Rigorous Software Development.
+  Springer, 2009.
+
+\bibitem{curry-howard}
+  Morten Heine Sørensen, y Pawel Urzyczyn.
+  Lectures on the Curry-Howard Isomorphism.
+  2006
+
+\end{thebibliography}
 
 
 \end{document}

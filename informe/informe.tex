@@ -328,7 +328,7 @@ Comenzamos definiendo al Sistema F.
     \end{prooftree}
 
     \begin{prooftree}  
-      \AxiomC{$\mathtt{\Gamma \vdash t_{1} : \{ exists \; X, \; T_{12} \}}$}
+      \AxiomC{$\mathtt{\Gamma \vdash t_{1} : exists \; X, \; T_{12} }$}
       \AxiomC{$\mathtt{\Gamma, X, x:T_{12}  \vdash t_{2} : T_{2}}$}
       \RightLabel{\scriptsize \textsc{T-Unpack}}
       \BinaryInfC{$\mathtt{\Gamma \vdash let \{ X, x \} = t_{1} \; in \; t_{2} : T_{2}}$}
@@ -527,7 +527,7 @@ Veamos como se construye el lambda término de acuerdo a la aplicación de las t
 
   \end{itemize}
 
-\item \texttt{left}: Corresponde a la prueba $(intro\_or1 \; ?_{1})$.
+\item \texttt{left}: Corresponde a la prueba $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$.
   
   \begin{minipage}[t]{0.3\linewidth}
     \AxiomC{$\Gamma$}
@@ -543,7 +543,7 @@ Veamos como se construye el lambda término de acuerdo a la aplicación de las t
     \DisplayProof    
   \end{minipage}
 
-\item \texttt{right}: Corresponde a la prueba $(intro\_or2 \; ?_{1})$.
+\item \texttt{right}: Corresponde a la prueba $(intro\_or2 \; [\alpha] \; [\beta] \; ?_{1})$.
   
   \begin{minipage}[t]{0.3\linewidth}
     \AxiomC{$\Gamma$}
@@ -559,7 +559,7 @@ Veamos como se construye el lambda término de acuerdo a la aplicación de las t
     \DisplayProof    
   \end{minipage}
   
-\item \texttt{split}: Corresponde a la prueba $(intro\_and \; ?_{1} \; ?_{2})$.
+\item \texttt{split}: Corresponde a la prueba $(intro\_and \; [\alpha] \; [\beta] \; ?_{1} \; ?_{2})$.
 
   \begin{minipage}[t]{0.3\linewidth}
     \AxiomC{$\Gamma$}
@@ -580,7 +580,7 @@ Veamos como se construye el lambda término de acuerdo a la aplicación de las t
     \DisplayProof    
   \end{minipage}
 
-\item \texttt{absurd $\alpha$}: Corresponde a la prueba $(intro\_bottom \; ?_{1} \; ?_{2})$.
+\item \texttt{absurd $\alpha$}: Corresponde a la prueba $(intro\_bottom \; [\alpha] \; ?_{1} \; ?_{2})$.
 
   \begin{minipage}[t]{0.3\linewidth}
     \AxiomC{$\Gamma$}
@@ -601,10 +601,109 @@ Veamos como se construye el lambda término de acuerdo a la aplicación de las t
     \DisplayProof    
   \end{minipage}
 
+\item \texttt{exists $\alpha$}: Corresponde a la prueba $\{ ^*\alpha, ?_1 \} \; as \; exists \; x, \; \sigma$. 
+
+  \begin{minipage}[t]{0.3\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$? : exists \; x, \; \sigma$}
+    \DisplayProof
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$?_{1} : \sigma [x \rightarrow \alpha]$}
+    \DisplayProof    
+  \end{minipage}
+
+
 \item \texttt{elim H}: tenemos varios casos.
 
+  \begin{itemize}
+  \item Corresponde a la prueba $(elim\_or \; [\alpha] \; [\beta] \; [\sigma] \; H \; ?_{1} \; ?_{2})$.
+
+    \begin{minipage}[t]{0.2\linewidth}
+      \AxiomC{$\Gamma$}
+      \noLine
+      \UnaryInfC{$H : \alpha \vee \beta$}
+      \UnaryInfC{$? : \sigma$}
+      \DisplayProof
+    \end{minipage}
+    \begin{minipage}[t]{0.1\linewidth}
+      $\rightsquigarrow$
+    \end{minipage}
+    \begin{minipage}[t]{0.2\linewidth}
+      \AxiomC{$\Gamma$}
+      \noLine
+      \UnaryInfC{$H : \alpha \vee \beta$}
+      \UnaryInfC{$?_1 : \alpha \rightarrow \sigma$}
+      \DisplayProof    
+    \end{minipage}
+    \begin{minipage}[t]{0.1\linewidth}
+      \AxiomC{$\Gamma$}
+      \noLine
+      \UnaryInfC{$H : \alpha \vee \beta$}
+      \UnaryInfC{$?_2 : \beta \rightarrow \alpha$}
+      \DisplayProof    
+    \end{minipage}
+
+  \item Corresponde a la prueba $(elim\_and \; [\alpha] \; [\beta] \; [\sigma] \; H \; ?_1)$.
+
+    \begin{minipage}[t]{0.2\linewidth}
+      \AxiomC{$\Gamma$}
+      \noLine
+      \UnaryInfC{$H : \alpha \wedge \beta$}
+      \UnaryInfC{$? : \sigma$}
+      \DisplayProof
+    \end{minipage}
+    \begin{minipage}[t]{0.1\linewidth}
+      $\rightsquigarrow$
+    \end{minipage}
+    \begin{minipage}[t]{0.2\linewidth}
+      \AxiomC{$\Gamma$}
+      \noLine
+      \UnaryInfC{$H : \alpha \wedge \beta$}
+      \UnaryInfC{$?_1 : \alpha \rightarrow \beta \rightarrow \sigma$}
+      \DisplayProof    
+    \end{minipage}
+
+  \item Corresponde a la prueba $(elim\_bottom \; [\sigma] \; H)$.
+
+    \begin{minipage}[t]{0.2\linewidth}
+      \AxiomC{$\Gamma$}
+      \noLine
+      \UnaryInfC{$H : False$}
+      \UnaryInfC{$? : \sigma$}
+      \DisplayProof
+    \end{minipage}
+
+  \item Corresponde a la prueba $let \; \{x, H'\} = H \; in \; ?_1$
+
+    \begin{minipage}[t]{0.2\linewidth}
+      \AxiomC{$\Gamma$}
+      \noLine
+      \UnaryInfC{$H : exists \; x, \; \alpha $}
+      \UnaryInfC{$? : \sigma$}
+      \DisplayProof
+    \end{minipage}
+    \begin{minipage}[t]{0.1\linewidth}
+      $\rightsquigarrow$
+    \end{minipage}
+    \begin{minipage}[t]{0.2\linewidth}
+      \AxiomC{$\Gamma$}
+      \noLine
+      \UnaryInfC{$x$}
+      \noLine
+      \UnaryInfC{$H' : \alpha$}
+      \UnaryInfC{$?_1 : \sigma$}
+      \DisplayProof    
+    \end{minipage}
+
+  \end{itemize}
 
 \end{itemize}
+
 
 
 \section{Data types}

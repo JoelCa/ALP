@@ -373,12 +373,84 @@ Por ello, lo añadimos al lenguaje. Ver Figura \ref{SintaxisTiposF}.
 \subsection{Construcción de pruebas}
 \label{construcciónDePruebas}
 
-El asistente de prueba, implementa un chequeo de tipos sobre el lambda término que se construye a
-medida que el usuario realiza una prueba. 
+El asistente de prueba, implementa el isomorfismo Curry-Howard, con lo cual se construye un lambda término
+a medida que el usuario realiza la prueba de un teorema. 
 Cuando la prueba finaliza el lambda término asociado a la prueba tendrá como tipo la fórmula probada.
 
-Utilizamos  términos con agujeros, de modo tal que sucesivas aplicaciones de las tácticas terminen 
-de armar el lambda término que cumpla con el tipo deseado.
+En la construcción del lambda término, utilizamos \textit{términos con agujeros}, de modo tal que sucesivas aplicaciones 
+de las tácticas armen el término que cumpla con el tipo deseado.
+
+\subsubsection{Ejemplo}
+\label{ejemplo}
+
+Tomemos como ejemplo la siguiente fórmula: $\forall p, \forall q, p \wedge q \rightarrow p$.
+Para probarlo aplicaremos las reglas de eliminación e introducción mediante el uso de las tácticas.
+
+En la Cuadro \ref{Ejemplo}, vemos la prueba realizada, donde la aplicación de cada táctica corresponde a un lambda término.
+Una vez finalizada la prueba, se tiene un lambda término completo.
+
+En el Cuadro \ref{Ejemplo} la columna \textbf{Tácticas} indica las tácticas ingresadas por el usuario. 
+La columna \textbf{Lambda término} muestra el lambda término asociado a la prueba, 
+y por último \textbf{Derivación} tiene la derivación que resta probar una vez procesadas las tácticas.
+
+
+\begin{table}[]
+\centering
+\caption{Prueba de $\forall p, \forall q, p \wedge q \rightarrow p$}
+\label{Ejemplo}
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Tácticas} & \textbf{Lambda término} & \textbf{Derivación} \\ \hline
+    -    &     ?          & \AxiomC{}
+                            \UnaryInfC{$\forall p, \forall q, p \wedge q \rightarrow p$}
+                            \DisplayProof   \\ \hline
+  intros & $\lambda p. \lambda q. \lambda H0: p \wedge q. \; ?$ 
+                          & \AxiomC{$$}
+                            \noLine
+                            \UnaryInfC{$p$}
+                            \noLine
+                            \UnaryInfC{$q$}
+                            \noLine
+                            \UnaryInfC{$H0: p \wedge q$}
+                            \UnaryInfC{$p$}
+                            \DisplayProof   \\ \hline
+ intros; elim H0 
+         & $\lambda p. \lambda q. \lambda H0: p \wedge q. \; elim\_and \; [p] \; [q] \; [p] \; H0 \; ?$
+                          & \AxiomC{$$}
+                            \noLine
+                            \UnaryInfC{$p$}
+                            \noLine 
+                            \UnaryInfC{$q$}
+                            \noLine
+                            \UnaryInfC{$H0: p \wedge q$}
+                            \UnaryInfC{$p \rightarrow q \rightarrow p$}
+                            \DisplayProof   \\ \hline
+ intros; elim H0; intros
+         & \begin{tabular}[c]{@{}c@{}}$\lambda p. \lambda q. \lambda H0: p \wedge q. \; elim\_and \; [p] \; [q] \; [p]$
+             \\ $H0 \; (\lambda H1: p. \lambda H2: q. \; ?)$\end{tabular}
+                          & \AxiomC{$$}
+                            \noLine
+                            \UnaryInfC{$p$}
+                            \noLine 
+                            \UnaryInfC{$q$}
+                            \noLine
+                            \UnaryInfC{$H0: p \wedge q$}
+                            \noLine
+                            \UnaryInfC{$H1: p$}
+                            \noLine
+                            \UnaryInfC{$H2: q$}
+                            \UnaryInfC{$p$}
+                            \DisplayProof   \\ \hline
+  \begin{tabular}[c]{@{}c@{}}intros; elim H0\\ intros; assumption\end{tabular}
+         & \begin{tabular}[c]{@{}c@{}}$\lambda p. \lambda q. \lambda H0: p \wedge q. \; elim\_and \; [p] \; [q] \; [p]$
+             \\ $H0 \; (\lambda H1: p. \; \lambda H2: q. \; H1)$\end{tabular}
+                          & - \\ \hline
+
+\end{tabular}
+\end{table}
+
+
+\subsubsection{Tácticas}
 
 Veamos como se construye el lambda término de acuerdo a la aplicación de las tácticas.
 

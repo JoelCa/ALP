@@ -373,7 +373,7 @@ Por ello, lo añadimos al lenguaje. Ver Figura \ref{SintaxisTiposF}.
 \subsection{Construcción de pruebas}
 \label{construcciónDePruebas}
 
-El asistente de prueba, implementa el isomorfismo Curry-Howard, con lo cual se construye un lambda término
+El asistente de prueba implementa el isomorfismo Curry-Howard, se construye un lambda término
 a medida que el usuario realiza la prueba de un teorema. 
 Cuando la prueba finaliza el lambda término asociado a la prueba tendrá como tipo la fórmula probada.
 
@@ -382,17 +382,6 @@ de las tácticas armen el término que cumpla con el tipo deseado.
 
 \subsubsection{Ejemplo}
 \label{ejemplo}
-
-Tomemos como ejemplo la siguiente fórmula: $\forall p, \forall q, p \wedge q \rightarrow p$.
-Para probarlo aplicaremos las reglas de eliminación e introducción mediante el uso de las tácticas.
-
-En la Cuadro \ref{Ejemplo}, vemos la prueba realizada, donde la aplicación de cada táctica corresponde a un lambda término.
-Una vez finalizada la prueba, se tiene un lambda término completo.
-
-En el Cuadro \ref{Ejemplo} la columna \textbf{Tácticas} indica las tácticas ingresadas por el usuario. 
-La columna \textbf{Lambda término} muestra el lambda término asociado a la prueba, 
-y por último \textbf{Derivación} tiene la derivación que resta probar una vez procesadas las tácticas.
-
 
 \begin{table}[]
 \centering
@@ -449,6 +438,16 @@ y por último \textbf{Derivación} tiene la derivación que resta probar una vez
 \end{tabular}
 \end{table}
 
+Tomemos como ejemplo la siguiente fórmula: $\forall p, \forall q, p \wedge q \rightarrow p$.
+Lo probaremos aplicando reglas de eliminación e introducción mediante el uso de tácticas.
+
+En el Cuadro \ref{Ejemplo}, vemos una prueba del teorema.
+La columna \textbf{Tácticas} muestra las tácticas ingresadas. 
+La columna \textbf{Lambda término} tiene el lambda término asociado a la prueba, 
+y por último \textbf{Derivación} indica la derivación que resta probar una vez procesadas las tácticas.
+Vemos que la aplicación de cada táctica corresponde a un lambda término.
+Una vez finalizada la prueba, se tiene un lambda término completo.
+
 
 \subsubsection{Tácticas}
 
@@ -479,7 +478,7 @@ Veamos como se construye el lambda término de acuerdo a la aplicación de las t
     \begin{minipage}[t]{0.1\linewidth}
       \AxiomC{$\Gamma$}
       \noLine
-      \UnaryInfC{$H : \alpha$}
+      \UnaryInfC{$H : \alpha$}/
       \UnaryInfC{$?_{1} : \beta$}
       \DisplayProof    
     \end{minipage}

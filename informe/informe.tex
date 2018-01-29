@@ -776,7 +776,7 @@ Veamos como se construye el lambda término de acuerdo a la aplicación de las t
 \end{itemize}
 
 
-\section{Modulos}
+\section{Módulos}
 
 A continuación se describen los aspectos fundamentales que trata cada módulo.
 
@@ -784,16 +784,18 @@ A continuación se describen los aspectos fundamentales que trata cada módulo.
 
 \item ErrorMsj: mensajes de error.
 \item Common: tipos abstractos de datos.
-\item Proof: contiene las funciones que operan sobre la construccíon de la prueba.
+\item Proof: contiene las funciones que operan sobre la construcción de la prueba.
 \item GlobalState: mantiene funciones que operan sobre los datos ``globales'', es decir
 datos que se mantienen durante toda la ejecución del asistente.
 \item ProverState: tiene el estado general del asistente, incluye tanto los datos de la
 construcción de una prueba como los datos globales.
-\item TypeSubstitution: oculta la substitución.
+\item TypeSubstitution: oculta el algoritmo de substitución.
 \item TypeUnification: oculta la unificación de tipos.
+\item TypeInference: oculta la inferencia de tipos.
 \item TypeDefinition: oculta funciones que operan sobre el entorno de tipos.
-\item LambdaTermDefinition: oculta funciones que operan sobre el lambda término con aujeros.
+\item LambdaTermDefinition: oculta funciones que operan sobre el lambda términos con aujeros.
 \item Hyphotesis: 
+
 \end{itemize}
 
 \section{Data types}

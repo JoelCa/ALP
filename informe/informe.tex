@@ -373,15 +373,195 @@ Por ello, lo añadimos al lenguaje. Ver Figura \ref{SintaxisTiposF}.
 \subsection{Construcción de pruebas}
 \label{construcciónDePruebas}
 
+El isomorfismo de Curry-Howard, nos permite relacionar a los tipos con fórmulas lógicas, 
+y a las pruebas con lambda términos.
+
 El asistente de prueba implementa el isomorfismo Curry-Howard, se construye un lambda término
 a medida que el usuario realiza la prueba de un teorema. 
-Cuando la prueba finaliza el lambda término asociado a la prueba tendrá como tipo la fórmula probada.
+Cuando se prueba una fórmula $\alpha$, se construye un lambda término $t$, tal que $t:\alpha$.
+Es decir, que cuando la prueba finaliza el lambda término asociado a la prueba tendrá como tipo la fórmula probada.
 
-En la construcción del lambda término, utilizamos \textit{términos con agujeros}, de modo tal que sucesivas aplicaciones 
-de las tácticas armen el término que cumpla con el tipo deseado.
+El teorema de Curry-Howard, nos asegura que, si $t:\alpha$, entonces la fórmula asociada a $\alpha$ es válida.
 
-\subsubsection{Ejemplo}
-\label{ejemplo}
+Para probar cierta fórmula objetivo utilizaremos diferentes tácticas que transforman el objetivo original e
+introducen hipótesis adicionales.
+
+Cuando construimos una prueba tenemos la siguiente situación:
+existen varios objetivos a probar, cada uno a partir de ciertas hipótesis.
+\newline
+
+\begin{minipage}[t]{0.1\linewidth}
+  \AxiomC{$\Gamma_{1}$}
+  \UnaryInfC{$\alpha_{1}$}
+  \DisplayProof    
+\end{minipage}
+\begin{minipage}[t]{0.07\linewidth}
+  \AxiomC{$\Gamma_{2}$}
+  \UnaryInfC{$\alpha_{2}$}
+  \DisplayProof    
+\end{minipage}
+\begin{minipage}[t]{0.05\linewidth}
+  $\ldots$
+\end{minipage}
+\begin{minipage}[t]{0.1\linewidth}
+  \AxiomC{$\Gamma_{n}$}
+  \UnaryInfC{$\alpha_{n}$}
+  \DisplayProof    
+\end{minipage}
+\newline
+
+Tenemos que,
+
+\begin{itemize}
+\item Cada $\Gamma_{i}$ (contexto) es un conjunto de fórmulas (hipótesis) y variables. donde las hipótesis
+son de la forma H0 : $\gamma_{0}$, $\ldots$, Hk : $\gamma_{k}$.
+\item $\alpha_{i}$ es una fórmula, la cual debe ser probada a partir de $\Gamma_{i}$. 
+\end{itemize}
+
+
+\begin{figure}[!h]
+  \centering
+  \begin{tikzpicture}
+    %% vertices
+    \draw[fill=black] (1,0) circle (3pt);
+    \draw[fill=black] (5,1.5) circle (3pt);
+    \draw[fill=black] (3,1.5) circle (3pt);
+    \draw[fill=black] (5,3) circle (3pt);
+    %% vertex labels
+    \node at (4.8,3)
+    {
+      \begin{minipage}[t]{0.1\linewidth}
+        \AxiomC{$\Gamma_{1}$}
+        \UnaryInfC{$\alpha_{1}$}
+        \DisplayProof    
+      \end{minipage}
+    };
+    \node at (2.7,1.5) 
+    {
+      \begin{minipage}[t]{0.1\linewidth}
+        \AxiomC{$\Gamma_{11}$}
+        \UnaryInfC{$\alpha_{11}$}
+        \DisplayProof    
+      \end{minipage}
+    };
+    \node at (4.7,1.5) 
+    {
+      \begin{minipage}[t]{0.1\linewidth}
+        \AxiomC{$\Gamma_{12}$}
+        \UnaryInfC{$\alpha_{12}$}
+        \DisplayProof    
+      \end{minipage}
+    };
+    \node at (7,1.5) 
+    {
+      \ldots
+    };
+    \node at (0.5,0)
+    {
+      \begin{minipage}[t]{0.1\linewidth}
+        \AxiomC{$\Gamma_{111}$}
+        \UnaryInfC{$\alpha_{111}$}
+        \DisplayProof    
+      \end{minipage}
+    };
+    \node at (3,0) 
+    {
+      \ldots
+    };
+    \node at (5,0) 
+    {
+      \ldots
+    };
+    \node at (1,-1.5) 
+    {
+      \ldots
+    };
+    %%% edges
+    \draw[thick] (1, -1.3) -- (1,0) (5,0.2) -- (5,3) (3,0.2) -- (3,1.5) (1,0) -- (3,1.5) (7,1.7) -- (5,3)  (3,1.5) -- (5,3)  (5,1.5) -- (5,3);
+  \end{tikzpicture}
+  \caption{Árbol de prueba} \label{arbol}
+\end{figure}
+
+Las tácticas modifican el contexto durante una prueba, transformando un secuente en cero o más secuentes. Ver Figura \ref{arbol}.
+
+\subsubsection{Ejemplos}
+\label{ejemplos}
+
+Una subprueba se corresponde a un nodo en el árbol de derivación. 
+Las tácticas que ingresa el usuario construyen dicho árbol. Cuando se demuestran todas las subpruebas, se obtiene el lambda término final. 
+
+Podemos ver en la Figura \ref{Estados} un diagrama compuesto de todas las subpruebas que se generan al demostrar el
+siguiente secuente:
+$p, \; q \vee  (p \rightarrow t) \rightarrow  r, \; t, \; p \wedge t \rightarrow r \rightarrow q \vee t \rightarrow w \vdash w$.
+
+Empleamos la siguiente notación:\\
+
+\tikz \node[rectangle,draw,label=below:
+Estado de $subps$]{Subpruebas};
+
+Donde, $subps$ mantiene los datos de las subpruebas ($subps :: [SubProof]$), y $ty$ retorna el objetivo de la subprueba que recibe como
+argumento.
+La transición de un estado a otro se realiza mediante una táctica.
+Consideramos $C = H0 : p, \; H1 : q \vee  (p \rightarrow t) \rightarrow  r, \; H2 : t, \; H3: p \wedge t \rightarrow r \rightarrow q \vee t \rightarrow w$.
+
+\begin{figure}  
+  \begin{tikzpicture}[->, node distance=2cm, auto, thick,main node/.style={rectangle,draw}]
+
+    \node[main node, label={[align=left]below:$subps = [s_{0}]$\\$\wedge \; ty \; s_{0} = [w]$}] (1) {$C \vdash  w$};
+    \node[main node, label={[align=left]below:$subps = [s_{1},s_{0}]$ \\ $\wedge \; ty \; s_{1} = [p \wedge q]$ \\ 
+      $\wedge \; ty \; s_{0} = [r, q \vee t]$}] 
+    (2) [right=of 1] {$C \vdash  p \wedge t$, $C \vdash r$, $C \vdash q \vee t$};
+    \begin{scope}[node distance=1.4cm]
+      \node[main node, label={[align=left]below:$subps = [s_{2},s_{1},s_{0}]$\\$\wedge \; ty \; s_{2} = [p]$
+        \\$\wedge \; ty \; s_{1} = [t]$ \\ $\wedge \; ty \; s_{0} = [r,q \vee t]$}]
+      (3) [right=of 2] {$C \vdash  p , C \vdash t$, $C \vdash r$, $C \vdash q \vee t$};
+    \end{scope}
+    \begin{scope}[node distance=1cm]
+      \coordinate [right=of 3] (4) {};
+    \end{scope}
+    \begin{scope}[node distance=2.8cm]
+      \node[main node, label={[align=left]below:$subps = [s_{1},s_{0}]$ \\$\wedge \; ty \; s_{1} = [t]$ \\ $\wedge \; ty \; s_{0} = [r,q \vee t]$}] 
+      (5) [below=of 4] {$C \vdash t$, $C \vdash r$,$C \vdash q \vee t$};
+    \end{scope}
+    \begin{scope}[node distance=2.2cm]
+      \node[main node, label={[align=left]below:$subps = [s_{3},s_{0}]$ \\$\wedge \; ty \; s_{3} = [r]$ \\ $\wedge \; ty \; s_{0} = [q \vee t]$}] 
+      (6) [left=of 5] {$C \vdash r$, $C \vdash q \vee t$};
+    \end{scope}
+    \begin{scope}[node distance=1.7cm]
+    \node[main node, label={[align=left]below:$subps = [s_{3},s_{0}]$ \\$\wedge \; ty \; s_{3} = [q \vee  (p \rightarrow t)]$ \\ 
+      $\wedge \; ty \; s_{0} = [q \vee t]$}] 
+    (7) [left=of 6] {$C \vdash q \vee  (p \rightarrow t)$, $C \vdash q \vee t$};
+    \coordinate [left=of 7] (8) {};
+    \end{scope}
+    \begin{scope}[node distance=2.8cm]
+      \node[main node, label={[align=left]below:$subps = [s_{3},s_{0}]$ \\$\wedge \; ty \; s_{3} = [p \rightarrow t]$ \\ $\wedge \; ty 
+        \; s_{0} = [q \vee t]$}] 
+      (9) [below=of 8] {$C \vdash p \rightarrow t$, $C \vdash q \vee t$};
+    \end{scope}
+    \begin{scope}[node distance=1.5cm]
+      \node[main node, label={[align=left]below:$subps = [s_{3},s_{0}]$ \\$\wedge \; ty \; s_{3} = [t]$ \\ $\wedge \; ty 
+        \; s_{0} = [q \vee t]$}] 
+      (10) [right=of 9] {$\{C, H4: p \}\vdash t$, $C \vdash q \vee t$};
+    \end{scope}
+    \begin{scope}[node distance=2.4cm]
+      \node[main node, label={[align=left]below:$subps = [s_{0}]$ \\ $\wedge \; ty \; s_{0} = [q \vee t]$}] 
+      (11) [right=of 10] {$C \vdash q \vee t$};
+      \coordinate [right=of 11] (12) {};
+      \node[main node, label={[align=left]below:$subps = [s_{0}]$ \\ $\wedge \; ty \; s_{0} = [t]$}] 
+      (13) [below=of 12] {$C \vdash t$};
+      \node[main node, label={[align=left]below:$subps = [\;]$}] 
+      (14) [left=of 13] {$\emptyset$};
+    \end{scope}
+    \path[draw] (1) edge [above] node {\texttt{apply H3}} (2) (2) edge [above] node {\texttt{split}} (3)
+    (3) -- (4) (4) edge node [left] {\texttt{assumption}} (5) (5) edge node [above] {\texttt{assumption}} (6) 
+    (6) edge node [above] {\texttt{apply H1}} (7) (7) -- (8) (8) -- node [right] {\texttt{right}} (9)
+    (9) edge node [above] {\texttt{intro}} (10) (10) edge node [above] {\texttt{assumption}} (11)
+    (11) -- (12) (12) -- node [left] {\texttt{right}} (13) (13) edge node [above] {\texttt{assumption}} (14);
+  \end{tikzpicture}
+  \caption{Diagrama de subpruebas. Secuente: 
+$p, \; q \vee  (p \rightarrow t) \rightarrow  r, \; t, \; p \wedge t \rightarrow r \rightarrow q \vee t \rightarrow w \vdash w$.
+} \label{Estados}
+\end{figure}
 
 \begin{table}[]
 \centering
@@ -390,10 +570,10 @@ de las tácticas armen el término que cumpla con el tipo deseado.
 \begin{tabular}{|c|c|c|}
 \hline
 \textbf{Tácticas} & \textbf{Lambda término} & \textbf{Derivación} \\ \hline
-    -    &     ?          & \AxiomC{}
+  \texttt{-}    &     ?          & \AxiomC{}
                             \UnaryInfC{$\forall p, \forall q, p \wedge q \rightarrow p$}
                             \DisplayProof   \\ \hline
-  intros & $\lambda p. \lambda q. \lambda H0: p \wedge q. \; ?$ 
+  \texttt{intros} & $\lambda p. \lambda q. \lambda H0: p \wedge q. \; ?$ 
                           & \AxiomC{$$}
                             \noLine
                             \UnaryInfC{$p$}
@@ -403,7 +583,7 @@ de las tácticas armen el término que cumpla con el tipo deseado.
                             \UnaryInfC{$H0: p \wedge q$}
                             \UnaryInfC{$p$}
                             \DisplayProof   \\ \hline
- intros; elim H0 
+ \texttt{intros; elim H0} 
          & $\lambda p. \lambda q. \lambda H0: p \wedge q. \; elim\_and \; [p] \; [q] \; [p] \; H0 \; ?$
                           & \AxiomC{$$}
                             \noLine
@@ -414,7 +594,7 @@ de las tácticas armen el término que cumpla con el tipo deseado.
                             \UnaryInfC{$H0: p \wedge q$}
                             \UnaryInfC{$p \rightarrow q \rightarrow p$}
                             \DisplayProof   \\ \hline
- intros; elim H0; intros
+ \texttt{intros; elim H0; intros}
          & \begin{tabular}[c]{@{}c@{}}$\lambda p. \lambda q. \lambda H0: p \wedge q. \; elim\_and \; [p] \; [q] \; [p]$
              \\ $H0 \; (\lambda H1: p. \lambda H2: q. \; ?)$\end{tabular}
                           & \AxiomC{$$}
@@ -430,13 +610,16 @@ de las tácticas armen el término que cumpla con el tipo deseado.
                             \UnaryInfC{$H2: q$}
                             \UnaryInfC{$p$}
                             \DisplayProof   \\ \hline
-  \begin{tabular}[c]{@{}c@{}}intros; elim H0\\ intros; assumption\end{tabular}
+  \begin{tabular}[c]{@{}c@{}}\texttt{intros; elim H0}\\ \texttt{intros; assumption}\end{tabular}
          & \begin{tabular}[c]{@{}c@{}}$\lambda p. \lambda q. \lambda H0: p \wedge q. \; elim\_and \; [p] \; [q] \; [p]$
              \\ $H0 \; (\lambda H1: p. \; \lambda H2: q. \; H1)$\end{tabular}
                           & - \\ \hline
 
 \end{tabular}
 \end{table}
+
+En la construcción del lambda término, utilizamos \textit{términos con agujeros}, de modo tal que sucesivas aplicaciones 
+de las tácticas armen el término que cumpla con el tipo deseado.
 
 Tomemos como ejemplo la siguiente fórmula: $\forall p, \forall q, p \wedge q \rightarrow p$.
 Lo probaremos aplicando reglas de eliminación e introducción mediante el uso de tácticas.
@@ -448,161 +631,405 @@ y por último \textbf{Derivación} indica la derivación que resta probar una ve
 Vemos que la aplicación de cada táctica corresponde a un lambda término.
 Una vez finalizada la prueba, se tiene un lambda término completo.
 
+\section{Comandos}
 
-\subsubsection{Tácticas}
+El asistente de prueba cuenta con un entorno global, el cual llamaremos $GEnv$ (un record de tipo \texttt{GlobalState}).
+En este entorno están las variables declaradas.
 
-Veamos como se construye el lambda término de acuerdo a la aplicación de las tácticas.
+\begin{verbatim}
+> Variables a, b;
+\end{verbatim}
+
+Se añaden $a$ y $b$ a $GEnv$. El contexto con el cual inicia una prueba tendrá a las variables $a$ y $b$.
+
+Además, $GEnv$ tiene los teoremas probados.
+
+\begin{verbatim}
+> Theorem t1: a -> a;
+\end{verbatim}
+  
+El contexto inicial es $\Gamma_1 = a, \; b$. 
+
+\begin{verbatim}
+a1 < intro; assumption;
+\end{verbatim}
+
+Cuando la prueba termina se añade a $GEnv$ el nombre del teorema, el tipo, y
+la prueba: $t1$, $a \rightarrow a$, $\lambda H0:a. \; H0$.
+Luego,  $t1$ puede utilizarse en pruebas posteriores.
+
+En $GEnv$ están los supuestos.
+
+\begin{verbatim}
+> Axiom a1: forall p, p \/ ~p;
+\end{verbatim}
+
+Se añaden el nombre y el tipo a $GEnv$, es decir, $a1$ y $\forall p, p \vee \neg p$.
+De este modo, $a1$ estará disponibles en las siguientes pruebas.
+
+Por último, en $GEnv$ están los operados definidos por el usuario.
+
+\begin{verbatim}
+> op1 x = ~ ~ x;
+\end{verbatim}
+
+El contexto con el cual inicia cada prueba se obtiene de $GEnv$. Cuando inicia el asistente, $GEnv$ tiene los teoremas
+y operadores definidos en \texttt{Prelude.hs}.
+
+Todos los comandos terminan con punto y coma \texttt{``;''}. Es posible escribir varios comandos en la misma entrada,
+incluso comandos $incompletos$. Es decir que podemos ir completando el comando. 
+Por ejemplo,
+
+\begin{verbatim}
+> Theorem 
+>* t2 : forall q,
+>* q -> q;
+\end{verbatim}
+
+Estos son los comandos que definen el lenguaje del asistente de prueba.
 
 \begin{itemize}
-\item \texttt{assumption}: corresponde a la prueba $H$.
+
+\item \texttt{Variables} \textit{var}. Declaración de variables.
+\item \textit{name} \texttt{=} \textit{type}. Declaración de un operador.
+  Permite definir sinónimos de tipos. 
+
+  Variantes:
+  \begin{itemize}
+  \item \textit{name} $var_0$ \ldots $var_n$ \texttt{=} \textit{type}.
+    Asocia las variables al operador. 
+
+    Es equivalente a escribir:
+    \textit{name} \texttt{=} $\forall \; var_0, \; \ldots \; , \forall var_n, \; type$.
+  \item $var_0$ \textit{name} $var_1$. Define al operador de manera infija.
+
+    Es equivalente a escribir:
+    \textit{name} \texttt{=} $\forall \; var_0, \forall var_1, \; type$.
+  \end{itemize}
+
+\item \textit{name} \texttt{=} \textit{lambda term}. Declaración de un lambda término,
+se añade al entorno global.
+
+\item \textit{name} \texttt{:} \textit{type}. Asume \textit{type} como un postulado,
+se añade al entorno global. Equivale a \texttt{Axiom} \textit{name} \texttt{:} \textit{type}.
+
+\item \texttt{Theorem} \textit{name} \texttt{:} \textit{type}. Inicia la prueba de un
+teorema. Cuando la prueba finaliza se la añade a un entorno global, de modo tal que pueda utilizarse en las pruebas de
+otros teoremas. 
+
+
+\item \texttt{Axiom} \textit{name} \texttt{:} \textit{type}. Asume \textit{type} como un postulado.
+Equivale a \textit{name} \texttt{:} \textit{type}.
+
+\item \texttt{Print} \textit{name}. Imprime en pantalla la prueba de \textit{name}, si existe.
+
+Variante:
+\texttt{Print} \_. Imprime todos los operadores, teoremas y axiomas declarados.
+
+\item \texttt{Check} \textit{lambda term}. Determina el tipo de \textit{lambda term}, si existe.
+
+\item \textit{tactic}. Tácticas, ver sección \ref{tácticas}.
+
+\end{itemize}
+
+Comandos de control: 
+
+\begin{itemize}
+
+\item \texttt{:load} \textit{files}. Carga desde uno o varios archivos.
+
+\item \texttt{:save} \textit{file}. Guarda en un archivo todos los comandos válidos ingresados hasta el momento.
+
+\item \texttt{:abort}. Cancela la prueba actual.
+
+\item \texttt{:quit}. Sale del asistente de prueba.
+
+\item \texttt{:help}. Imprime un mensaje describiendo todos los comandos.
+
+\end{itemize}
+
+
+\subsection{Tácticas}
+\label{tácticas}
+
+A continuación se describen las tácticas de acuerdo a las reglas de inferencias.
+
+\begin{itemize}
+\item Caso trivial: táctica \texttt{assumption}, o \texttt{apply H}.   
   
   \AxiomC{$\Gamma$}
   \noLine
   \UnaryInfC{$H:\alpha$}
-  \UnaryInfC{$? : \alpha$}
+  \UnaryInfC{$\alpha$}
   \DisplayProof
 
-\item \texttt{intro}: tenemos dos casos.
+Corresponde al término $H$.
 
-  \begin{itemize}
-  \item corresponde a la prueba $\lambda H:\alpha. \; ?_{1}$.
+\item Introducción de la implicancia: táctica \texttt{intro}.
 
-    \begin{minipage}[t]{0.2\linewidth}
-      \AxiomC{$\Gamma$}
-      \UnaryInfC{$? : \alpha \rightarrow \beta$}
-      \DisplayProof    
-    \end{minipage}
-    \begin{minipage}[t]{0.1\linewidth}
-      $\rightsquigarrow$
-    \end{minipage}
-    \begin{minipage}[t]{0.1\linewidth}
-      \AxiomC{$\Gamma$}
-      \noLine
-      \UnaryInfC{$H : \alpha$}/
-      \UnaryInfC{$?_{1} : \beta$}
-      \DisplayProof    
-    \end{minipage}
-
-  \item corresponde a la prueba $\lambda x. \; ?_{1}$.
-
-    \begin{minipage}[t]{0.2\linewidth}
-      \AxiomC{$\Gamma$}
-      \UnaryInfC{$? : \forall x. \; \beta$}
-      \DisplayProof    
-    \end{minipage}
-    \begin{minipage}[t]{0.1\linewidth}
-      $\rightsquigarrow$
-    \end{minipage}
-    \begin{minipage}[t]{0.1\linewidth}
-      \AxiomC{$\Gamma$}
-      \noLine
-      \UnaryInfC{$x$}
-      \UnaryInfC{$?_{1} : \beta$}
-      \DisplayProof    
-    \end{minipage}
-    
-  \end{itemize}  
-
-\item \texttt{apply H}: corresponde a la prueba $(H \; ?_{1})$.
-
-  \begin{minipage}[t]{0.2\linewidth}
+  \begin{minipage}[t]{0.13\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\alpha \rightarrow \beta$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.08\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
     \AxiomC{$\Gamma$}
     \noLine
-    \UnaryInfC{$H:\alpha \rightarrow \beta$}
-    \UnaryInfC{$? : \beta$}
+    \UnaryInfC{$H : \alpha$}
+    \UnaryInfC{$\beta$}
+    \DisplayProof    
+  \end{minipage}
+
+  Corresponde al término $\lambda H:\alpha. \; ?_{1}$, siendo
+  $?_{1}$ la prueba de $\beta$.
+
+\item Introducción del para todo: táctica \texttt{intro}.
+
+  \begin{minipage}[t]{0.13\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\forall x. \; \beta$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.08\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \noLine
+    \UnaryInfC{$x$}
+    \UnaryInfC{$\beta$}
+    \DisplayProof    
+  \end{minipage}
+
+  Corresponde al término $\lambda x. \; ?_{1}$, donde $?_{1}$ es la prueba de $\beta$.
+
+\item Introducción de la disyunción izquierda: táctica \texttt{left}.
+  
+  \begin{minipage}[t]{0.13\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\alpha \vee \beta$}
+    \DisplayProof
+  \end{minipage}
+  \begin{minipage}[t]{0.08\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\alpha$}
+    \DisplayProof    
+  \end{minipage}
+
+Corresponde al término $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$, siendo $?_{1}$ la prueba de $\alpha$.
+
+\item Introducción de la disyunción derecha: táctica \texttt{right}.
+
+  \begin{minipage}[t]{0.13\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\alpha \vee \beta$}
+    \DisplayProof
+  \end{minipage}
+  \begin{minipage}[t]{0.08\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\beta$}
+    \DisplayProof    
+  \end{minipage}
+  
+  Corresponde al término $(intro\_or2 \; [\alpha] \; [\beta] \; ?_{1})$, donde $?_{1}$ es la prueba de $\beta$.
+
+\item Introducción de la conjunción: táctica \texttt{split}.
+
+  \begin{minipage}[t]{0.13\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\alpha \wedge \beta$}
+    \DisplayProof
+  \end{minipage}
+  \begin{minipage}[t]{0.08\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\alpha$}
     \DisplayProof    
   \end{minipage}
   \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\beta$}
+    \DisplayProof    
+  \end{minipage}
+
+  Corresponde al término $(intro\_and \; [\alpha] \; [\beta] \; ?_{1} \; ?_{2})$, donde $?_{1}$ es la prueba de $\alpha$, y $?_{2}$ es la prueba de $\beta$.
+
+\item Introducción del existencial: táctica \texttt{exists $\alpha$}.
+
+  \begin{minipage}[t]{0.2\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$exists \; x, \; \sigma$}
+    \DisplayProof
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\sigma [x \rightarrow \alpha]$}
+    \DisplayProof    
+  \end{minipage}
+
+  Corresponde al término ($\{ ^*\alpha, ?_1 \} \; as \; exists \; x, \; \sigma$), siendo $?_{1}$ la prueba de $\sigma [x \rightarrow \alpha]$. 
+
+\item Introducción del absurdo: táctica \texttt{absurd $\alpha$}. 
+
+  \begin{minipage}[t]{0.13\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$False$}
+    \DisplayProof
+  \end{minipage}
+  \begin{minipage}[t]{0.08\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\alpha$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\neg \alpha$}
+    \DisplayProof    
+  \end{minipage}
+
+  Corresponde a la prueba $(intro\_bottom \; [\alpha] \; ?_{1} \; ?_{2})$, siendo $?_{1}$ la prueba de $\alpha$, 
+  y $?_{2}$ la prueba de $\neg \alpha$.
+
+\item Eliminación de la implicancia: táctica \texttt{apply H}.
+
+  \begin{minipage}[t]{0.18\linewidth}
+    \AxiomC{$\Gamma$}
+    \noLine
+    \UnaryInfC{$H:\alpha \rightarrow \beta$}
+    \UnaryInfC{$\beta$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.08\linewidth}
     $\rightsquigarrow$
   \end{minipage}
   \begin{minipage}[t]{0.1\linewidth}
     \AxiomC{$\Gamma$}
     \noLine
     \UnaryInfC{$H : \alpha \rightarrow \beta$}
-    \UnaryInfC{$?_{1} : \alpha$}
+    \UnaryInfC{$\alpha$}
     \DisplayProof    
   \end{minipage}
 
-\item \texttt{cut $\beta$}: corresponde a la prueba $(?_{1} \; ?_{2})$.
+  Corresponde a la prueba $(H \; ?_{1})$, donde $?_{1}$ es la prueba de $\alpha$.
 
-  \begin{minipage}[t]{0.2\linewidth}
-    \AxiomC{$\Gamma$}
-    \UnaryInfC{$? : \alpha$}
-    \DisplayProof    
-  \end{minipage}
-  \begin{minipage}[t]{0.1\linewidth}
-    $\rightsquigarrow$
-  \end{minipage}
-  \begin{minipage}[t]{0.2\linewidth}
-    \AxiomC{$\Gamma$}
-    \UnaryInfC{$?_{1} : \beta \rightarrow \alpha$}
-    \DisplayProof    
-  \end{minipage}
-  \begin{minipage}[t]{0.1\linewidth}
-    \AxiomC{$\Gamma$}
-    \UnaryInfC{$?_{2} : \beta$}
-    \DisplayProof    
-  \end{minipage}
+  La táctica también se puede aplicar en la siguiente situación:
 
-\item \texttt{apply H}: tenemos 3 casos.
-  
-  \begin{itemize}
-  \item Corresponde a la prueba $(H \; [\theta_{1}] [\theta_{2}] .. [\theta_{n}])$
-    de modo tal que, $\gamma = \beta \; [ x_{1} \rightarrow \theta_{1} ] .. [x_{n} \rightarrow \theta_{n}].$
-    
-    \begin{minipage}[t]{0.2\linewidth}
-      \AxiomC{$\Gamma$}
-      \noLine
-      \UnaryInfC{$H : \forall x_{1}. \forall x_{2}. .. \forall x_{n}. \; \beta$}
-      \UnaryInfC{$? : \gamma$}
-      \DisplayProof
-    \end{minipage}
-    
-  \item Corresponde a la prueba $(H \; ?_{1} .. ?_{n})$.
-
-    \begin{minipage}[t]{0.3\linewidth}
-      \AxiomC{$\Gamma$}
-      \noLine
-      \UnaryInfC{$H : \alpha_{1} \rightarrow \alpha_{2} \rightarrow ... \rightarrow \alpha_{n}$}
-      \UnaryInfC{$? : \beta$}
-      \DisplayProof
-    \end{minipage}
-    \begin{minipage}[t]{0.1\linewidth}
-      $\rightsquigarrow$
-    \end{minipage}
-    \begin{minipage}[t]{0.1\linewidth}
-      \AxiomC{$\Gamma$}
-      \noLine
-      \UnaryInfC{$H : ..$}
-      \UnaryInfC{$?_{1} : \alpha_{1}$}
-      \DisplayProof    
-    \end{minipage}
-    \begin{minipage}[t]{0.05\linewidth}
-      $\ldots$
-    \end{minipage}
-    \begin{minipage}[t]{0.1\linewidth}
-      \AxiomC{$\Gamma$}
-      \noLine
-      \UnaryInfC{$H : ..$}
-      \UnaryInfC{$?_{n} : \alpha_{n}$}
-      \DisplayProof    
-    \end{minipage}
-
-  \item Corresponde a la prueba $H$.
-
+  \begin{minipage}[t]{0.35\linewidth}
     \AxiomC{$\Gamma$}
     \noLine
-    \UnaryInfC{$H:\alpha$}
-    \UnaryInfC{$? : \alpha$}
+    \UnaryInfC{$H:\alpha_{1} \rightarrow \alpha_{2} \rightarrow \ldots \rightarrow \alpha_{n} \rightarrow \beta$}
+    \UnaryInfC{$\beta$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.07\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \noLine
+    \UnaryInfC{$H : \ldots$}
+    \UnaryInfC{$\alpha_{1}$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \noLine
+    \UnaryInfC{$H : \ldots$}
+    \UnaryInfC{$\alpha_{2}$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.04\linewidth}
+    \ldots    
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \noLine
+    \UnaryInfC{$H : \ldots$}
+    \UnaryInfC{$\alpha_{n}$}
+    \DisplayProof    
+  \end{minipage}
+
+  Corresponde al término $(H \; ?_{1} \; \ldots \; ?_{n})$, donde $?_{i}$ es la prueba de $\alpha_{i}$.
+
+\item Eliminación del para todo: táctica \texttt{apply H}.
+
+  \begin{minipage}[t]{0.2\linewidth}
+    \AxiomC{$\Gamma$}
+    \noLine
+    \UnaryInfC{$H : \forall x. \; \beta$}
+    \UnaryInfC{$\gamma$}
     \DisplayProof
+  \end{minipage}
 
-  \end{itemize}
-
-\item \texttt{left}: Corresponde a la prueba $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$.
+  Corresponde al término $(H \; [\theta])$, si existe $\theta$ tal que $\gamma = \beta[x \rightarrow \theta]$.
   
-  \begin{minipage}[t]{0.3\linewidth}
+  En términos generales,
+
+  \begin{minipage}[t]{0.2\linewidth}
     \AxiomC{$\Gamma$}
-    \UnaryInfC{$? : \alpha \vee \beta$}
+    \noLine
+    \UnaryInfC{$H : \forall x_{1}. \forall x_{2}. .. \forall x_{n}. \; \beta$}
+    \UnaryInfC{$\gamma$}
+    \DisplayProof
+  \end{minipage}
+
+  Corresponde a la prueba $(H \; [\theta_{1}] [\theta_{2}] \ldots [\theta_{n}])$,
+  de modo tal que $\gamma = \beta \; [ x_{1} \rightarrow \theta_{1} ] \ldots [x_{n} \rightarrow \theta_{n}]$, si existen $\theta_{1} \ldots \theta_{n}$.
+
+\item Eliminación de la disyunción: táctica \texttt{elim H}.
+
+  \begin{minipage}[t]{0.18\linewidth}
+    \AxiomC{$\Gamma$}
+    \noLine
+    \UnaryInfC{$H : \alpha \vee \beta$}
+    \UnaryInfC{$\sigma$}
+    \DisplayProof
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.15\linewidth}
+    \AxiomC{$\Gamma$}
+    \noLine
+    \UnaryInfC{$H : \alpha \vee \beta$}
+    \UnaryInfC{$\alpha \rightarrow \sigma$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \noLine
+    \UnaryInfC{$H : \alpha \vee \beta$}
+    \UnaryInfC{$\beta \rightarrow \alpha$}
+    \DisplayProof    
+  \end{minipage}
+
+  Corresponde al término $(elim\_or \; [\alpha] \; [\beta] \; [\sigma] \; H \; ?_{1} \; ?_{2})$, 
+  donde $?_{1}$ es la prueba de $\alpha \rightarrow \sigma$, y $?_{2}$ es la prueba de $\beta \rightarrow \alpha$.
+
+\item Eliminación de la conjunción: táctica \texttt{elim H}.
+
+  \begin{minipage}[t]{0.18\linewidth}
+    \AxiomC{$\Gamma$}
+    \noLine
+    \UnaryInfC{$H : \alpha \wedge \beta$}
+    \UnaryInfC{$\sigma$}
     \DisplayProof
   \end{minipage}
   \begin{minipage}[t]{0.1\linewidth}
@@ -610,619 +1037,286 @@ Veamos como se construye el lambda término de acuerdo a la aplicación de las t
   \end{minipage}
   \begin{minipage}[t]{0.1\linewidth}
     \AxiomC{$\Gamma$}
-    \UnaryInfC{$?_{1} : \alpha$}
+    \noLine
+    \UnaryInfC{$H : \alpha \wedge \beta$}
+    \UnaryInfC{$\alpha \rightarrow \beta \rightarrow \sigma$}
     \DisplayProof    
   \end{minipage}
-
-\item \texttt{right}: Corresponde a la prueba $(intro\_or2 \; [\alpha] \; [\beta] \; ?_{1})$.
   
-  \begin{minipage}[t]{0.3\linewidth}
+  Corresponde al término $(elim\_and \; [\alpha] \; [\beta] \; [\sigma] \; H \; ?_1)$, donde $?_{1}$ es la prueba de $\alpha \rightarrow \beta \rightarrow \sigma$.
+
+\item Eliminación del existencial: táctica \texttt{elim H}.
+
+  \begin{minipage}[t]{0.2\linewidth}
     \AxiomC{$\Gamma$}
-    \UnaryInfC{$? : \alpha \vee \beta$}
+    \noLine
+    \UnaryInfC{$H : exists \; x, \; \alpha $}
+    \UnaryInfC{$\gamma$}
     \DisplayProof
   \end{minipage}
-  \begin{minipage}[t]{0.1\linewidth}
+  \begin{minipage}[t]{0.05\linewidth}
     $\rightsquigarrow$
   \end{minipage}
   \begin{minipage}[t]{0.1\linewidth}
     \AxiomC{$\Gamma$}
-    \UnaryInfC{$?_{1} : \beta$}
+    \noLine
+    \UnaryInfC{$H : exists \; x, \; \alpha $}
+    \noLine
+    \UnaryInfC{$x$}
+    \noLine
+    \UnaryInfC{$H' : \alpha$}
+    \UnaryInfC{$\gamma$}
+    \DisplayProof    
+  \end{minipage}
+
+  Corresponde al término ($let \; \{x, H'\} = H \; in \; ?_1$),
+  siendo $?_1$ la prueba de $\gamma$.
+
+\item Eliminación del absurdo: táctica \texttt{elim H}.
+
+  \begin{minipage}[t]{0.2\linewidth}
+    \AxiomC{$\Gamma$}
+    \noLine
+    \UnaryInfC{$H : False$}
+    \UnaryInfC{$\sigma$}
+    \DisplayProof
+  \end{minipage}
+
+  Corresponde al término $(elim\_bottom \; [\sigma] \; H)$.
+
+\end{itemize}
+
+Otras tácticas:
+
+\begin{itemize}
+
+\item Lema intermedio: táctica \texttt{cut $\beta$}.
+
+  \begin{minipage}[t]{0.08\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\alpha$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.08\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\beta \rightarrow \alpha$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\beta$}
+    \DisplayProof    
+  \end{minipage}
+
+  Corresponde a la prueba $(?_{1} \; ?_{2})$, donde $?_1$ es la prueba de $\beta \rightarrow \alpha$, y $?_2$ es la
+  prueba de $\beta$.
+
+\item Explicitación de la prueba: táctica \texttt{exact T}.
+
+  \begin{minipage}[t]{0.2\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\alpha$}
+    \DisplayProof
+  \end{minipage}
+
+  Esta táctica tiene como lambda término asociado a $T$, donde $T$ debe ser una prueba de $\alpha$.
+  
+\item Eliminación de la definición: táctica \texttt{unfold op}.
+
+  Aplica la definición del operador \texttt{op}. Por ejemplo, \texttt{unfold not} produce lo siguiente,
+
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\neg \alpha$}
+    \DisplayProof    
+  \end{minipage}
+  \begin{minipage}[t]{0.08\linewidth}
+    $\rightsquigarrow$
+  \end{minipage}
+  \begin{minipage}[t]{0.1\linewidth}
+    \AxiomC{$\Gamma$}
+    \UnaryInfC{$\alpha \rightarrow False$}
     \DisplayProof    
   \end{minipage}
   
-\item \texttt{split}: Corresponde a la prueba $(intro\_and \; [\alpha] \; [\beta] \; ?_{1} \; ?_{2})$.
+  Es posible usar $unfold$ en las hipótesis así: \texttt{unfold op in H}, donde \texttt{H} es el nombre de la hipótesis.
 
-  \begin{minipage}[t]{0.3\linewidth}
-    \AxiomC{$\Gamma$}
-    \UnaryInfC{$? : \alpha \wedge \beta$}
-    \DisplayProof
-  \end{minipage}
-  \begin{minipage}[t]{0.1\linewidth}
-    $\rightsquigarrow$
-  \end{minipage}
-  \begin{minipage}[t]{0.1\linewidth}
-    \AxiomC{$\Gamma$}
-    \UnaryInfC{$?_{1} : \alpha$}
-    \DisplayProof    
-  \end{minipage}
-  \begin{minipage}[t]{0.1\linewidth}
-    \AxiomC{$\Gamma$}
-    \UnaryInfC{$?_{2} : \beta$}
-    \DisplayProof    
-  \end{minipage}
-
-\item \texttt{absurd $\alpha$}: Corresponde a la prueba $(intro\_bottom \; [\alpha] \; ?_{1} \; ?_{2})$.
-
-  \begin{minipage}[t]{0.3\linewidth}
-    \AxiomC{$\Gamma$}
-    \UnaryInfC{$? : False$}
-    \DisplayProof
-  \end{minipage}
-  \begin{minipage}[t]{0.1\linewidth}
-    $\rightsquigarrow$
-  \end{minipage}
-  \begin{minipage}[t]{0.1\linewidth}
-    \AxiomC{$\Gamma$}
-    \UnaryInfC{$?_{1} : \alpha$}
-    \DisplayProof    
-  \end{minipage}
-  \begin{minipage}[t]{0.1\linewidth}
-    \AxiomC{$\Gamma$}
-    \UnaryInfC{$?_{2} : \neg \alpha$}
-    \DisplayProof    
-  \end{minipage}
-
-\item \texttt{exists $\alpha$}: Corresponde a la prueba $\{ ^*\alpha, ?_1 \} \; as \; exists \; x, \; \sigma$. 
-
-  \begin{minipage}[t]{0.3\linewidth}
-    \AxiomC{$\Gamma$}
-    \UnaryInfC{$? : exists \; x, \; \sigma$}
-    \DisplayProof
-  \end{minipage}
-  \begin{minipage}[t]{0.1\linewidth}
-    $\rightsquigarrow$
-  \end{minipage}
-  \begin{minipage}[t]{0.1\linewidth}
-    \AxiomC{$\Gamma$}
-    \UnaryInfC{$?_{1} : \sigma [x \rightarrow \alpha]$}
-    \DisplayProof    
-  \end{minipage}
-
-
-\item \texttt{elim H}: tenemos varios casos.
-
-  \begin{itemize}
-  \item Corresponde a la prueba $(elim\_or \; [\alpha] \; [\beta] \; [\sigma] \; H \; ?_{1} \; ?_{2})$.
-
-    \begin{minipage}[t]{0.2\linewidth}
-      \AxiomC{$\Gamma$}
-      \noLine
-      \UnaryInfC{$H : \alpha \vee \beta$}
-      \UnaryInfC{$? : \sigma$}
-      \DisplayProof
-    \end{minipage}
-    \begin{minipage}[t]{0.1\linewidth}
-      $\rightsquigarrow$
-    \end{minipage}
-    \begin{minipage}[t]{0.2\linewidth}
-      \AxiomC{$\Gamma$}
-      \noLine
-      \UnaryInfC{$H : \alpha \vee \beta$}
-      \UnaryInfC{$?_1 : \alpha \rightarrow \sigma$}
-      \DisplayProof    
-    \end{minipage}
-    \begin{minipage}[t]{0.1\linewidth}
-      \AxiomC{$\Gamma$}
-      \noLine
-      \UnaryInfC{$H : \alpha \vee \beta$}
-      \UnaryInfC{$?_2 : \beta \rightarrow \alpha$}
-      \DisplayProof    
-    \end{minipage}
-
-  \item Corresponde a la prueba $(elim\_and \; [\alpha] \; [\beta] \; [\sigma] \; H \; ?_1)$.
-
-    \begin{minipage}[t]{0.2\linewidth}
-      \AxiomC{$\Gamma$}
-      \noLine
-      \UnaryInfC{$H : \alpha \wedge \beta$}
-      \UnaryInfC{$? : \sigma$}
-      \DisplayProof
-    \end{minipage}
-    \begin{minipage}[t]{0.1\linewidth}
-      $\rightsquigarrow$
-    \end{minipage}
-    \begin{minipage}[t]{0.2\linewidth}
-      \AxiomC{$\Gamma$}
-      \noLine
-      \UnaryInfC{$H : \alpha \wedge \beta$}
-      \UnaryInfC{$?_1 : \alpha \rightarrow \beta \rightarrow \sigma$}
-      \DisplayProof    
-    \end{minipage}
-
-  \item Corresponde a la prueba $(elim\_bottom \; [\sigma] \; H)$.
-
-    \begin{minipage}[t]{0.2\linewidth}
-      \AxiomC{$\Gamma$}
-      \noLine
-      \UnaryInfC{$H : False$}
-      \UnaryInfC{$? : \sigma$}
-      \DisplayProof
-    \end{minipage}
-
-  \item Corresponde a la prueba $let \; \{x, H'\} = H \; in \; ?_1$
-
-    \begin{minipage}[t]{0.2\linewidth}
-      \AxiomC{$\Gamma$}
-      \noLine
-      \UnaryInfC{$H : exists \; x, \; \alpha $}
-      \UnaryInfC{$? : \sigma$}
-      \DisplayProof
-    \end{minipage}
-    \begin{minipage}[t]{0.1\linewidth}
-      $\rightsquigarrow$
-    \end{minipage}
-    \begin{minipage}[t]{0.2\linewidth}
-      \AxiomC{$\Gamma$}
-      \noLine
-      \UnaryInfC{$x$}
-      \noLine
-      \UnaryInfC{$H' : \alpha$}
-      \UnaryInfC{$?_1 : \sigma$}
-      \DisplayProof    
-    \end{minipage}
-
-  \end{itemize}
+\item Introducción de la implicación y del para todo: táctica \texttt{intros}.
+  Esta táctica aplica \texttt{intro} hasta que no se pueda seguir aplicando.
 
 \end{itemize}
 
 
 \section{Módulos}
 
-A continuación se describen los aspectos fundamentales que trata cada módulo.
+A continuación se describe brevemente cuales son los aspectos fundamentales que trata cada módulo.
 
 \begin{itemize}
 
-\item ErrorMsj: mensajes de error.
-\item Common: tipos abstractos de datos.
-\item Proof: contiene las funciones que operan sobre la construcción de la prueba.
-\item GlobalState: mantiene funciones que operan sobre los datos ``globales'', es decir
+\item \texttt{ErrorMsj}: pretty printer de los mensajes de error.
+\item \texttt{Common}: contiene los tipos abstractos de datos principales.
+\item \texttt{Proof}: oculta las funciones que operan sobre la construcción de una prueba.
+\item \texttt{GlobalState}: tiene funciones que operan sobre datos ``globales'', es decir que son
 datos que se mantienen durante toda la ejecución del asistente.
-\item ProverState: tiene el estado general del asistente, incluye tanto los datos de la
-construcción de una prueba como los datos globales.
-\item TypeSubstitution: oculta el algoritmo de substitución.
-\item TypeUnification: oculta la unificación de tipos.
-\item TypeInference: oculta la inferencia de tipos.
-\item TypeDefinition: oculta funciones que operan sobre el entorno de tipos.
-\item LambdaTermDefinition: oculta funciones que operan sobre el lambda términos con aujeros.
-\item Hyphotesis: 
+\item \texttt{ProverState}: mantiene el estado general del asistente, incluye los datos de la
+construcción de una prueba y los datos globales.
+\item \texttt{TypeSubstitution}: oculta el algoritmo de substitución.
+\item \texttt{TypeUnification}: oculta la unificación de tipos.
+\item \texttt{TypeInference}: oculta la inferencia de tipos.
+\item \texttt{TypeDefinition}: contiene funciones que operan sobre el entorno de tipos.
+\item \texttt{LambdaTermDefinition}: tiene funciones que operan sobre el entorno de los lambda términos.
+\item \texttt{TermsWithHoles}: oculta el tratamiento de los lambda términos con agujeros.
+\item \texttt{Hyphotesis}: tiene funciones relacionadas con las hipótesis.
+\item \texttt{RenamedVariables}: oculta el algoritmo de renombramiento utilizado sobre los nombres de la hipótesis.
+\item \texttt{Transformers}: mantiene las transformaciones de lambda términos y tipos.
+\item \texttt{Tactics}: se encarga de construir una prueba a partir de una táctica.
+\item \texttt{PrettyPrinter}: pretty printer general del asistente.
+\item \texttt{Parser}: parser del lenguaje.
+\item \texttt{Main}: procesa el comando de entrada. 
+\item \texttt{PreludePath}: oculta la ubicación del archivo \texttt{Prelude.pr}.
 
 \end{itemize}
 
-\section{Data types}
-
-\begin{verbatim}
-data ProverState = PSt { proof :: Maybe ProofState
-                       , global :: GlobalState
-                       , tempSave :: (FilePath, Handle)
-                       , input :: Input
-                       , cc :: Int
-                       }
-\end{verbatim}
-
-Estado general del asistente.
-\begin{itemize}
-  \item \texttt{proof}: representa a la prueba que construye el usuario, si existe.
-  \item \texttt{global}: mantiene datos globales.
-  \item \texttt{tempSave}: historial de comandos.
-  \item \texttt{input}: datos de la entrada compuesta.
-  \item \texttt{cc}: contador, número de líneas del usuario. 
-\end{itemize}
-
-\begin{verbatim}
-data GlobalState = Global { fTypeContext :: FTypeContext
-                          , lamDef :: LTD.LamDefs
-                          , typeDef :: TD.TypeDefs
-                          , conflict :: ConflictNames
-                          }
-\end{verbatim}
-
-Este registro contiene los datos globales del asistente.
-\begin{itemize}
-  \item \texttt{fTypeContext}: variables de tipo libres.
-  \item \texttt{lamDef}: lambda términos definidos.
-  \item \texttt{typeDef}: representa a los operadores.
-  \item \texttt{conflict}: nombre de lambda términos conflictivos. Es decir que, son nombres
-    que coinciden con el espacio de nombres de las hipótesis.
-\end{itemize}
-
-\begin{verbatim}
-data ProofState = PState { name :: String
-                         , types :: (Type,TType)
-                         , constr :: ProofConstruction
-                         }
-\end{verbatim}
-
-Estado general de la prueba que realiza el usuario.
-\begin{itemize}
-  \item \texttt{name}: nombre de la prueba.
-  \item \texttt{types}: tipo, con y sin nombres, que se quiere habitar. Se corresponde a fórmula que quiere probar el usuario.
-  \item \texttt{constr}: construcción de la prueba.
-\end{itemize}
-
-\begin{verbatim}
-data ProofConstruction = PConstruction { tsubp :: Int
-                                       , subps :: [SubProof]
-                                       , cglobal :: GlobalState
-                                       , term :: LTermHoles
-                                       }
-\end{verbatim}
-
-Prueba que realiza el usuario.
-\begin{itemize}
-  \item \texttt{tsubp}: cantidad total de subpruebas activas.
-  \item \texttt{subps}: mantiene a todas las subpruebas activas.
-  \item \texttt{cglobal}: datos globales vigentes durante la construcción de la prueba.
-  \item \texttt{term}: representa al lambda término que va formando el usuario.
-\end{itemize}
-
-\begin{verbatim}
-data SubProof = SP { termContext :: TermContext
-                   , bTypeContext :: BTypeContext
-                   , lsubp :: Int
-                   , tvars :: Int
-                   , ty :: [Maybe (Type, TType)]
-                   }
-\end{verbatim}
-
-Representa a un conjunto de subpruebas.
-Consideramos que todas ellas tienen el mismo contexto, comparten tanto los campos \texttt{termContext} como \texttt{bTypeContext}.
-\begin{itemize}
-  \item \texttt{termContext}: contexto de las variables de lambda terminos.
-  \item \texttt{bTypeContext}: contexto de las variables de tipo ligadas. Nos referimos a las variables que corresponden a una cuantificación.
-  \item \texttt{lsubp}: indica la cantidad de subpruebas que contiene.
-  \item \texttt{tvars}: cantidad total de variables de tipo ligadas, y variables de términos.
-  \item \texttt{ty}: tipos objetivos de cada subprueba.
-\end{itemize}
-
-
-Utilizamos el siguiente AST para representar a un lambda término:
-\begin{verbatim}
-  data LamTerm a b c = LVar b
-                   | Abs a c (LamTerm a b c)
-                   | BAbs TypeVar (LamTerm a b c)
-                   | LamTerm a b c :@: LamTerm a b c
-                   | LamTerm a b c :!: c
-                   | EPack c (LamTerm a b c) c
-                   | EUnpack TypeVar a (LamTerm a b c) (LamTerm a b c)
-                   | LamTerm a b c ::: c
-                   deriving (Show, Eq)
-\end{verbatim}
-  
-Donde, \texttt{Type} es el AST de los tipos, y \texttt{TType} es el AST de los tipos sin nombres, es decir que estos emplean la notación De Bruijn.
-\texttt{Type} nos es útil a la hora de imprimir en pantalla el tipo del lambda término, de modo tal que tenga casi el mismo tipo ingresado por el usuario 
-(posible renombramiento de tipos).
-Mientras que, \texttt{TType} lo usamos en todas las operatorias sobre los tipos de los lambda términos, por ejemplo, en la unificación de tipos, que
-se realiza cuando se aplica la regla de eliminación del \textbf{para todo}.
-
-A continuación, explicamos el data type utilizado para representar al lambda término que se construye de manera interactiva por el usuario.
-
-\begin{verbatim}
-data SpecialTerm = HoleT (Term->Term) | DoubleHoleT (Term->Term->Term) |
-                   Term Term | TypeH TypeHole
-
-data TypeHole = HTe ((Type, TType) -> Term) | HTy ((Type, TType) -> TypeHole)
-\end{verbatim}
-
-El data type \texttt{SpecialTerm} representa a un lamba término que puede tener dos tipos de agujero: lambda términos o tipos, de manera
-exclusiva, es decir solo puede tener un solo tipo de agujero.
-
-El data type \texttt{TypeHole} representa agujeros de tipos en un lambda término.
 
 \section{Gramáticas}
- Gramática del lambda calculo.
+
+Veremos algunas de las gramáticas más importantes del lenguaje.
+Gramática del lambda calculo:
 
 \begin{tabbing}
-$\langle lamterm \rangle$ \= $::=$ $\langle abs \rangle$ | $\langle term \rangle$ ( $\langle abs \rangle$ | $\varepsilon$ ) \\
+$\langle lamTerm \rangle$ \hspace{0.5cm} \= $::=$ $\langle abs \rangle$ | $\langle app \rangle$ 
+\Big( $\langle abs \rangle$ | $\varepsilon$ \Big) \\
 
-$\langle term \rangle$ \> $::=$ $\langle term \rangle$ ($\langle unitterm \rangle$ | $\varepsilon$) \\
+$\langle app \rangle$ \> $::=$ $\langle app \rangle$ $\Big($ \texttt{'['} $\langle typeTerm \rangle$ \texttt{']'} 
+| $\langle unitTerm \rangle \; \Big)$ 
+| $\langle unitTerm \rangle$ \\
 
-$\langle unitterm \rangle$ \> $::=$ \texttt{'('} $\langle lambterm \rangle$ \texttt{')'} |
-$\langle var \rangle$ | $\langle unitterm \rangle$ \texttt{'['} $\langle typeterm \rangle$ \texttt{']'}\\
+$\langle unitTerm \rangle$ \> $::=$ $\langle unitaryTerm \rangle$ $\Big($ \texttt{'as'} $\langle typeTerm \rangle \; 
+| \; \varepsilon \; \Big)$ \\
 
-$\langle abs \rangle$ \> $::=$ \texttt{'$\lambda$'} $\langle var \rangle$ ( \texttt{':'} $\langle typeterm \rangle$ \texttt{'.'} $\langle lamterm \rangle$
-| \texttt{'.'} $\langle lamterm \rangle$)
-\end{tabbing}
+$\langle unitaryTerm \rangle$ \> $::=$ \texttt{'('} $\langle lamTerm \rangle$ \texttt{')'} 
+| $\langle var \rangle$ \\
 
-Consideramos a $\langle var \rangle$, como la gramática de palabras alfanuméricas, incluido el guión bajo, exceptuando
-las palabras reservadas: $Theorem$, $Definition$, $forall$, $False$.
-
-Gramática del lambda calculo, sin recursión a izquierda.
-
-\begin{tabbing}
-$\langle lamterm \rangle$ \= $::=$ $\langle abs \rangle$ | $\langle term \rangle$ ( $\langle abs \rangle$ | $\varepsilon$ ) \\
-
-$\langle term \rangle$ \> $::=$ $\langle unitterm \rangle$ $\langle term' \rangle$ \\
-
-$\langle term' \rangle$ \> $::=$  $\langle unitterm \rangle$  $\langle term' \rangle$ | $\varepsilon$ \\
-
-$\langle unitterm \rangle$ \> $::=$ $\langle unit \rangle$ $\langle unitterm' \rangle$ \\
-
-$\langle unitterm' \rangle$ \> $::=$ \texttt{'['} $\langle typeterm \rangle$ \texttt{']'} $\langle unitterm' \rangle$ | $\varepsilon$ \\
-
-$\langle unit \rangle$ \> $::=$ \texttt{'('} $\langle lambterm \rangle$ \texttt{')'} | $\langle var \rangle$ \\
-
-$\langle abs \rangle$ \> $::=$ \texttt{'$\lambda$'} $\langle var \rangle$ ( \texttt{':'} $\langle typeterm \rangle$ \texttt{'.'} $\langle lamterm \rangle$
-| \texttt{'.'} $\langle lamterm \rangle$)
-\end{tabbing}
-
-Gramática de fórmulas o tipos.
-
-\begin{tabbing}
-$\langle typeterm \rangle$ \= $::=$ $\langle unit_{1} \rangle$ \texttt{'<->'} $\langle typeterm \rangle$ | $\langle unit_{1}' \rangle$\\
-$\langle unit_{1}' \rangle$ \= $::=$ $\langle unit_{2} \rangle$ ( \texttt{'->'} $\langle unit_{1}' \rangle$ | $\varepsilon$ ) 
-| \texttt{'forall'} $\langle var \rangle$ \texttt{'.'} $\langle typeterm \rangle$\\
-$\langle unit_{1} \rangle$ \= $::=$ $\langle unit_{2} \rangle$ ( \texttt{'->'} $\langle unit_{1} \rangle$ | $\varepsilon$ ) \\
-$\langle unit_{2} \rangle$ \= $::=$ $\langle unit_{3} \rangle$ ( \texttt{'$\vee$'} $\langle unit_{2} \rangle$ | $\varepsilon$ ) \\
-$\langle unit_{3} \rangle$ \= $::=$ $\langle infixOps \rangle$ ( \texttt{'$\wedge$'} $\langle unit_{3} \rangle$ | $\varepsilon$ ) \\
-$\langle unit_{4} \rangle$ \= $::=$ $\langle unit_{5} \rangle$ | \texttt{'$\sim$'} $\langle unit_{4} \rangle$ |
-$\langle prefixOps_{1} \rangle$ | $\langle prefixOps_{2} \rangle$ \\
-$\langle unit_{5} \rangle$ \= $::=$ \texttt{'('} $\langle typeterm \rangle$ \texttt{')'} | $\langle var \rangle$ | 
-$\langle prefixOps_{0} \rangle$
+$\langle abs \rangle$ \> $::=$ \texttt{'$\lambda$'} $\langle var \rangle$ $\Big($ \texttt{':'} $\langle typeTerm \rangle$ \texttt{'.'} 
+$\langle lamTerm \rangle$ | \texttt{'.'} $\langle lamTerm \rangle \; \Big)$ \\
+\> | \texttt{'\{' '*'} $\langle typeTerm \rangle$ \texttt{','} $\langle lamTerm \rangle$ \texttt{'\}' 'as'} $\langle typeTerm \rangle$ \\
+\> | \texttt{'let' '\{'} $\langle var \rangle$ \texttt{','} $\langle var \rangle$ \texttt{'\}' '='} $\langle lamTerm \rangle$ \texttt{'in'}
+$\langle lamTerm \rangle$
 
 \end{tabbing}
 
-Consideramos a $\langle prefixOps_{i} \rangle$, con $0 \leq i \leq 2$, como las gramáticas de los operadores prefijos definidos por el usuario.
-Mientras que $\langle infixOps \rangle$ es la gramática de los operadores binarios infijos, el cual debe hacer referencia a $\langle unit_{4} \rangle$.
+Consideramos a $\langle var \rangle$, como la gramática de palabras alfanuméricas, (incluido el guión bajo) 
+exceptuando las palabras reservadas: \texttt{Theorem}, \texttt{forall}, \texttt{False}, etc.
+
+Gramática de fórmulas o tipos:
+
+\begin{tabbing}
+
+$\langle typeTerm \rangle$ \hspace{0.3cm} \= $::=$ $\langle unit_{1} \rangle$ $\Big($ \texttt{'<->'} $\langle typeTerm \rangle$ | $\varepsilon \; \Big)$\\
+$\langle unit_{1} \rangle$ \> $::=$ $\langle unit_{2} \rangle$ $\Big($ \texttt{'->'} $\langle unit_{1} \rangle$ | $\varepsilon$ $\Big)$ \\
+$\langle unit_{2} \rangle$ \> $::=$ $\langle unit_{3} \rangle$ $\Big($ \texttt{'\textbackslash/'} $\langle unit_{2} \rangle$ 
+| $\varepsilon$ $\Big)$ \\
+$\langle unit_{3} \rangle$ \> $::=$ $\langle infixOps \rangle$ $\Big($ \texttt{'/\textbackslash'} $\langle unit_{3} \rangle$ 
+| $\varepsilon$ $\Big)$ \\
+$\langle unit_{4} \rangle$ \> $::=$ \texttt{'$\sim$'} $\langle unit_{4} \rangle$ 
+| $\langle prefixOps \rangle$ | $\langle unit_{5} \rangle$ | $\langle quantifiers \rangle$\\
+$\langle unit_{5} \rangle$ \> $::=$ \texttt{'('} $\langle typeTerm \rangle$ \texttt{')'} | \texttt{False} | $\langle var \rangle$  \\
+$\langle infixOps \rangle$ \> $::=$ $\langle unit_{4} \rangle$ $\Big($ $\langle symbol \rangle$ $\langle infixOps \rangle$ $\Big)$ 
+| $\varepsilon$\\
+$\langle prefixOps \rangle$ \> $::=$ $\langle prefixOps \rangle$ $\langle unit_{5} \rangle$ | $\langle app \rangle$\\
+$\langle app \rangle$ \> $::=$ \texttt{'('} $\langle prefixOps \rangle$ \texttt{')'} | $\langle symbol \rangle$ | $\langle var \rangle$ \\
+$\langle quantifiers \rangle$ \> $::=$ $\Big($ \texttt{'forall'} | \texttt{'exists'} $\Big)$ $\langle var \rangle$ \texttt{','} $\langle typeTerm \rangle$ \\
+\end{tabbing}
+
+Tenemos que $\langle symbol \rangle$ es la gramática de símbolos, mas precisamente se tratan de caracteres de símbolos Unicode, 
+incluye símbolos matemáticos, de moneda y los caracteres \texttt{\textbackslash}, \texttt{/}, y \texttt{-}, exceptuando a los
+símbolos: \texttt{\textbackslash/}, \texttt{/\textbackslash}, etc.
 
 Precedencia de los operadores:
+
 \setlist[enumerate,1]{start=0}
 \begin{enumerate}
-  \item \textit{Prefix ops.}
-  \item $\sim$
-  \item \textit{Infix binary ops.}
-  \item $\wedge$
-  \item $\vee$
-  \item $\rightarrow$
-  \item $\leftrightarrow$
-  \item $forall$ (operador infijo)
+
+\item \textit{Prefix operators}, $\mathtt{\sim}$
+\item \textit{Binary infix operators}
+\item \texttt{/\textbackslash}
+\item \texttt{\textbackslash/}
+\item \texttt{->}
+\item \texttt{<->}
+\item \texttt{forall}, \texttt{exists} 
+
 \end{enumerate}
 
-Los operadores con un valor de precedencia (\textit{pv}) alto tienen menos precedencia que otro con un valor más bajo.
-Por ejemplo, $\wedge$ tiene más precedencia que $\vee$, pues $pv (\wedge) < pv (\vee)$.
+Los operadores con un valor de precedencia alto tienen menos precedencia que otro con un valor más bajo.
+Por ejemplo, \texttt{/\textbackslash} tiene más precedencia que \texttt{\textbackslash/}.
 
-\textit{Prefix ops.} es el conjunto de los todos los operadores prefijos definidos por el usuario. Consideramos
-que todos ellos tienen la misma precedencia.
-Mientras que \textit{Infix binary ops.} es el conjunto de los operadores infijos (binarios) declarados por el usuario.
-Cada operador infijo que da el usuario, tiene asociado un valor de precedencia (el 2) y un valor de precedencia infija (\textit{ipv}).
-Un nuevo operador infijo tiene un \textit{ipv} más alto que los operadores previamente declarados.
-Es decir que, cada operador infijo tiene menos precedencia que aquellos que fueron declarados previamente.
-Solo los operadores binarios infijos dados por el usuario mantienen un \textit{ipv}.
+Consideramos a \textit{Prefix operators} como el conjunto de los todos los operadores prefijos definidos por el usuario,
+donde todos ellos tienen la misma precedencia.
+Mientras que \textit{Binary infix operators} es el conjunto de los operadores binarios infijos dados por el usuario,
+donde todos ellos mantienen la misma precedencia.
 
-Consideramos que todos los operadores binarios infijos asocian a derecha.
-
+Todos los operadores binarios infijos asocian a derecha.
 
 
 \section{Observaciones}
-\begin{itemize}
-  \item El comando \texttt{apply} puede actuar como el comando \texttt{assumption}.
+Cuando se ingresa un tipo o fórmula, posiblemente se lo renombre, de modo tal de que éste respete la siguiente
+convención.
+  
+\textbf{Convención 1}: Sea \textit{t} un tipo. 
+En \textit{t} no se declaran dos variables de tipo ligadas con el mismo nombre, una más anidada que la otra.
+Además, $BV (t) \cap (\Gamma_{t} \cup Props) = \emptyset$. Donde, $\Gamma_{t}$ es el conjunto de variables de tipo del contexto, y $Props$ es el conjunto
+de variables de tipos libres.
 
-  \item La substitución que encuentra el algoritmo de unificación es un termino cerrado.
-  
-  \item Cuando se ingresa un tipo mediante el comando \texttt{Theorem}, posiblemente se lo renombre, de modo tal de que éste respete la siguiente
-  convención.
-  
-  \textbf{Convención 1}: Sea \textit{t} un tipo. 
-  En \textit{t}, no se declaran dos variables de tipo ligadas con el mismo nombre, una más anidada que la otra.
-  Además, $BV (t) \cap (\Gamma_{t} \cup Props) = \emptyset$. Donde, $\Gamma_{t}$ es el conjunto de variables de tipo del contexto, y $Props$ es el conjunto
-  de variables de tipos libres.
-  
-  La \textbf{Convención 1} se aplica al tipo del \textit{goal}.
-  
-  \item La \textbf{Convención 1} nos permite evitar la captura de variables, a la hora de realizar la sustitución generada por el comando \texttt{unfold},
-  y que en el entorno de variables de tipos no se ingrese la misma variable más de dos veces (cuando se aplica \texttt{intro}).
- 
-  \item Cuando implementamos el comando \texttt{unfold}, nos aseguramos que el tipo resultado de la sustitución, respete la \textbf{Convención 1}.
-  
-  \item Al implementar el comando \texttt{intro} sobre un ``para todo'', no es necesario chequear que no la variable de tipo ligada no se encuentre
-  en el contexto de tipos, pues ya sabemos que no está allí, gracias al renombramiento de variables de tipos ligadas.
-  
-  \item Construimos un lambda término $t$, tal que $t:\alpha$, donde $\alpha$ es el tipo (asociado a una fórmula lógica), dado por el usuario. El isomorfismo
-  de Curry-Howard, nos permite relacionar a los tipos con fórmulas lógicas, y a las pruebas con lambda términos.
-  El lambda término $t$, se construye a partir de la prueba que da el usuario.
-  El teorema de Curry-Howard, nos asegura que, si $t:\alpha$, entonces la fórmula asociada a $\alpha$ es válida.
-  
-  \item La función \texttt{habitar} se encarga de construir el lambda término asociado a la prueba que va dando el usuario.
-  A cada regla de la deducción natural del sistema IFC, le corresponde una regla de tipo, en el lambda cálculo simplemente
-  tipado. ¿Como construimos el término $t$, asociado a una prueba lógica?.
-  A cada aplicación de una regla de tipo, le corresponde un lambda término ``vació''.
-  Es decir, si se busca un lambda término de tipo $\beta \rightarrow \gamma$, por ejemplo, y se lo quiere construir mediante la regla 
-  de tipo \textbf{T-Abs}, entonces, tenemos el término vació, $t_{1} = \lambda x:\beta. \; ?$, donde $? : \gamma$.
-  Representamos a los términos vacíos, mediante funciones, en el caso anterior, tendríamos la función:
+La \textbf{Convención 1} se aplica al tipo del \textit{goal}.
 
-  \begin{verse}
+Esta convención nos permite evitar la captura de variables. 
+Cuando implementamos el comando \texttt{unfold}, nos aseguramos que el tipo resultado de la sustitución, respete la \textbf{Convención 1}.
+Además, sabemos que en el entorno de variables de tipos no se tiene la misma variable más de dos veces, gracias al renombramiento.
+% Por ello, al aplicar la táctica \texttt{intro} sobre un ``para todo'', no es necesario chequear que no la variable de tipo ligada
+% no se encuentre en el contexto de tipos, pues ya sabemos que no está allí, gracias al renombramiento de variables de tipos ligadas.
+
+La función \texttt{habitar} se encarga de construir el lambda término asociado a la prueba que va dando el usuario.
+A cada regla de la deducción natural del sistema IFC, le corresponde una regla de tipo, en el lambda cálculo simplemente
+tipado. ¿Como construimos el término $t$, asociado a una prueba lógica?.
+A cada aplicación de una regla de tipo, le corresponde un lambda término ``vació''.
+Es decir, si se busca un lambda término de tipo $\beta \rightarrow \gamma$, por ejemplo, y se lo quiere construir mediante la regla 
+de tipo \textbf{T-Abs}, entonces, tenemos el término vació, $t_{1} = \lambda x:\beta. \; ?$, donde $? : \gamma$.
+Representamos a los términos vacíos, mediante funciones, en el caso anterior, tendríamos la función:
+
+\begin{verse}
   $t_{1}$ :: \texttt{Term} $\rightarrow$  \texttt{Term} \\
   $t_{1}$ $t$ = $\lambda x:\beta. \; t$
-  \end{verse}
+\end{verse}
 
-  Donde, \texttt{Term} es el tipo de los lambda términos. El argumento que se le pase a $t_{1}$, debería tener tipo $\gamma$.
-  Esto se chequea de acuerdo a qué regla de tipo quiere aplicar el usuario.
-  Por lo tanto, $t = (t_{1} . t_{2} \dots t_{n-2} . t_{n-1}) \; t_{n}$, donde $t_{n}$ es un lambda término no vació, que sirve de argumento a la composiciones
-  de funciones. Cada $t_{i}$, con $i \in \{ 1 \dots n \}$, se corresponde con una regla de tipado, que a su vez se corresponde con una regla de deducción natural, 
-  que da el usuario.
-  
-  \item Una subprueba se corresponde a un nodo en el árbol de derivación de la fórmula. Las tácticas que ingresa el usuario construyen dicho árbol,
-  así se obtiene el lambda término que lo representa. La demostración de una fórmula puede requerir la prueba de otras fórmulas. Por ejemplo,
-  en la demostración $\vdash (p \rightarrow p) \wedge (q \rightarrow q)$, al aplicar la introducción del and, se genera dos nuevas subpruebas.
-  
-  % \begin{prooftree}
-  % \[
-  % \[
-  % p
-  % \using
-  % {ass}
-  % \justifies
-  % p
-  % \]
-  % \using
-  % {i_{\rightarrow}}
-  % \justifies
-  % p \rightarrow p
-  % \]
-  % \[
-  % \[
-  % q
-  % \using
-  % {ass}
-  % \justifies
-  % q
-  % \]
-  % \using
-  % {i_{\rightarrow}}
-  % \justifies
-  % q \rightarrow q
-  % \]
-  % \using
-  % {i_{\wedge}}
-  % \justifies
-  % (p \rightarrow p) \wedge (q \rightarrow q)
-  % \end{prooftree}
-  
-  En el asistente tendríamos lo siguiente:
-  
-  \begin{verbatim}
-  > Theorem t1: (p -> p) /\ (q -> q).
-  Hay 1 sub pruebas.
+Donde, \texttt{Term} es el tipo de los lambda términos. El argumento que se le pase a $t_{1}$, debería tener tipo $\gamma$.
+Esto se chequea de acuerdo a qué regla de tipo quiere aplicar el usuario.
+Por lo tanto, $t = (t_{1} . t_{2} \dots t_{n-2} . t_{n-1}) \; t_{n}$, donde $t_{n}$ es un lambda término no vació, que sirve de argumento a la composiciones
+de funciones. Cada $t_{i}$, con $i \in \{ 1 \dots n \}$, se corresponde con una regla de tipado, que a su vez se corresponde con una regla de deducción natural, 
+que da el usuario.
 
-  p : Prop
-  q : Prop
-  ___________________[1/1]
-  (p -> p) /\ (q -> q)
-  > split.
-  Hay 2 sub pruebas.
-
-  p : Prop
-  q : Prop
-  ___________________[1/2]
-  p -> p
-  ___________________[2/2]
-  q -> q
-  \end{verbatim}
+En la implementación de la regla de tipado, correspondiente a la introducción del existe, consideramos que $t_{2}$ debe tener un tipo equivalente
+a $T_{2}[X:=U]$, llamemos lo $T$. Es decir que $T$ puede variar de $T_{2}[X:=U]$, con respecto a los nombres de las variables de tipo ligadas que aparecen en 
+el segundo.
+Hacemos esto para respetar la \textbf{Convención 1}. 
   
-  Cuando se demuestra una fórmula, decimos que la subprueba termina.
-
-  Podemos ver en la Figura \ref{Estados}, la aplicación del algoritmo de control de las subpruebas, al resolver el teorema:
-  $p, q \vee  (p \rightarrow t) \rightarrow  r, t, p \wedge t \rightarrow r \rightarrow q \vee t \rightarrow w \vdash w$.
-  En dicho diagrama consideramos a $C = H0 : p, H1 : q \vee  (p \rightarrow t) \rightarrow  r, H2 : t, H3: p \wedge t \rightarrow r \rightarrow q \vee t \rightarrow w$.
-  Empleamos la siguiente notación:
+El tipo $T$ lo calcula la función \texttt{applyTypes}. Para ello, realiza la sustitución $T_{2}[X:=U]$, más un renombramiento que respete la \textbf{Convención 1}.
+Ver Ejemplo 7, en los casos de inferencia OK.
   
-  \tikz \node[rectangle,draw,label=below:
-  Estado de $subps$]{Conjunto de pruebas};
-  
-  Donde la transición de un estado a otro se realiza a partir de un comando.
-
-  \begin{figure}  
-  \begin{tikzpicture}[->, node distance=2cm, auto, thick,main node/.style={rectangle,draw}]
-
-  \node[main node, label={[align=left]below:$subps = [s_{0}]$\\$\wedge \; ty \; s_{0} = [w]$}] (1) {$C \vdash  w$};
-  \node[main node, label={[align=left]below:$subps = [s_{1},s_{0}]$ \\ $\wedge \; ty \; s_{1} = [p \wedge q]$ \\ $\wedge \; ty \; s_{0} = [r,t]$}] 
-  (2) [right=of 1] {$C \vdash  p \wedge t$, $C \vdash r$, $C \vdash q \vee t$};
-  \begin{scope}[node distance=1.4cm]
-  \node[main node, label={[align=left]below:$subps = [s_{2},s_{1},s_{0}]$\\$\wedge \; ty \; s_{2} = [p]$
-  \\$\wedge \; ty \; s_{1} = [t]$ \\ $\wedge \; ty \; s_{0} = [r,q \vee t]$}]
-  (3) [right=of 2] {$C \vdash  p , C \vdash t$, $C \vdash r$, $C \vdash q \vee t$};
-  \end{scope}
-  \begin{scope}[node distance=1cm]
-  \coordinate [right=of 3] (4) {};
-  \end{scope}
-  \begin{scope}[node distance=2.8cm]
-  \node[main node, label={[align=left]below:$subps = [s_{1},s_{0}]$ \\$\wedge \; ty \; s_{1} = [t]$ \\ $\wedge \; ty \; s_{0} = [r,q \vee t]$}] 
-  (5) [below=of 4] {$C \vdash t$, $C \vdash r$, $C \vdash q \vee t$};
-  \end{scope}
-  \begin{scope}[node distance=2.3cm]
-  \node[main node, label={[align=left]below:$subps = [s_{3},s_{0}]$ \\$\wedge \; ty \; s_{3} = [r]$ \\ $\wedge \; ty \; s_{0} = [q \vee t]$}] 
-  (6) [left=of 5] {$C \vdash r$, $C \vdash q \vee t$};
-  \end{scope}
-  \node[main node, label={[align=left]below:$subps = [s_{3},s_{0}]$ \\$\wedge \; ty \; s_{3} = [q \vee  (p \rightarrow t)]$ \\ $\wedge \; ty \; s_{0} = [t]$}] 
-  (7) [left=of 6] {$C \vdash q \vee  (p \rightarrow t)$, $C \vdash t$};
-  \coordinate [left=of 7] (8) {};
-  \begin{scope}[node distance=2.8cm]
-  \node[main node, label={[align=left]below:$subps = [s_{3},s_{0}]$ \\$\wedge \; ty \; s_{3} = [p \rightarrow t]$ \\ $\wedge \; ty \; s_{0} = [t]$}] 
-  (9) [below=of 8] {$C \vdash p \rightarrow t$, $C \vdash t$};
-  \end{scope}
-  \begin{scope}[node distance=1.5cm]
-  \node[main node, label={[align=left]below:$subps = [s_{3},s_{0}]$ \\$\wedge \; ty \; s_{3} = [t]$ \\ $\wedge \; ty \; s_{0} = [t]$}] 
-  (10) [right=of 9] {$\{C, H4: p \}\vdash t$, $C \vdash t$};
-  \end{scope}
-  \begin{scope}[node distance=2.8cm]
-  \node[main node, label={[align=left]below:$subps = [s_{0}]$ \\ $\wedge \; ty \; s_{0} = [t]$}] 
-  (11) [right=of 10] {$C \vdash t$};
-  \node[main node, label={[align=left]below:$subps = [\;]$}] 
-  (12) [right=of 11] {$\emptyset$};
-  \end{scope}
-  \path[draw] (1) edge [above] node {\texttt{apply H0}} (2) (2) edge [above] node {\texttt{split}} (3)
-  (3) -- (4) (4) edge node [left] {\texttt{assumption}} (5) (5) edge node [above] {\texttt{assumption}} (6) 
-  (6) edge node [above] {\texttt{apply H1}} (7) (7) -- (8) (8) -- node [right] {\texttt{right}} (9)
-  (9) edge node [above] {\texttt{intro}} (10) (10) edge node [above] {\texttt{assumption}} (11)
-  (11) edge node [above] {\texttt{assumption}} (12);
-  \end{tikzpicture}
-  \caption{Diagrama de estados.} \label{Estados}
-  \end{figure}
-  
-  
-  \item Aunque halla un lambda término con variables de tipo que tengan el mismo nombre que las variables de términos, su semántica de tipos está
-  bien determinada.
-  
-  \item Al hacer el parser del lambda cálculo, asumí que la aplicación de tipos tiene más precedencia que la aplicación de términos, ¿está bien?.
-  Ejemplo: $x \; y \; [A] = x \; (y \; [A]).$
-  
-  \item El pretty printer de los tipos o fórmulas, no utiliza la menor cantidad de paréntesis, cuando hay un \texttt{para todo} y \texttt{<->}.
-  Por ejemplo \texttt{forall x, x <-> forall y, y}; se imprime así: \texttt{forall x, x <-> (forall y, y)}.
-  
-  \item Coq permite iniciar una nueva prueba de un teorema cuando la actual prueba no ha concluido.
-  Sin embargo, solo se puede ``usar'' un teorema cuando ha sido probado mediante \textit{Proof}, y \textit{Qed}.
-  
-  \item Coq en algunos casos nos devuelve, mediante el comando \texttt{Print}, un lambda término ``incompleto'', al cual no es posible encontrarle
-  un tipo mediante el comando \texttt{Check}. Ver \textit{Theorem k12}, en \texttt{plantilla\_p2.v}.
-  
-  \item En la implementación de la regla de tipado, correspondiente a la introducción del existe, consideramos que $t_{2}$ debe tener un tipo equivalente
-  a $T_{2}[X:=U]$, llamemos lo $T$. Es decir que $T$ puede variar de $T_{2}[X:=U]$, con respecto a los nombres de las variables de tipo ligadas que aparecen en 
-  el segundo.
-  Hacemos esto para respetar la \textbf{Convención 1}. 
-  
-  El tipo $T$ lo calcula la función \texttt{applyTypes}. Para ello, realiza la sustitución $T_{2}[X:=U]$, más un renombramiento que respete la \textbf{Convención 1}.
-  Ver Ejemplo 7, en los casos de inferencia OK.
-  
-%   \item El comando \texttt{exact} puede recibir un tipo cuando la unificación no puede precisar
-%   una instancia de tipo.
-%   Decidimos utilizar la palabra reservada $type$, para identificar que \texttt{exact} toma un tipo.
-%   Si no hiciésemos esto, en ciertos casos no podríamos determinar si lo que recibe \texttt{exact} es un
-%   tipo o un lambda término.
-  
-  \item Permitimos definir un teorema cuyo nombre sea el nombre de una hipótesis del contexto de
-  su prueba. De todas formas, esto no sería un problema.
-  
-  \item Consideramos dos espacios de nombres para las variables.
-  \begin{itemize}
-    \item $v.términos = v.ligadas_{te} \cup v.libres_{te}$
-    \item $v.libres_{te} = teoremas$
-    \item $v.tipos = v.ligadas_{ti} \cup v.libres_{ti}$
-    \item $v.libres_{ti} = proposiciones \cup operadores$
-  \end{itemize}
-  
-  Donde, $v.ligadas_{ti} \cap v.libres_{ti} = \emptyset$, para satisfacer la \textbf{Convención 1}.
-  Además, $v.libres_{te} \cap v.libres_{ti} = \emptyset$, para desambiguar las aplicaciones de variables.
-  
-  También, consideramos para cada prueba, $hipótesis \cap teoremas = \emptyset$. De lo contrario, tendríamos conflictos de nombres.
-  
-  \item Cuando se incluye un tipo en un lambda término mediante el constructor $as$, se puede producir un error de parseo, si no se lo
-  incluye entre paréntesis. Por ejemplo, aplicaciones de variables de lambda términos documentadas mediante $as$, pueden entenderse
-  como un tipo. Ejemplo: $\lambda a.\lambda x:a. \lambda y:a \rightarrow a. y \; as \; a \rightarrow a \; x \; as \; a$,
-  es incorrecto. Lo correcto es: $\lambda a.\lambda x:a. \lambda y:a \rightarrow a. y \; as \; (a \rightarrow a) \; x \; as \; a$
-  
-  \item No renombramos el tipo asociado al \textit{as} de un lambda término, pues no es necesario.
-  
-
+Consideramos dos espacios de nombres para las variables.
+\begin{itemize}
+\item $v.términos = v.ligadas_{te} \cup v.libres_{te}$
+\item $v.libres_{te} = teoremas$
+\item $v.tipos = v.ligadas_{ti} \cup v.libres_{ti}$
+\item $v.libres_{ti} = proposiciones \cup operadores$
 \end{itemize}
+
+Donde, $v.ligadas_{ti} \cap v.libres_{ti} = \emptyset$, para satisfacer la \textbf{Convención 1}.
+Además, $v.libres_{te} \cap v.libres_{ti} = \emptyset$, para desambiguar las aplicaciones de variables.
+
+También, consideramos para cada prueba, $hipótesis \cap teoremas = \emptyset$. De lo contrario, tendríamos conflictos de nombres.
 
 
 \begin{thebibliography}{9}

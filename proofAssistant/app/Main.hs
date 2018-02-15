@@ -360,8 +360,7 @@ otherTacticsCPrinting =
   do s <- lift get
      let (op, ty, pc) = (typeDef $ global s, getTypeProof s, getProofC s)
      if isFinalTerm pc
-       then (outputStrLn $ (msjDefOk $ theoremName s) ++ "\n" ++
-             renderLTerm op (getLTermFromProof pc ty))
+       then outputStrLn $ msjDefOk $ theoremName s
        else outputStrLn $ renderProof pc
 
 --------------------------------------------------------------------------------------

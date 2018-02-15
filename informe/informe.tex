@@ -17,6 +17,8 @@
 \newtheorem{theorem}{Teorema}
 \theoremstyle{definition}
 \newtheorem{definition}{Definición}
+\theoremstyle{remark}
+\newtheorem{invariant}{Invariante}
 
 \usetikzlibrary{positioning, babel,shapes}
 \newdimen\nodeDist
@@ -40,9 +42,9 @@
 
 
 \section{Motivación}
-Era de especial intereses para el autor entender la cual es la relación entre la lógica y el lambda cálculo.
-Para ello decide implementar un asistente de prueba, el cual emplea la correspondencia
-existente entre el Sistema F, y la lógica proposicional constructiva de segundo orden.
+Es de especial intereses para el autor entender la cual es la relación que existe entre la lógica y el lambda cálculo.
+Por ello decide implementar un asistente de prueba, cuya construcción se basa en la correspondencia
+entre el Sistema F, y la lógica proposicional constructiva de segundo orden, dado por el isomorfimo de Curry-Howard.
  
 \section{Fórmulas como tipos}
 Podemos interpretar $M : \sigma$ de dos formas:
@@ -166,6 +168,7 @@ Procedemos a definir lo que entendemos por fórmulas como tipos. Para ello consi
   Si $\mathcal{D}$ es una derivación en PROP, entonces $\overline{\mathcal{D}}$ es un lambda término en $\lambda_{\rightarrow}$.
 \end{definition}
 
+El siguiente teorema se extrajo de \textit{Language Engineering and Rigorous Software Development} \cite{languageEng}. 
 
 \begin{theorem}
   Soundness, Completitud de formulas como tipos.
@@ -368,22 +371,21 @@ $\exists \alpha. \sigma := \forall \beta. (\forall \alpha. \sigma \rightarrow \b
 
 Sin embargo, creemos que no es posible dar su regla de introducción y eliminación mediante un lambda término.
 Por ello, lo añadimos al lenguaje. Ver Figura \ref{SintaxisTiposF}.
+Para más información del isomorfismo Curry-Howard ver \textit{Lectures on the Curry-Howard Isomorphism} \cite{curry-howard}.
 
-
-\subsection{Construcción de pruebas}
+\section{Construcción de pruebas}
 \label{construcciónDePruebas}
 
-El isomorfismo de Curry-Howard, nos permite relacionar a los tipos con fórmulas lógicas, 
-y a las pruebas con lambda términos.
+% El isomorfismo de Curry-Howard, nos permite relacionar a los tipos con fórmulas lógicas, 
+% y a las pruebas con lambda términos.
 
-El asistente de prueba implementa el isomorfismo Curry-Howard, se construye un lambda término
-a medida que el usuario realiza la prueba de un teorema. 
+El asistente de prueba implementa el isomorfismo Curry-Howard.
+
 Cuando se prueba una fórmula $\alpha$, se construye un lambda término $t$, tal que $t:\alpha$.
 Es decir, que cuando la prueba finaliza el lambda término asociado a la prueba tendrá como tipo la fórmula probada.
+Por lo tanto, si $t:\alpha$, entonces la fórmula asociada a $\alpha$ es válida.
 
-El teorema de Curry-Howard, nos asegura que, si $t:\alpha$, entonces la fórmula asociada a $\alpha$ es válida.
-
-Para probar cierta fórmula objetivo utilizaremos diferentes tácticas que transforman el objetivo original e
+Para probar cierta fórmula utilizaremos diferentes tácticas que transforman el objetivo original e
 introducen hipótesis adicionales.
 
 Cuando construimos una prueba tenemos la siguiente situación:
@@ -484,7 +486,42 @@ son de la forma H0 : $\gamma_{0}$, $\ldots$, Hk : $\gamma_{k}$.
 
 Las tácticas modifican el contexto durante una prueba, transformando un secuente en cero o más secuentes. Ver Figura \ref{arbol}.
 
-\subsubsection{Ejemplos}
+La función \texttt{habitar}\footnote{Se encuentra en el archivo \texttt{Tactics.hs}} se encarga de construir el lambda término asociado 
+a la prueba que va dando el usuario.
+Vimos que a cada regla de la deducción natural $PROP$, le corresponde una regla de tipo, en el lambda cálculo simplemente
+tipado. Ahora bien, ¿como construimos el lambda término $t$, asociado a una prueba lógica?.
+A cada aplicación de una regla de tipo, le corresponde un lambda término \textit{vacío}.
+Es decir, si se busca un lambda término de tipo $\beta \rightarrow \gamma$, por ejemplo, y se lo quiere construir mediante la regla 
+de tipo \textbf{T-Abs}, entonces, tenemos el término vacío, $t_{1} = \lambda x:\beta. \; ?$, donde $? : \gamma$.
+Consideramos a los términos vacíos como funciones, en el caso anterior, tendríamos la función:
+
+\begin{verse}
+  $t_{1}$ :: \texttt{LamTerm} $\rightarrow$  \texttt{LamTerm} \\
+  $t_{1}$ $t$ = $\lambda x:\beta. \; t$
+\end{verse}
+
+Donde, \texttt{LamTerm} es el tipo de los lambda términos. El argumento que se le pase a $t_{1}$, debería tener tipo $\gamma$.
+Esto se chequea de acuerdo a qué regla de tipo quiere aplicar el usuario.
+Por lo tanto, el lambda término final es de la forma: $t = (t_{1} \; . \; t_{2} \dots t_{n-2} \; . \; t_{n-1}) \; t_{n}$, donde $t_{n}$ es un lambda término no vació, que sirve de argumento a la composiciones
+de funciones. Cada $t_{i}$, con $i \in \{ 1 \dots n \}$, se corresponde con una regla de tipado, que a su vez se corresponde con una regla de deducción natural, 
+que da el usuario.
+
+Nuestro asistente debería preservar el siguiente invariante. 
+
+\begin{invariant}
+Sea $t$ el tipo objetivo de un contexto $\Gamma$ en una subprueba $i$. 
+
+Luego, $fv(t) \; \cap \; bv(t) \; \cap \; vars(\Gamma) \; \cap \; lam \; \cap \; operadores = \emptyset$.
+Donde, $vars(\Gamma)$ es conjunto de todas las variables que componen el contexto,
+por ejemplo $vars(\{a,b,H0:a\})= {a,b,H0}$. Luego, $lam$ es el conjunto de nombres de los lambda términos definidos hasta
+la subprueba $i$. Mientras que, $operadores$ es el conjunto de nombres de todos los operadores definidos hasta la subprueba $i$.  
+\end{invariant}
+
+Cuando se ingresa un tipo o fórmula, posiblemente se lo renombre, de modo tal de que éste respete el invariante.
+Esta convención nos permite evitar la captura de variables, pues si \textit{t} es un tipo, entonces no se declaran 
+dos variables de tipo ligadas con el mismo nombre, una más anidada que la otra.
+
+\subsection{Ejemplos}
 \label{ejemplos}
 
 Una subprueba se corresponde a un nodo en el árbol de derivación. 
@@ -633,7 +670,8 @@ Una vez finalizada la prueba, se tiene un lambda término completo.
 
 \section{Comandos}
 
-El asistente de prueba cuenta con un entorno global, el cual llamaremos $GEnv$ (un record de tipo \texttt{GlobalState}).
+El asistente de prueba cuenta con un entorno global\footnote{Se representa mediante el datatype \texttt{GlobalState}, 
+en \texttt{GlobalState.hs}}, el cual llamaremos $GEnv$.
 En este entorno están las variables declaradas.
 
 \begin{verbatim}
@@ -673,7 +711,7 @@ Por último, en $GEnv$ están los operados definidos por el usuario.
 > op1 x = ~ ~ x;
 \end{verbatim}
 
-El contexto con el cual inicia cada prueba se obtiene de $GEnv$. Cuando inicia el asistente, $GEnv$ tiene los teoremas
+El contexto con el cual inicia cada prueba se obtiene de $GEnv$. Cuando inicia el asistente, $GEnv$ tiene los lambda términos
 y operadores definidos en \texttt{Prelude.hs}.
 
 Todos los comandos terminan con punto y coma \texttt{``;''}. Es posible escribir varios comandos en la misma entrada,
@@ -696,26 +734,25 @@ Estos son los comandos que definen el lenguaje del asistente de prueba.
 
   Variantes:
   \begin{itemize}
-  \item \textit{name} $var_0$ \ldots $var_n$ \texttt{=} \textit{type}.
-    Asocia las variables al operador. 
+  \item \textit{name}/\textit{symbol} $var_1$ \ldots $var_n$ \texttt{=} \textit{type}.
+    Define al operador \textit{name} (o \textit{symbol}) de manera prefija. 
+    % Es equivalente a escribir:
+    % \textit{name} \texttt{=} $\forall \; var_0, \; \ldots \; , \forall var_n, \; type$.
+  \item $var_1$ \textit{symbol} $var_2$. Define al operador \textit{symbol} de manera infija.
 
-    Es equivalente a escribir:
-    \textit{name} \texttt{=} $\forall \; var_0, \; \ldots \; , \forall var_n, \; type$.
-  \item $var_0$ \textit{name} $var_1$. Define al operador de manera infija.
-
-    Es equivalente a escribir:
-    \textit{name} \texttt{=} $\forall \; var_0, \forall var_1, \; type$.
+    % Es equivalente a escribir:
+    % \textit{name} \texttt{=} $\forall \; var_0, \forall var_1, \; type$.
   \end{itemize}
 
 \item \textit{name} \texttt{=} \textit{lambda term}. Declaración de un lambda término,
-se añade al entorno global.
+se lo añade al entorno global.
 
-\item \textit{name} \texttt{:} \textit{type}. Asume \textit{type} como un postulado,
-se añade al entorno global. Equivale a \texttt{Axiom} \textit{name} \texttt{:} \textit{type}.
+\item \textit{name} \texttt{:} \textit{type}. Declaración del nombre de un lambda término. 
+Se lo añade al entorno global. Equivale a \texttt{Axiom} \textit{name} \texttt{:} \textit{type}.
 
 \item \texttt{Theorem} \textit{name} \texttt{:} \textit{type}. Inicia la prueba de un
-teorema. Cuando la prueba finaliza se la añade a un entorno global, de modo tal que pueda utilizarse en las pruebas de
-otros teoremas. 
+teorema. Cuando la prueba finaliza, añade el lambda término asociado a la prueba al entorno global.
+Equivale a \textit{name} \texttt{=} \textit{proof}.
 
 
 \item \texttt{Axiom} \textit{name} \texttt{:} \textit{type}. Asume \textit{type} como un postulado.
@@ -724,7 +761,7 @@ Equivale a \textit{name} \texttt{:} \textit{type}.
 \item \texttt{Print} \textit{name}. Imprime en pantalla la prueba de \textit{name}, si existe.
 
 Variante:
-\texttt{Print} \_. Imprime todos los operadores, teoremas y axiomas declarados.
+\texttt{Print} \_. Imprime todos los operadores, términos declarados.
 
 \item \texttt{Check} \textit{lambda term}. Determina el tipo de \textit{lambda term}, si existe.
 
@@ -748,6 +785,8 @@ Comandos de control:
 
 \end{itemize}
 
+Consideramos que tanto $var$ como $name$, representan una palabra alfanumérica, mientras
+que $symbol$ sigue la definición dada en la sección \ref{gramáticas}. 
 
 \subsection{Tácticas}
 \label{tácticas}
@@ -1182,7 +1221,7 @@ construcción de una prueba y los datos globales.
 
 
 \section{Gramáticas}
-
+\label{gramáticas}
 Veremos algunas de las gramáticas más importantes del lenguaje.
 Gramática del lambda calculo:
 
@@ -1260,63 +1299,31 @@ donde todos ellos mantienen la misma precedencia.
 
 Todos los operadores binarios infijos asocian a derecha.
 
-
-\section{Observaciones}
-Cuando se ingresa un tipo o fórmula, posiblemente se lo renombre, de modo tal de que éste respete la siguiente
-convención.
-  
-\textbf{Convención 1}: Sea \textit{t} un tipo. 
-En \textit{t} no se declaran dos variables de tipo ligadas con el mismo nombre, una más anidada que la otra.
-Además, $BV (t) \cap (\Gamma_{t} \cup Props) = \emptyset$. Donde, $\Gamma_{t}$ es el conjunto de variables de tipo del contexto, y $Props$ es el conjunto
-de variables de tipos libres.
-
-La \textbf{Convención 1} se aplica al tipo del \textit{goal}.
-
-Esta convención nos permite evitar la captura de variables. 
-Cuando implementamos el comando \texttt{unfold}, nos aseguramos que el tipo resultado de la sustitución, respete la \textbf{Convención 1}.
-Además, sabemos que en el entorno de variables de tipos no se tiene la misma variable más de dos veces, gracias al renombramiento.
+% Cuando implementamos el comando \texttt{unfold}, nos aseguramos que el tipo resultado de la sustitución, respete la \textbf{Convención 1}.
+% Además, sabemos que en el entorno de variables de tipos no se tiene la misma variable más de dos veces, gracias al renombramiento.
 % Por ello, al aplicar la táctica \texttt{intro} sobre un ``para todo'', no es necesario chequear que no la variable de tipo ligada
 % no se encuentre en el contexto de tipos, pues ya sabemos que no está allí, gracias al renombramiento de variables de tipos ligadas.
 
-La función \texttt{habitar} se encarga de construir el lambda término asociado a la prueba que va dando el usuario.
-A cada regla de la deducción natural del sistema IFC, le corresponde una regla de tipo, en el lambda cálculo simplemente
-tipado. ¿Como construimos el término $t$, asociado a una prueba lógica?.
-A cada aplicación de una regla de tipo, le corresponde un lambda término ``vació''.
-Es decir, si se busca un lambda término de tipo $\beta \rightarrow \gamma$, por ejemplo, y se lo quiere construir mediante la regla 
-de tipo \textbf{T-Abs}, entonces, tenemos el término vació, $t_{1} = \lambda x:\beta. \; ?$, donde $? : \gamma$.
-Representamos a los términos vacíos, mediante funciones, en el caso anterior, tendríamos la función:
-
-\begin{verse}
-  $t_{1}$ :: \texttt{Term} $\rightarrow$  \texttt{Term} \\
-  $t_{1}$ $t$ = $\lambda x:\beta. \; t$
-\end{verse}
-
-Donde, \texttt{Term} es el tipo de los lambda términos. El argumento que se le pase a $t_{1}$, debería tener tipo $\gamma$.
-Esto se chequea de acuerdo a qué regla de tipo quiere aplicar el usuario.
-Por lo tanto, $t = (t_{1} . t_{2} \dots t_{n-2} . t_{n-1}) \; t_{n}$, donde $t_{n}$ es un lambda término no vació, que sirve de argumento a la composiciones
-de funciones. Cada $t_{i}$, con $i \in \{ 1 \dots n \}$, se corresponde con una regla de tipado, que a su vez se corresponde con una regla de deducción natural, 
-que da el usuario.
-
-En la implementación de la regla de tipado, correspondiente a la introducción del existe, consideramos que $t_{2}$ debe tener un tipo equivalente
-a $T_{2}[X:=U]$, llamemos lo $T$. Es decir que $T$ puede variar de $T_{2}[X:=U]$, con respecto a los nombres de las variables de tipo ligadas que aparecen en 
-el segundo.
-Hacemos esto para respetar la \textbf{Convención 1}. 
+% En la implementación de la regla de tipado, correspondiente a la introducción del existe, consideramos que $t_{2}$ debe tener un tipo equivalente
+% a $T_{2}[X:=U]$, llamemos lo $T$. Es decir que $T$ puede variar de $T_{2}[X:=U]$, con respecto a los nombres de las variables de tipo ligadas que aparecen en 
+% el segundo.
+% Hacemos esto para respetar la \textbf{Convención 1}. 
   
-El tipo $T$ lo calcula la función \texttt{applyTypes}. Para ello, realiza la sustitución $T_{2}[X:=U]$, más un renombramiento que respete la \textbf{Convención 1}.
-Ver Ejemplo 7, en los casos de inferencia OK.
-  
-Consideramos dos espacios de nombres para las variables.
-\begin{itemize}
-\item $v.términos = v.ligadas_{te} \cup v.libres_{te}$
-\item $v.libres_{te} = teoremas$
-\item $v.tipos = v.ligadas_{ti} \cup v.libres_{ti}$
-\item $v.libres_{ti} = proposiciones \cup operadores$
-\end{itemize}
+% El tipo $T$ lo calcula la función \texttt{applyTypes}. Para ello, realiza la sustitución $T_{2}[X:=U]$, más un renombramiento que respete la \textbf{Convención 1}.
+% Ver Ejemplo 7, en los casos de inferencia OK.
 
-Donde, $v.ligadas_{ti} \cap v.libres_{ti} = \emptyset$, para satisfacer la \textbf{Convención 1}.
-Además, $v.libres_{te} \cap v.libres_{ti} = \emptyset$, para desambiguar las aplicaciones de variables.
+% Consideramos dos espacios de nombres para las variables.
+% \begin{itemize}j
+% \item $v.términos = v.ligadas_{te} \cup v.libres_{te}$
+% \item $v.libres_{te} = teoremas$
+% \item $v.tipos = v.ligadas_{ti} \cup v.libres_{ti}$
+% \item $v.libres_{ti} = proposiciones \cup operadores$
+% \end{itemize}
 
-También, consideramos para cada prueba, $hipótesis \cap teoremas = \emptyset$. De lo contrario, tendríamos conflictos de nombres.
+% Donde, $v.ligadas_{ti} \cap v.libres_{ti} = \emptyset$, para satisfacer la \textbf{Convención 1}.
+% Además, $v.libres_{te} \cap v.libres_{ti} = \emptyset$, para desambiguar las aplicaciones de variables.
+
+% También, consideramos para cada prueba, $hipótesis \cap teoremas = \emptyset$. De lo contrario, tendríamos conflictos de nombres.
 
 
 \begin{thebibliography}{9}

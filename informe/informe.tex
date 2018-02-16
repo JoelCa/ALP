@@ -33,6 +33,7 @@
 
 \maketitle 
 
+\thispagestyle{empty}
 \begin{center}
 \section*{Análisis de lenguajes de programación} 
 \subsection*{Asistente de prueba de la lógica proposicional constructiva de segundo orden}
@@ -40,11 +41,15 @@
 
 \newpage{\pagestyle{empty}\cleardoublepage}
 
+\tableofcontents
+
+\newpage
+
 
 \section{Motivación}
 Es de especial intereses para el autor entender la cual es la relación que existe entre la lógica y el lambda cálculo.
 Por ello decide implementar un asistente de prueba, cuya construcción se basa en la correspondencia
-entre el Sistema F, y la lógica proposicional constructiva de segundo orden, dado por el isomorfimo de Curry-Howard.
+entre el Sistema F, y la lógica proposicional constructiva de segundo orden, dado por la correspondencia de Curry-Howard.
  
 \section{Fórmulas como tipos}
 Podemos interpretar $M : \sigma$ de dos formas:
@@ -53,7 +58,7 @@ Podemos interpretar $M : \sigma$ de dos formas:
   \item Tipo como una fórmula, término como su prueba: $M$ es una prueba de la fórmula $\sigma$.
 \end{itemize}
 
-La correspondencia Curry-Howard fórmulas como tipos, es una correspondencia uno a uno entre términos
+La correspondencia Curry-Howard, fórmulas como tipos, es una correspondencia uno a uno entre términos
 tipados del lambda cálculo y las derivaciones en la lógica proposicional minimal.
 Desde el punto de vista de la lógica: $x_{1}:\tau_{1}, x_{2}:\tau_{2}, \ldots, x_{n}:\tau_{n} \vdash M : \sigma$,
 puede leerse como $M$ es una prueba de $\sigma$ a partir de las hipótesis $\tau_{1}, \tau_{2}, \ldots, \tau_{n}$.  
@@ -68,7 +73,7 @@ El sistema de lógica proposicional PROP restringido al conectivo de implicació
   
   $prop ::= PropVar \; | \; (prop \rightarrow prop)$.
   
-  \item Reglas de derivación. Donde $\Delta$ es un conjunto de proposiciones, $\sigma$ y $\tau$ son proposiciones.
+  \item Reglas de inferencia. Donde $\Delta$ es un conjunto de proposiciones, $\sigma$ y $\tau$ son proposiciones.
     
     \begin{minipage}[t]{0.3\linewidth}
       \centering
@@ -197,7 +202,7 @@ Comenzamos definiendo al Sistema F.
 
   $Typ := TVar \; | \; (Typ \rightarrow Typ) \; | \; \forall \alpha . Typ$
 
-  Mientras que las reglas de derivación son :
+  Mientras que las reglas de tipos son :
 
   \begin{minipage}[t]{0.4\linewidth}
     \centering
@@ -345,8 +350,6 @@ Comenzamos definiendo al Sistema F.
 Implementamos el Sistema F siguiendo las reglas de inferencia de tipos que presenta Pierce \cite{pierce}.
 Ver Figura \ref{SintaxisTiposF}.
 Se decidió extenderlo con el inclusión del cuantificador existencial, y la adscripción de un tipo a término.
-Era necesario mapear la introducción y eliminación del existencial con un lambda término o regla de inferencia de tipo, 
-lo cual puede realizarse de manera directa con la inclusión del cuantificador al lenguaje. 
 
 El sistema F, permite la abstracción tanto de términos como tipos. Con lo cual podemos ``definir'' nuevos
 constructores de tipos, a partir del lenguaje, como se muestra a continuación.
@@ -368,10 +371,26 @@ de los operadores $\bot, \wedge,$ y $\vee$.
 
 Sabemos que es posible describir al existencial de la siguiente manera:
 $\exists \alpha. \sigma := \forall \beta. (\forall \alpha. \sigma \rightarrow \beta) \rightarrow \beta$.
-
 Sin embargo, creemos que no es posible dar su regla de introducción y eliminación mediante un lambda término.
-Por ello, lo añadimos al lenguaje. Ver Figura \ref{SintaxisTiposF}.
-Para más información del isomorfismo Curry-Howard ver \textit{Lectures on the Curry-Howard Isomorphism} \cite{curry-howard}.
+Por ello, decimos mapear la introducción y eliminación del existencial con reglas de inferencia de tipo (\texttt{T-Pack}, y \texttt{T-Unpack}).
+
+Para más información ver \textit{Lectures on the Curry-Howard Isomorphism} \cite{curry-howard}.
+
+\section{Instalación}
+
+El código fuente se encuentra en: \url{https://github.com/JoelCa/ALP/tree/master/proofAssistant}.
+La instalación se realiza mediante $stack$ (Stack Version 1.5.1, Cabal Version 2.0.0.0). 
+Desde el directorio raíz del código fuente hacer:
+
+\begin{verbatim}
+$ stack setup
+$ stack build
+$ cd app
+$ stack exec proofAssistant
+\end{verbatim}
+
+Nos movemos al directorio \texttt{app} para que el ejecutable \texttt{proofAsistant} encuentre el archivo 
+\texttt{Prelude.pr}. Este archivo contiene la definición de operadores básicos, junto con sus reglas de introducción y eliminación.
 
 \section{Construcción de pruebas}
 \label{construcciónDePruebas}
@@ -380,10 +399,12 @@ Para más información del isomorfismo Curry-Howard ver \textit{Lectures on the 
 % y a las pruebas con lambda términos.
 
 El asistente de prueba implementa el isomorfismo Curry-Howard.
-
 Cuando se prueba una fórmula $\alpha$, se construye un lambda término $t$, tal que $t:\alpha$.
-Es decir, que cuando la prueba finaliza el lambda término asociado a la prueba tendrá como tipo la fórmula probada.
+Es decir que, cuando la prueba finaliza el lambda término asociado a la prueba tendrá como tipo la fórmula probada.
 Por lo tanto, si $t:\alpha$, entonces la fórmula asociada a $\alpha$ es válida.
+
+De ahora en adelante, cuando hablemos de una prueba posiblemente nos estemos refiriendo al lambda término asociado a la prueba lógica.
+Además, tratamos de manera indistinta a una fórmula de un tipo.
 
 Para probar cierta fórmula utilizaremos diferentes tácticas que transforman el objetivo original e
 introducen hipótesis adicionales.
@@ -486,14 +507,14 @@ son de la forma H0 : $\gamma_{0}$, $\ldots$, Hk : $\gamma_{k}$.
 
 Las tácticas modifican el contexto durante una prueba, transformando un secuente en cero o más secuentes. Ver Figura \ref{arbol}.
 
-La función \texttt{habitar}\footnote{Se encuentra en el archivo \texttt{Tactics.hs}} se encarga de construir el lambda término asociado 
+La función \texttt{habitar}\footnote{Se encuentra en el archivo \texttt{Tactics.hs}.} se encarga de construir el lambda término asociado 
 a la prueba que va dando el usuario.
 Vimos que a cada regla de la deducción natural $PROP$, le corresponde una regla de tipo, en el lambda cálculo simplemente
 tipado. Ahora bien, ¿como construimos el lambda término $t$, asociado a una prueba lógica?.
 A cada aplicación de una regla de tipo, le corresponde un lambda término \textit{vacío}.
 Es decir, si se busca un lambda término de tipo $\beta \rightarrow \gamma$, por ejemplo, y se lo quiere construir mediante la regla 
 de tipo \textbf{T-Abs}, entonces, tenemos el término vacío, $t_{1} = \lambda x:\beta. \; ?$, donde $? : \gamma$.
-Consideramos a los términos vacíos como funciones, en el caso anterior, tendríamos la función:
+Consideramos a los términos vacíos como funciones. En el caso anterior, tendríamos la función:
 
 \begin{verse}
   $t_{1}$ :: \texttt{LamTerm} $\rightarrow$  \texttt{LamTerm} \\
@@ -536,7 +557,8 @@ Empleamos la siguiente notación:\\
 \tikz \node[rectangle,draw,label=below:
 Estado de $subps$]{Subpruebas};
 
-Donde, $subps$ mantiene los datos de las subpruebas ($subps :: [SubProof]$), y $ty$ retorna el objetivo de la subprueba que recibe como
+Donde, $subps$\footnote{Campo del datatype \texttt{ProofConstruction}, en \texttt{Proof.hs}.} mantiene los datos de las subpruebas, 
+y $ty$\footnote{Campo del datatype \texttt{SubProof}, en \texttt{Proof.hs}.} retorna el objetivo de la subprueba que recibe como
 argumento.
 La transición de un estado a otro se realiza mediante una táctica.
 Consideramos $C = H0 : p, \; H1 : q \vee  (p \rightarrow t) \rightarrow  r, \; H2 : t, \; H3: p \wedge t \rightarrow r \rightarrow q \vee t \rightarrow w$.
@@ -671,7 +693,7 @@ Una vez finalizada la prueba, se tiene un lambda término completo.
 \section{Comandos}
 
 El asistente de prueba cuenta con un entorno global\footnote{Se representa mediante el datatype \texttt{GlobalState}, 
-en \texttt{GlobalState.hs}}, el cual llamaremos $GEnv$.
+en \texttt{GlobalState.hs}.}, el cual llamaremos $GEnv$.
 En este entorno están las variables declaradas.
 
 \begin{verbatim}
@@ -708,21 +730,11 @@ De este modo, $a1$ estará disponibles en las siguientes pruebas.
 Por último, en $GEnv$ están los operados definidos por el usuario.
 
 \begin{verbatim}
-> op1 x = ~ ~ x;
+> x $ y  = ~x -> ~y;
 \end{verbatim}
 
 El contexto con el cual inicia cada prueba se obtiene de $GEnv$. Cuando inicia el asistente, $GEnv$ tiene los lambda términos
-y operadores definidos en \texttt{Prelude.hs}.
-
-Todos los comandos terminan con punto y coma \texttt{``;''}. Es posible escribir varios comandos en la misma entrada,
-incluso comandos $incompletos$. Es decir que podemos ir completando el comando. 
-Por ejemplo,
-
-\begin{verbatim}
-> Theorem 
->* t2 : forall q,
->* q -> q;
-\end{verbatim}
+y operadores definidos en \texttt{Prelude.pr}.
 
 Estos son los comandos que definen el lenguaje del asistente de prueba.
 
@@ -761,7 +773,7 @@ Equivale a \textit{name} \texttt{:} \textit{type}.
 \item \texttt{Print} \textit{name}. Imprime en pantalla la prueba de \textit{name}, si existe.
 
 Variante:
-\texttt{Print} \_. Imprime todos los operadores, términos declarados.
+\texttt{Print} \_. Imprime todo el entorno (operadores, términos declarados).
 
 \item \texttt{Check} \textit{lambda term}. Determina el tipo de \textit{lambda term}, si existe.
 
@@ -773,9 +785,9 @@ Comandos de control:
 
 \begin{itemize}
 
-\item \texttt{:load} \textit{files}. Carga desde uno o varios archivos.
+\item \texttt{:load} \textit{proof files}. Carga desde uno o varios archivos que tengan sufijo \texttt{``.pr''}.
 
-\item \texttt{:save} \textit{file}. Guarda en un archivo todos los comandos válidos ingresados hasta el momento.
+\item \texttt{:save} \textit{proof file}. Guarda en un archivo (que tenga sufijo \texttt{``.pr''}) todos los comandos válidos ingresados hasta ese momento.
 
 \item \texttt{:abort}. Cancela la prueba actual.
 
@@ -788,13 +800,25 @@ Comandos de control:
 Consideramos que tanto $var$ como $name$, representan una palabra alfanumérica, mientras
 que $symbol$ sigue la definición dada en la sección \ref{gramáticas}. 
 
+Es posible escribir varios comandos en la misma entrada,
+incluso comandos $incompletos$. Es decir que podemos ir completando el comando. 
+Por ejemplo,
+
+\begin{verbatim}
+> Theorem 
+>* t2 : forall q,
+>* q -> q;
+\end{verbatim}
+
+Todos los comandos $completos$, que no son de control, deben terminar con punto y coma \texttt{``;''}. 
+
 \subsection{Tácticas}
 \label{tácticas}
 
 A continuación se describen las tácticas de acuerdo a las reglas de inferencias.
 
 \begin{itemize}
-\item Caso trivial: táctica \texttt{assumption}, o \texttt{apply H}.   
+\item Caso trivial: táctica \texttt{assumption}, o \texttt{apply} $H$.   
   
   \AxiomC{$\Gamma$}
   \noLine
@@ -802,7 +826,7 @@ A continuación se describen las tácticas de acuerdo a las reglas de inferencia
   \UnaryInfC{$\alpha$}
   \DisplayProof
 
-Corresponde al término $H$.
+Corresponde al término $\mathtt{H}$.
 
 \item Introducción de la implicancia: táctica \texttt{intro}.
 
@@ -822,14 +846,14 @@ Corresponde al término $H$.
     \DisplayProof    
   \end{minipage}
 
-  Corresponde al término $\lambda H:\alpha. \; ?_{1}$, siendo
+  Corresponde al término $\mathtt{\lambda H:\alpha. \; ?_{1}}$, siendo
   $?_{1}$ la prueba de $\beta$.
 
 \item Introducción del para todo: táctica \texttt{intro}.
 
   \begin{minipage}[t]{0.13\linewidth}
     \AxiomC{$\Gamma$}
-    \UnaryInfC{$\forall x. \; \beta$}
+    \UnaryInfC{$\forall x, \; \beta$}
     \DisplayProof    
   \end{minipage}
   \begin{minipage}[t]{0.08\linewidth}
@@ -843,7 +867,7 @@ Corresponde al término $H$.
     \DisplayProof    
   \end{minipage}
 
-  Corresponde al término $\lambda x. \; ?_{1}$, donde $?_{1}$ es la prueba de $\beta$.
+  Corresponde al término $\mathtt{\lambda x. \; ?_{1}}$, donde $?_{1}$ es la prueba de $\beta$.
 
 \item Introducción de la disyunción izquierda: táctica \texttt{left}.
   
@@ -861,7 +885,7 @@ Corresponde al término $H$.
     \DisplayProof    
   \end{minipage}
 
-Corresponde al término $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$, siendo $?_{1}$ la prueba de $\alpha$.
+Corresponde al término $\mathtt{(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})}$, siendo $?_{1}$ la prueba de $\alpha$.
 
 \item Introducción de la disyunción derecha: táctica \texttt{right}.
 
@@ -879,7 +903,7 @@ Corresponde al término $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$, siendo $
     \DisplayProof    
   \end{minipage}
   
-  Corresponde al término $(intro\_or2 \; [\alpha] \; [\beta] \; ?_{1})$, donde $?_{1}$ es la prueba de $\beta$.
+  Corresponde al término $\mathtt{(intro\_or2 \; [\alpha] \; [\beta] \; ?_{1})}$, donde $?_{1}$ es la prueba de $\beta$.
 
 \item Introducción de la conjunción: táctica \texttt{split}.
 
@@ -902,13 +926,14 @@ Corresponde al término $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$, siendo $
     \DisplayProof    
   \end{minipage}
 
-  Corresponde al término $(intro\_and \; [\alpha] \; [\beta] \; ?_{1} \; ?_{2})$, donde $?_{1}$ es la prueba de $\alpha$, y $?_{2}$ es la prueba de $\beta$.
+  Corresponde al término $\mathtt{(intro\_and \; [\alpha] \; [\beta] \; ?_{1} \; ?_{2})}$, 
+  donde $?_{1}$ es la prueba de $\alpha$, y $?_{2}$ es la prueba de $\beta$.
 
 \item Introducción del existencial: táctica \texttt{exists $\alpha$}.
 
   \begin{minipage}[t]{0.2\linewidth}
     \AxiomC{$\Gamma$}
-    \UnaryInfC{$exists \; x, \; \sigma$}
+    \UnaryInfC{$\exists \; x, \; \sigma$}
     \DisplayProof
   \end{minipage}
   \begin{minipage}[t]{0.1\linewidth}
@@ -920,7 +945,8 @@ Corresponde al término $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$, siendo $
     \DisplayProof    
   \end{minipage}
 
-  Corresponde al término ($\{ ^*\alpha, ?_1 \} \; as \; exists \; x, \; \sigma$), siendo $?_{1}$ la prueba de $\sigma [x \rightarrow \alpha]$. 
+  Corresponde al término ($\mathtt{\{ ^*\alpha, ?_1 \} \; as \; exists \; x, \; \sigma}$), 
+  siendo $?_{1}$ la prueba de $\mathtt{\sigma [x \rightarrow \alpha]}$. 
 
 \item Introducción del absurdo: táctica \texttt{absurd $\alpha$}. 
 
@@ -943,10 +969,10 @@ Corresponde al término $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$, siendo $
     \DisplayProof    
   \end{minipage}
 
-  Corresponde a la prueba $(intro\_bottom \; [\alpha] \; ?_{1} \; ?_{2})$, siendo $?_{1}$ la prueba de $\alpha$, 
+  Corresponde a la prueba $\mathtt{(intro\_bottom \; [\alpha] \; ?_{1} \; ?_{2})}$, siendo $?_{1}$ la prueba de $\alpha$, 
   y $?_{2}$ la prueba de $\neg \alpha$.
 
-\item Eliminación de la implicancia: táctica \texttt{apply H}.
+\item Eliminación de la implicancia: táctica \texttt{apply} $H$.
 
   \begin{minipage}[t]{0.18\linewidth}
     \AxiomC{$\Gamma$}
@@ -966,7 +992,7 @@ Corresponde al término $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$, siendo $
     \DisplayProof    
   \end{minipage}
 
-  Corresponde a la prueba $(H \; ?_{1})$, donde $?_{1}$ es la prueba de $\alpha$.
+  Corresponde a la prueba $\mathtt{(H \; ?_{1})}$, donde $?_{1}$ es la prueba de $\alpha$.
 
   La táctica también se puede aplicar en la siguiente situación:
 
@@ -1005,34 +1031,35 @@ Corresponde al término $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$, siendo $
     \DisplayProof    
   \end{minipage}
 
-  Corresponde al término $(H \; ?_{1} \; \ldots \; ?_{n})$, donde $?_{i}$ es la prueba de $\alpha_{i}$.
+  Corresponde al término $\mathtt{(H \; ?_{1} \; \ldots \; ?_{n})}$, donde $?_{i}$ es la prueba de $\alpha_{i}$.
 
-\item Eliminación del para todo: táctica \texttt{apply H}.
+\item Eliminación del para todo: táctica \texttt{apply} $H$.
 
   \begin{minipage}[t]{0.2\linewidth}
     \AxiomC{$\Gamma$}
     \noLine
-    \UnaryInfC{$H : \forall x. \; \beta$}
+    \UnaryInfC{$H : \forall x, \; \beta$}
     \UnaryInfC{$\gamma$}
     \DisplayProof
   \end{minipage}
 
-  Corresponde al término $(H \; [\theta])$, si existe $\theta$ tal que $\gamma = \beta[x \rightarrow \theta]$.
+  Corresponde al término $\mathtt{(H \; [\theta])}$, si existe $\theta$ tal que $\mathtt{\gamma = \beta[x \rightarrow \theta]}$.
   
   En términos generales,
 
   \begin{minipage}[t]{0.2\linewidth}
     \AxiomC{$\Gamma$}
     \noLine
-    \UnaryInfC{$H : \forall x_{1}. \forall x_{2}. .. \forall x_{n}. \; \beta$}
+    \UnaryInfC{$H : \forall x_{1}, \forall x_{2}, \ldots ,\forall x_{n}, \; \beta$}
     \UnaryInfC{$\gamma$}
     \DisplayProof
   \end{minipage}
 
-  Corresponde a la prueba $(H \; [\theta_{1}] [\theta_{2}] \ldots [\theta_{n}])$,
-  de modo tal que $\gamma = \beta \; [ x_{1} \rightarrow \theta_{1} ] \ldots [x_{n} \rightarrow \theta_{n}]$, si existen $\theta_{1} \ldots \theta_{n}$.
+  Corresponde a la prueba $\mathtt{(H \; [\theta_{1}] [\theta_{2}] \ldots [\theta_{n}])}$,
+  de modo tal que $\mathtt{\gamma = \beta \; [ x_{1} \rightarrow \theta_{1} ] \ldots [x_{n} \rightarrow \theta_{n}]}$, 
+  si existen $\theta_{1} \ldots \theta_{n}$.
 
-\item Eliminación de la disyunción: táctica \texttt{elim H}.
+\item Eliminación de la disyunción: táctica \texttt{elim} $H$.
 
   \begin{minipage}[t]{0.18\linewidth}
     \AxiomC{$\Gamma$}
@@ -1059,10 +1086,10 @@ Corresponde al término $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$, siendo $
     \DisplayProof    
   \end{minipage}
 
-  Corresponde al término $(elim\_or \; [\alpha] \; [\beta] \; [\sigma] \; H \; ?_{1} \; ?_{2})$, 
+  Corresponde al término $\mathtt{(elim\_or \; [\alpha] \; [\beta] \; [\sigma] \; H \; ?_{1} \; ?_{2})}$, 
   donde $?_{1}$ es la prueba de $\alpha \rightarrow \sigma$, y $?_{2}$ es la prueba de $\beta \rightarrow \alpha$.
 
-\item Eliminación de la conjunción: táctica \texttt{elim H}.
+\item Eliminación de la conjunción: táctica \texttt{elim} $H$.
 
   \begin{minipage}[t]{0.18\linewidth}
     \AxiomC{$\Gamma$}
@@ -1082,14 +1109,14 @@ Corresponde al término $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$, siendo $
     \DisplayProof    
   \end{minipage}
   
-  Corresponde al término $(elim\_and \; [\alpha] \; [\beta] \; [\sigma] \; H \; ?_1)$, donde $?_{1}$ es la prueba de $\alpha \rightarrow \beta \rightarrow \sigma$.
+  Corresponde al término $\mathtt{(elim\_and \; [\alpha] \; [\beta] \; [\sigma] \; H \; ?_1)}$, donde $?_{1}$ es la prueba de $\alpha \rightarrow \beta \rightarrow \sigma$.
 
-\item Eliminación del existencial: táctica \texttt{elim H}.
+\item Eliminación del existencial: táctica \texttt{elim} $H$.
 
   \begin{minipage}[t]{0.2\linewidth}
     \AxiomC{$\Gamma$}
     \noLine
-    \UnaryInfC{$H : exists \; x, \; \alpha $}
+    \UnaryInfC{$H : \exists \; x, \; \alpha $}
     \UnaryInfC{$\gamma$}
     \DisplayProof
   \end{minipage}
@@ -1099,7 +1126,7 @@ Corresponde al término $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$, siendo $
   \begin{minipage}[t]{0.1\linewidth}
     \AxiomC{$\Gamma$}
     \noLine
-    \UnaryInfC{$H : exists \; x, \; \alpha $}
+    \UnaryInfC{$H : \exists \; x, \; \alpha $}
     \noLine
     \UnaryInfC{$x$}
     \noLine
@@ -1108,10 +1135,10 @@ Corresponde al término $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$, siendo $
     \DisplayProof    
   \end{minipage}
 
-  Corresponde al término ($let \; \{x, H'\} = H \; in \; ?_1$),
+  Corresponde al término ($\mathtt{let \; \{x, H'\} = H \; in \; ?_1}$),
   siendo $?_1$ la prueba de $\gamma$.
 
-\item Eliminación del absurdo: táctica \texttt{elim H}.
+\item Eliminación del absurdo: táctica \texttt{elim} $H$.
 
   \begin{minipage}[t]{0.2\linewidth}
     \AxiomC{$\Gamma$}
@@ -1121,7 +1148,7 @@ Corresponde al término $(intro\_or1 \; [\alpha] \; [\beta] \; ?_{1})$, siendo $
     \DisplayProof
   \end{minipage}
 
-  Corresponde al término $(elim\_bottom \; [\sigma] \; H)$.
+  Corresponde al término $\mathtt{(elim\_bottom \; [\sigma] \; H)}$.
 
 \end{itemize}
 
@@ -1150,10 +1177,10 @@ Otras tácticas:
     \DisplayProof    
   \end{minipage}
 
-  Corresponde a la prueba $(?_{1} \; ?_{2})$, donde $?_1$ es la prueba de $\beta \rightarrow \alpha$, y $?_2$ es la
+  Corresponde a la prueba $\mathtt{(?_{1} \; ?_{2})}$, donde $?_1$ es la prueba de $\beta \rightarrow \alpha$, y $?_2$ es la
   prueba de $\beta$.
 
-\item Explicitación de la prueba: táctica \texttt{exact T}.
+\item Explicitación de la prueba: táctica \texttt{exact} $lamt$, donde $lamt$ es un lambda término.
 
   \begin{minipage}[t]{0.2\linewidth}
     \AxiomC{$\Gamma$}
@@ -1161,11 +1188,27 @@ Otras tácticas:
     \DisplayProof
   \end{minipage}
 
-  Esta táctica tiene como lambda término asociado a $T$, donde $T$ debe ser una prueba de $\alpha$.
+  Termina la prueba, si $lamt : \alpha$.
   
-\item Eliminación de la definición: táctica \texttt{unfold op}.
+\item Explicitación de la fórmula: táctica \texttt{exact} $ty$, donde $ty$ es un tipo.
 
-  Aplica la definición del operador \texttt{op}. Por ejemplo, \texttt{unfold not} produce lo siguiente,
+  Cuando el algoritmo de unificación no puede decidir el tipo a unificar, se deja a criterio del usuario resolverla,
+  mediante la táctica \texttt{exact}. Por ejemplo,
+
+  \begin{minipage}[t]{0.2\linewidth}
+    \AxiomC{$\Gamma$}
+    \noLine
+    \UnaryInfC{$H : \forall x, \forall y, y \rightarrow y$}
+    \UnaryInfC{$a \rightarrow a$}
+    \DisplayProof
+
+  \end{minipage}
+
+  Vemos que $x$ puede unificar con cualquier tipo.
+
+\item Eliminación de la definición: táctica \texttt{unfold} $op$, donde $op$ es un operador.
+
+  Aplica la definición del operador \textit{op}. Por ejemplo, \texttt{unfold not} produce lo siguiente,
 
   \begin{minipage}[t]{0.1\linewidth}
     \AxiomC{$\Gamma$}
@@ -1181,7 +1224,7 @@ Otras tácticas:
     \DisplayProof    
   \end{minipage}
   
-  Es posible usar $unfold$ en las hipótesis así: \texttt{unfold op in H}, donde \texttt{H} es el nombre de la hipótesis.
+  Es posible usar \texttt{unfold} en las hipótesis así: \texttt{unfold} $op$ \texttt{in} $H$, donde $H$ es el nombre de la hipótesis.
 
 \item Introducción de la implicación y del para todo: táctica \texttt{intros}.
   Esta táctica aplica \texttt{intro} hasta que no se pueda seguir aplicando.
@@ -1196,7 +1239,7 @@ A continuación se describe brevemente cuales son los aspectos fundamentales que
 \begin{itemize}
 
 \item \texttt{ErrorMsj}: pretty printer de los mensajes de error.
-\item \texttt{Common}: contiene los tipos abstractos de datos principales.
+\item \texttt{Common}: contiene los $AST$ principales.
 \item \texttt{Proof}: oculta las funciones que operan sobre la construcción de una prueba.
 \item \texttt{GlobalState}: tiene funciones que operan sobre datos ``globales'', es decir que son
 datos que se mantienen durante toda la ejecución del asistente.
@@ -1207,14 +1250,14 @@ construcción de una prueba y los datos globales.
 \item \texttt{TypeInference}: oculta la inferencia de tipos.
 \item \texttt{TypeDefinition}: contiene funciones que operan sobre el entorno de tipos.
 \item \texttt{LambdaTermDefinition}: tiene funciones que operan sobre el entorno de los lambda términos.
-\item \texttt{TermsWithHoles}: oculta el tratamiento de los lambda términos con agujeros.
+\item \texttt{TermsWithHoles}: oculta el tratamiento de los lambda términos con agujeros o vacíos.
 \item \texttt{Hyphotesis}: tiene funciones relacionadas con las hipótesis.
 \item \texttt{RenamedVariables}: oculta el algoritmo de renombramiento utilizado sobre los nombres de la hipótesis.
 \item \texttt{Transformers}: mantiene las transformaciones de lambda términos y tipos.
 \item \texttt{Tactics}: se encarga de construir una prueba a partir de una táctica.
 \item \texttt{PrettyPrinter}: pretty printer general del asistente.
 \item \texttt{Parser}: parser del lenguaje.
-\item \texttt{Main}: procesa el comando de entrada. 
+\item \texttt{Main}: proceso de la entrada y la salida. 
 \item \texttt{PreludePath}: oculta la ubicación del archivo \texttt{Prelude.pr}.
 
 \end{itemize}
@@ -1295,7 +1338,7 @@ Por ejemplo, \texttt{/\textbackslash} tiene más precedencia que \texttt{\textba
 Consideramos a \textit{Prefix operators} como el conjunto de los todos los operadores prefijos definidos por el usuario,
 donde todos ellos tienen la misma precedencia.
 Mientras que \textit{Binary infix operators} es el conjunto de los operadores binarios infijos dados por el usuario,
-donde todos ellos mantienen la misma precedencia.
+todos mantienen la misma precedencia.
 
 Todos los operadores binarios infijos asocian a derecha.
 

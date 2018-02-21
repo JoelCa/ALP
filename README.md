@@ -23,8 +23,8 @@ $ stack exec proofAssistant
 
 ## Ejemplos
 
-* [example1.pr] (https://github.com/JoelCa/ALP/blob/master/proofAssistant/app/example1.pr)
-* [example2.pr] (https://github.com/JoelCa/ALP/blob/master/proofAssistant/app/example2.pr)
+* [example1.pr](https://github.com/JoelCa/ALP/blob/master/proofAssistant/app/example1.pr)
+* [example2.pr](https://github.com/JoelCa/ALP/blob/master/proofAssistant/app/example2.pr)
 
 ## Dependencias
 

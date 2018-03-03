@@ -1,32 +1,36 @@
-# Asistente de prueba
+# Proof assistant
 
-Asistente de prueba de la lógica proposicional intuicionista de segundo orden.
+Proof assistant of propositional second order logic, based
+in coqtop.
 
-## Instalación
+## Setup
 
-Descargar el código fuente:
+Download the proof assistan code at:
 
 [Proof assistant](https://github.com/JoelCa/ALP/tree/master/proofAssistant)
 
-Desde el directorio raíz del código fuente hacer:
+In the root directory make:
 
 ```
 $ stack setup
 $ stack build
 ```
-Luego, para la ejecución hacer:
+
+Then, for the execution:
 
 ```
 $ cd app
 $ stack exec proofAssistant
 ```
 
-## Ejemplos
+## Test examples
+
+Load mannualy in the proof assistant.
 
 * [example1.pr](https://github.com/JoelCa/ALP/blob/master/proofAssistant/app/example1.pr)
 * [example2.pr](https://github.com/JoelCa/ALP/blob/master/proofAssistant/app/example2.pr)
 
-## Dependencias
+## Dependencies
 
 * Stack Version 1.5.1
 * Cabal Version 2.0.0.0

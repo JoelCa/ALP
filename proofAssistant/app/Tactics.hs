@@ -24,7 +24,7 @@ habitar Assumption =
      c <- getTermContext
      q <- getTBTypeVars
      (i,hy) <- maybeToProof AssuE $
-              S.foldrWithIndex (\index (h,_,p,Just t') r -> if positiveShift (q - p) t' == t then return (index,h) else r) Nothing c
+               S.foldrWithIndex (\index (h,_,p,Just t') r -> if positiveShift (q - p) t' == t then return (index,h) else r) Nothing c
      endSubProof
      modifyTerm $ simplifyLTerm $ LVar (hy, Bound i)
 habitar Intro =
@@ -183,6 +183,7 @@ habitar (Cut ty) =
      newSubProofs 2 [ Just (Fun tty t)
                     , Just tty ]
      modifyTerm $ addDHT (\x y -> x :@: y)
+habitar Show = return ()
 
 ----------------------------------------------------------------------------------------------------------------------
 -- Comando INTRO e INTROS

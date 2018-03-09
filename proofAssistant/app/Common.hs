@@ -99,6 +99,9 @@ data Command = Theorem String Type1
              | Tac Tactic
              | Vars (Seq TypeVar)
              | Definition String BodyDef
+             | Print String
+             | PrintAll
+             | Infer LTerm1
              deriving (Show)
 
   -- Comandos del lenguaje, y comandos de control. 
@@ -162,11 +165,11 @@ type TypeDefWithName = TypeDef (Type1, Seq TypeVar)
 type TypeDefNoName = TypeDef DoubleType
 
   -- Tácticas de prueba.
-data Tactic = Assumption | Apply Int | Intro | Intros | Split
-            | Elim Int | CLeft | CRight | Print String | PrintAll 
-            | CExists Type1 | Cut Type1 | Exact ExactB
-            | Infer LTerm1 | Unfold String (Maybe Int)
-            | Absurd Type1
+data Tactic = Assumption | Apply Int | Intro
+            | Intros | Split | Elim Int
+            | CLeft | CRight | CExists Type1
+            | Cut Type1 | Exact ExactB | Unfold String (Maybe Int)
+            | Absurd Type1 | Show
             deriving (Show)
 
   -- Táctica "exact".
@@ -189,7 +192,7 @@ data SemanticException = PNotFinished | PNotStarted | ExistE String
 
 data PException a = SemanticE a
                   | SyntaxE (ParseError Char Void)
-                  | FileE IOError
+                  | FileE String
                   deriving (Show, Typeable)
 
   -- Excepciones junto con su posición de aparición. 

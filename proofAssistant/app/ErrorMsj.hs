@@ -14,8 +14,10 @@ printError _ (SyntaxE e) =
   sep $
   (text $ parseErrorPretty e) :
   [text "error de sintaxis."]
-printError _ (FileE e) =
-  text $ show $ e
+printError _ (FileE f) =
+  text f <>
+  colon <+>
+  text "no existe."
 
 
 filePos :: String -> Int -> Doc

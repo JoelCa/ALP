@@ -171,7 +171,7 @@ Print All.
 
 Print k7.
 
-Axiom k81 : forall x:Prop, x -> x.
+Axiom k81 : forall x:Prop, x \/ x -> x.
 
 Print k81.
 

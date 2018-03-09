@@ -75,6 +75,10 @@ proverFromCLI =
 
 prelude = "Prelude.pr"
 
+welcomeMsg = "Asistente de prueba de la lógica proposicional\n\
+             \constructiva de segundo orden.\n\
+             \Para más información :help."
+
 startProver :: ProverInputState ()
 startProver =
   do s <- lift get
@@ -82,6 +86,7 @@ startProver =
      r <- lift $ lift $ commandsFromFiles [prelude]
      catch (do commands <- returnInputFromParser r
                checkCommands commands
+               outputStrLn welcomeMsg
                proverFromCLI)
        (\e -> outputStrLn (render $ printError (typeDef $ global s) e))
 
@@ -217,6 +222,14 @@ checkIndCommand' printing pos (Vars ps) =
 checkIndCommand' printing pos (Definition name body) =
   definitionCommand pos name body >>
   (when printing $ outputStrLn $ msjDefOk name)
+checkIndCommand' printing pos (Print x) =
+  printCommand pos x >>
+  (when printing $ printCommandPrinting x)
+checkIndCommand' printing _ PrintAll =
+  when printing printCommandPrintingAll
+checkIndCommand' printing pos (Infer x) =
+  do (te, ty) <- inferCommand pos x
+     when printing $ inferCommandPrinting te ty
 
 --------------------------------------------------------------------------------------
 -- Mantenimiento del historial de comandos
@@ -295,33 +308,6 @@ definitionCommand pos name body =
      when (invalidName name $ global s) $ throwSemanError pos $ ExistE name
      defCommand pos name body
 
--- Procesa una táctica.
-tacticCommand :: Bool -> EPosition -> Tactic -> ProverInputState ()
-tacticCommand printing pos (Print x) =
-  printCommand pos x >>
-  (when printing $ printCommandPrinting x)
-tacticCommand printing _ PrintAll =
-  when printing printCommandPrintingAll
-tacticCommand printing pos (Infer x) =
-  do (te, ty) <- inferCommand pos x
-     when printing $ inferCommandPrinting te ty
-tacticCommand printing pos ta =
-  otherTacticsCommand pos ta >>
-  (when printing $ otherTacticsCPrinting)
-       
--- Procesa todas las tácticas que no son "Print" ni "Infer".
-otherTacticsCommand :: EPosition -> Tactic -> ProverInputState ()
-otherTacticsCommand _ (Print _) =
-  error "error: otherTacticsCommand, no debería pasar."
-otherTacticsCommand _ (Infer _) =
-  error "error: otherTacticsCommand, no debería pasar."
-otherTacticsCommand pos ta =
-  do s <- lift get
-     when (not $ proofStarted s) $ throwSemanError pos PNotStarted
-     let pc = getProofC s
-     (_ , pc') <- returnInput pos $ runStateExceptions (habitar ta) pc
-     lift $ modify $ setProofC pc'
-
 printCommand :: EPosition -> String -> ProverInputState ()
 printCommand pos x =
   do s <- lift get
@@ -355,8 +341,23 @@ inferCommandPrinting te ty =
   do s <- lift get
      outputStrLn $ render $ printLTermWithType te ty (typeDef $ global s)
 
-otherTacticsCPrinting :: ProverInputState ()
-otherTacticsCPrinting =
+
+-- Procesa una táctica.
+tacticCommand :: Bool -> EPosition -> Tactic -> ProverInputState ()
+tacticCommand printing pos ta =
+  tacticsCommand' pos ta >>
+  (when printing $ tacticsCommandPrinting)
+
+tacticsCommand' :: EPosition -> Tactic -> ProverInputState ()
+tacticsCommand' pos ta =
+  do s <- lift get
+     when (not $ proofStarted s) $ throwSemanError pos PNotStarted
+     let pc = getProofC s
+     (_ , pc') <- returnInput pos $ runStateExceptions (habitar ta) pc
+     lift $ modify $ setProofC pc'
+
+tacticsCommandPrinting :: ProverInputState ()
+tacticsCommandPrinting =
   do s <- lift get
      let (op, ty, pc) = (typeDef $ global s, getTypeProof s, getProofC s)
      if isFinalTerm pc

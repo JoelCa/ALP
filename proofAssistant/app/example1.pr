@@ -5,7 +5,6 @@ Theorem t23 : forall o,
   intros;
   apply H0;
   exact (o \/ ~ ~ t);
-
 Theorem t24 : p -> q -> (((p /\ q) /\ p /\ p) /\ q) /\ p;
   intros;
   split;

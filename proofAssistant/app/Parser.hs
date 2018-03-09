@@ -28,7 +28,7 @@ interactive = "<interactive>"
 
 reservedWords = [ "Variables", "Theorem", "Axiom", "Print", "Check", "forall"
                 , "exists",  "let", "in", "as","assumption", "intro", "intros", "split"
-                , "left", "right", "apply", "elim", "absurd", "cut", "unfold", "exact"
+                , "left", "right", "apply", "elim", "absurd", "cut", "unfold", "exact", "show"
                 , ":load", ":abort", ":quit", ":help", ":save", ":l", ":a", ":q", ":h", ":s"
                 ]
 
@@ -104,13 +104,16 @@ symbolIdent = (lexeme . try) (p >>= check)
 -- Parseo de archivos
 commandsFromFiles :: [String] -> IO FileCommands
 commandsFromFiles files =
-  do content <- mapM (\f -> either Left (\x -> Right (f, x)) <$> (E.try $ readFile f)) files
+  do content <- mapM (\f -> getFileContent f) files
      case sequence content of
        Right xs ->
          case mapM (\(f,s) -> parse (lexeme space *> commands <* eof) f s) xs of
            Right x -> return $ Right $ concat x
            Left e -> return $ Left $ SyntaxE  e
-       Left e -> return $ Left $ FileE e
+       Left f -> return $ Left $ FileE f
+
+getFileContent :: String -> IO (Either String (String, String))
+getFileContent f = either (\_ -> Left f) (\x -> Right (f, x)) <$> ((E.try $ readFile f) :: (IO (Either IOError String)))
 
 commands :: Parser [PCommand]
 commands = many ((\x y -> (x,y)) <$> (getLinePos <$> getPosition) <*> command)
@@ -271,10 +274,22 @@ command = do rword "Theorem"
                 ps <- sepByCommaSeq identifier
                 semicolon
                 return $ Vars ps
+         <|> try (do rword "Print"
+                     symbol "_"
+                     semicolon
+                     return PrintAll)
+         <|> printBasic
+         <|> check
          <|> try (do tac <- tactic
                      return $ Tac tac)
          <|> do (name, def) <- definition
                 return $ Definition name def
+
+printBasic :: Parser Command
+printBasic = parserOneArg (identifier <|> symbolIdent) "Print" Print
+
+check :: Parser Command
+check = parserOneArg lambTerm "Check" Infer
 
 escapedCommand :: Parser ECommand
 escapedCommand =
@@ -498,32 +513,30 @@ tactic = assumptionP
          <|> splitP
          <|> leftP
          <|> rightP
-         <|> try printAllP
-         <|> printP
          <|> exactP
          <|> existsP
-         <|> checkP
          <|> unfoldP
          <|> absurdP
          <|> cutP
+         <|> showP
 
 assumptionP :: Parser Tactic
-assumptionP = tacticZeroArg "assumption" Assumption
+assumptionP = parserZeroArg "assumption" Assumption
 
 introP :: Parser Tactic
-introP = tacticZeroArg "intro" Intro
+introP = parserZeroArg "intro" Intro
 
 introsP :: Parser Tactic
-introsP = tacticZeroArg "intros" Intros
+introsP = parserZeroArg "intros" Intros
 
 splitP :: Parser Tactic
-splitP = tacticZeroArg "split" Split
+splitP = parserZeroArg "split" Split
 
 leftP :: Parser Tactic
-leftP = tacticZeroArg "left" CLeft
+leftP = parserZeroArg "left" CLeft
 
 rightP :: Parser Tactic
-rightP = tacticZeroArg "right" CRight
+rightP = parserZeroArg "right" CRight
 
 applyP :: Parser Tactic
 applyP = tacticIndexArg "apply" Apply
@@ -531,26 +544,17 @@ applyP = tacticIndexArg "apply" Apply
 elimP :: Parser Tactic
 elimP = tacticIndexArg "elim" Elim
 
-printP :: Parser Tactic
-printP = tacticOneArg (identifier <|> symbolIdent) "Print" Print
-
-checkP :: Parser Tactic
-checkP = tacticOneArg lambTerm "Check" Infer
-
 absurdP :: Parser Tactic
 absurdP = tacticType1Arg "absurd" Absurd
 
 cutP :: Parser Tactic
 cutP = tacticType1Arg "cut" Cut
 
+showP :: Parser Tactic
+showP = parserZeroArg "show" Show
+
 existsP :: Parser Tactic
 existsP = tacticType1Arg "exists" CExists
-
-printAllP :: Parser Tactic
-printAllP = do rword "Print"
-               symbol "_"
-               semicolon
-               return PrintAll
 
 unfoldP :: Parser Tactic
 unfoldP = do rword "unfold"
@@ -574,26 +578,26 @@ exactP = do rword "exact"
             semicolon
             return $ Exact r
 
--- Funciones auxiliares para el parser de las tácticas.
-tacticZeroArg :: String -> Tactic -> Parser Tactic
-tacticZeroArg s tac = do rword s
+-- Funciones auxiliares para el parser de las tácticas y comandos.
+parserZeroArg :: String -> Tactic -> Parser Tactic
+parserZeroArg s tac = do rword s
                          semicolon
                          return tac
 
-tacticOneArg :: Parser a -> String -> (a -> Tactic) -> Parser Tactic
-tacticOneArg p s tac = do rword s
-                          arg <- p
-                          semicolon
-                          return $ tac arg
+parserOneArg :: Parser a -> String -> (a -> b) -> Parser b
+parserOneArg p s f = do rword s
+                        arg <- p
+                        semicolon
+                        return $ f arg
 
 tacticIdentArg :: String -> (String -> Tactic) -> Parser Tactic
-tacticIdentArg = tacticOneArg identifier
+tacticIdentArg = parserOneArg identifier
 
 tacticType1Arg :: String -> (Type1 -> Tactic) -> Parser Tactic
-tacticType1Arg = tacticOneArg typeTerm
+tacticType1Arg = parserOneArg typeTerm
 
 tacticIndexArg :: String -> (Int -> Tactic) -> Parser Tactic
-tacticIndexArg = tacticOneArg (char 'H' >> nat)
+tacticIndexArg = parserOneArg (char 'H' >> nat)
 
 --------------------------------------------------------------------------------------
 -- Parser de una definición.
